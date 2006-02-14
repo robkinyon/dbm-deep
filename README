@@ -1,0 +1,1052 @@
+NAME
+    DBM::Deep - A pure perl multi-level hash/array DBM
+
+SYNOPSIS
+      use DBM::Deep;
+      my $db = new DBM::Deep "foo.db";
+  
+      $db->{key} = 'value'; # tie() style
+      print $db->{key};
+  
+      $db->put('key', 'value'); # OO style
+      print $db->get('key');
+  
+      # true multi-level support
+      $db->{my_complex} = [
+            'hello', { perl => 'rules' }, 
+            42, 99 ];
+
+DESCRIPTION
+    A unique flat-file database module, written in pure perl. True
+    multi-level hash/array support (unlike MLDBM, which is faked), hybrid OO
+    / tie() interface, cross-platform FTPable files, and quite fast. Can
+    handle millions of keys and unlimited hash levels without significant
+    slow-down. Written from the ground-up in pure perl -- this is NOT a
+    wrapper around a C-based DBM. Out-of-the-box compatibility with Unix,
+    Mac OS X and Windows.
+
+INSTALLATION
+    Hopefully you are using CPAN's excellent Perl module, which will
+    download and install the module for you. If not, get the tarball, and
+    run these commands:
+
+            tar zxf DBM-Deep-*
+            cd DBM-Deep-*
+            perl Makefile.PL
+            make
+            make test
+            make install
+
+SETUP
+    Construction can be done OO-style (which is the recommended way), or
+    using Perl's tie() function. Both are examined here.
+
+  OO CONSTRUCTION
+    The recommended way to construct a DBM::Deep object is to use the new()
+    method, which gets you a blessed, tied hash or array reference.
+
+            my $db = new DBM::Deep "foo.db";
+
+    This opens a new database handle, mapped to the file "foo.db". If this
+    file does not exist, it will automatically be created. DB files are
+    opened in "r+" (read/write) mode, and the type of object returned is a
+    hash, unless otherwise specified (see OPTIONS below).
+
+    You can pass a number of options to the constructor to specify things
+    like locking, autoflush, etc. This is done by passing an inline hash:
+
+            my $db = new DBM::Deep(
+                    file => "foo.db",
+                    locking => 1,
+                    autoflush => 1
+            );
+
+    Notice that the filename is now specified *inside* the hash with the
+    "file" parameter, as opposed to being the sole argument to the
+    constructor. This is required if any options are specified. See OPTIONS
+    below for the complete list.
+
+    You can also start with an array instead of a hash. For this, you must
+    specify the "type" parameter:
+
+            my $db = new DBM::Deep(
+                    file => "foo.db",
+                    type => DBM::Deep::TYPE_ARRAY
+            );
+
+    Note: Specifing the "type" parameter only takes effect when beginning a
+    new DB file. If you create a DBM::Deep object with an existing file, the
+    "type" will be loaded from the file header, and ignored if it is passed
+    to the constructor.
+
+  TIE CONSTRUCTION
+    Alternatively, you can create a DBM::Deep handle by using Perl's
+    built-in tie() function. This is not ideal, because you get only a
+    basic, tied hash (or array) which is not blessed, so you can't call any
+    functions on it.
+
+            my %hash;
+            tie %hash, "DBM::Deep", "foo.db";
+        
+            my @array;
+            tie @array, "DBM::Deep", "bar.db";
+
+    As with the OO constructor, you can replace the DB filename parameter
+    with a hash containing one or more options (see OPTIONS just below for
+    the complete list).
+
+            tie %hash, "DBM::Deep", {
+                    file => "foo.db",
+                    locking => 1,
+                    autoflush => 1
+            };
+
+  OPTIONS
+    There are a number of options that can be passed in when constructing
+    your DBM::Deep objects. These apply to both the OO- and tie- based
+    approaches.
+
+    * file
+        Filename of the DB file to link the handle to. You can pass a full
+        absolute filesystem path, partial path, or a plain filename if the
+        file is in the current working directory. This is a required
+        parameter.
+
+    * mode
+        File open mode (read-only, read-write, etc.) string passed to Perl's
+        FileHandle module. This is an optional parameter, and defaults to
+        "r+" (read/write). Note: If the default (r+) mode is selected, the
+        file will also be auto- created if it doesn't exist.
+
+    * type
+        This parameter specifies what type of object to create, a hash or
+        array. Use one of these two constants: "DBM::Deep::TYPE_HASH" or
+        "DBM::Deep::TYPE_ARRAY". This only takes effect when beginning a new
+        file. This is an optional parameter, and defaults to hash.
+
+    * locking
+        Specifies whether locking is to be enabled. DBM::Deep uses Perl's
+        Fnctl flock() function to lock the database in exclusive mode for
+        writes, and shared mode for reads. Pass any true value to enable.
+        This affects the base DB handle *and any child hashes or arrays*
+        that use the same DB file. This is an optional parameter, and
+        defaults to 0 (disabled). See LOCKING below for more.
+
+    * autoflush
+        Specifies whether autoflush is to be enabled on the underlying
+        FileHandle. This obviously slows down write operations, but is
+        required if you may have multiple processes accessing the same DB
+        file (also consider enable *locking* or at least *volatile*). Pass
+        any true value to enable. This is an optional parameter, and
+        defaults to 0 (disabled).
+
+    * volatile
+        If *volatile* mode is enabled, DBM::Deep will stat() the DB file
+        before each STORE() operation. This is required if an outside force
+        may change the size of the file between transactions. Locking also
+        implicitly enables volatile. This is useful if you want to use a
+        different locking system or write your own. Pass any true value to
+        enable. This is an optional parameter, and defaults to 0 (disabled).
+
+    * autobless
+        If *autobless* mode is enabled, DBM::Deep will preserve blessed
+        hashes, and restore them when fetched. This is an experimental
+        feature, and does have side-effects. Basically, when hashes are
+        re-blessed into their original classes, they are no longer blessed
+        into the DBM::Deep class! So you won't be able to call any DBM::Deep
+        methods on them. You have been warned. This is an optional
+        parameter, and defaults to 0 (disabled).
+
+    * filter_*
+        See FILTERS below.
+
+    * debug
+        Setting *debug* mode will make all errors non-fatal, dump them out
+        to STDERR, and continue on. This is for debugging purposes only, and
+        probably not what you want. This is an optional parameter, and
+        defaults to 0 (disabled).
+
+TIE INTERFACE
+    With DBM::Deep you can access your databases using Perl's standard
+    hash/array syntax. Because all Deep objects are *tied* to hashes or
+    arrays, you can treat them as such. Deep will intercept all reads/writes
+    and direct them to the right place -- the DB file. This has nothing to
+    do with the "TIE CONSTRUCTION" section above. This simply tells you how
+    to use DBM::Deep using regular hashes and arrays, rather than calling
+    functions like "get()" and "put()" (although those work too). It is
+    entirely up to you how to want to access your databases.
+
+  HASHES
+    You can treat any DBM::Deep object like a normal Perl hash reference.
+    Add keys, or even nested hashes (or arrays) using standard Perl syntax:
+
+            my $db = new DBM::Deep "foo.db";
+        
+            $db->{mykey} = "myvalue";
+            $db->{myhash} = {};
+            $db->{myhash}->{subkey} = "subvalue";
+
+            print $db->{myhash}->{subkey} . "\n";
+
+    You can even step through hash keys using the normal Perl "keys()"
+    function:
+
+            foreach my $key (keys %$db) {
+                    print "$key: " . $db->{$key} . "\n";
+            }
+
+    Remember that Perl's "keys()" function extracts *every* key from the
+    hash and pushes them onto an array, all before the loop even begins. If
+    you have an extra large hash, this may exhaust Perl's memory. Instead,
+    consider using Perl's "each()" function, which pulls keys/values one at
+    a time, using very little memory:
+
+            while (my ($key, $value) = each %$db) {
+                    print "$key: $value\n";
+            }
+
+    Please note that when using "each()", you should always pass a direct
+    hash reference, not a lookup. Meaning, you should never do this:
+
+            # NEVER DO THIS
+            while (my ($key, $value) = each %{$db->{foo}}) { # BAD
+
+    This causes an infinite loop, because for each iteration, Perl is
+    calling FETCH() on the $db handle, resulting in a "new" hash for foo
+    every time, so it effectively keeps returning the first key over and
+    over again. Instead, assign a temporary variable to "$db-"{foo}>, then
+    pass that to each().
+
+  ARRAYS
+    As with hashes, you can treat any DBM::Deep object like a normal Perl
+    array reference. This includes inserting, removing and manipulating
+    elements, and the "push()", "pop()", "shift()", "unshift()" and
+    "splice()" functions. The object must have first been created using type
+    "DBM::Deep::TYPE_ARRAY", or simply be a nested array reference inside a
+    hash. Example:
+
+            my $db = new DBM::Deep(
+                    file => "foo-array.db",
+                    type => DBM::Deep::TYPE_ARRAY
+            );
+        
+            $db->[0] = "foo";
+            push @$db, "bar", "baz";
+            unshift @$db, "bah";
+        
+            my $last_elem = pop @$db; # baz
+            my $first_elem = shift @$db; # bah
+            my $second_elem = $db->[1]; # bar
+        
+            my $num_elements = scalar @$db;
+
+OO INTERFACE
+    In addition to the *tie()* interface, you can also use a standard OO
+    interface to manipulate all aspects of DBM::Deep databases. Each type of
+    object (hash or array) has its own methods, but both types share the
+    following common methods: "put()", "get()", "exists()", "delete()" and
+    "clear()".
+
+    * put()
+        Stores a new hash key/value pair, or sets an array element value.
+        Takes two arguments, the hash key or array index, and the new value.
+        The value can be a scalar, hash ref or array ref. Returns true on
+        success, false on failure.
+
+                $db->put("foo", "bar"); # for hashes
+                $db->put(1, "bar"); # for arrays
+
+    * get()
+        Fetches the value of a hash key or array element. Takes one
+        argument: the hash key or array index. Returns a scalar, hash ref or
+        array ref, depending on the data type stored.
+
+                my $value = $db->get("foo"); # for hashes
+                my $value = $db->get(1); # for arrays
+
+    * exists()
+        Checks if a hash key or array index exists. Takes one argument: the
+        hash key or array index. Returns true if it exists, false if not.
+
+                if ($db->exists("foo")) { print "yay!\n"; } # for hashes
+                if ($db->exists(1)) { print "yay!\n"; } # for arrays
+
+    * delete()
+        Deletes one hash key/value pair or array element. Takes one
+        argument: the hash key or array index. Returns true on success,
+        false if not found. For arrays, the remaining elements located after
+        the deleted element are NOT moved over. The deleted element is
+        essentially just undefined, which is exactly how Perl's internal
+        arrays work. Please note that the space occupied by the deleted
+        key/value or element is not reused again -- see "UNUSED SPACE
+        RECOVERY" below for details and workarounds.
+
+                $db->delete("foo"); # for hashes
+                $db->delete(1); # for arrays
+
+    * clear()
+        Deletes all hash keys or array elements. Takes no arguments. No
+        return value. Please note that the space occupied by the deleted
+        keys/values or elements is not reused again -- see "UNUSED SPACE
+        RECOVERY" below for details and workarounds.
+
+                $db->clear(); # hashes or arrays
+
+  HASHES
+    For hashes, DBM::Deep supports all the common methods described above,
+    and the following additional methods: "first_key()" and "next_key()".
+
+    * first_key()
+        Returns the "first" key in the hash. As with built-in Perl hashes,
+        keys are fetched in an undefined order (which appears random). Takes
+        no arguments, returns the key as a scalar value.
+
+                my $key = $db->first_key();
+
+    * next_key()
+        Returns the "next" key in the hash, given the previous one as the
+        sole argument. Returns undef if there are no more keys to be
+        fetched.
+
+                $key = $db->next_key($key);
+
+    Here are some examples of using hashes:
+
+            my $db = new DBM::Deep "foo.db";
+        
+            $db->put("foo", "bar");
+            print "foo: " . $db->get("foo") . "\n";
+        
+            $db->put("baz", {}); # new child hash ref
+            $db->get("baz")->put("buz", "biz");
+            print "buz: " . $db->get("baz")->get("buz") . "\n";
+        
+            my $key = $db->first_key();
+            while ($key) {
+                    print "$key: " . $db->get($key) . "\n";
+                    $key = $db->next_key($key);     
+            }
+        
+            if ($db->exists("foo")) { $db->delete("foo"); }
+
+  ARRAYS
+    For arrays, DBM::Deep supports all the common methods described above,
+    and the following additional methods: "length()", "push()", "pop()",
+    "shift()", "unshift()" and "splice()".
+
+    * length()
+        Returns the number of elements in the array. Takes no arguments.
+
+                my $len = $db->length();
+
+    * push()
+        Adds one or more elements onto the end of the array. Accepts
+        scalars, hash refs or array refs. No return value.
+
+                $db->push("foo", "bar", {});
+
+    * pop()
+        Fetches the last element in the array, and deletes it. Takes no
+        arguments. Returns undef if array is empty. Returns the element
+        value.
+
+                my $elem = $db->pop();
+
+    * shift()
+        Fetches the first element in the array, deletes it, then shifts all
+        the remaining elements over to take up the space. Returns the
+        element value. This method is not recommended with large arrays --
+        see "LARGE ARRAYS" below for details.
+
+                my $elem = $db->shift();
+
+    * unshift()
+        Inserts one or more elements onto the beginning of the array,
+        shifting all existing elements over to make room. Accepts scalars,
+        hash refs or array refs. No return value. This method is not
+        recommended with large arrays -- see <LARGE ARRAYS> below for
+        details.
+
+                $db->unshift("foo", "bar", {});
+
+    * splice()
+        Performs exactly like Perl's built-in function of the same name. See
+        "perldoc -f splice" for usage -- it is too complicated to document
+        here. This method is not recommended with large arrays -- see "LARGE
+        ARRAYS" below for details.
+
+    Here are some examples of using arrays:
+
+            my $db = new DBM::Deep(
+                    file => "foo.db",
+                    type => DBM::Deep::TYPE_ARRAY
+            );
+        
+            $db->push("bar", "baz");
+            $db->unshift("foo");
+            $db->put(3, "buz");
+        
+            my $len = $db->length();
+            print "length: $len\n"; # 4
+        
+            for (my $k=0; $k<$len; $k++) {
+                    print "$k: " . $db->get($k) . "\n";
+            }
+        
+            $db->splice(1, 2, "biz", "baf");
+        
+            while (my $elem = shift @$db) {
+                    print "shifted: $elem\n";
+            }
+
+LOCKING
+    Enable automatic file locking by passing a true value to the "locking"
+    parameter when constructing your DBM::Deep object (see SETUP above).
+
+            my $db = new DBM::Deep(
+                    file => "foo.db",
+                    locking => 1
+            );
+
+    This causes Deep to "flock()" the underlying FileHandle object with
+    exclusive mode for writes, and shared mode for reads. This is required
+    if you have multiple processes accessing the same database file, to
+    avoid file corruption. Please note that "flock()" does NOT work for
+    files over NFS. See "DB OVER NFS" below for more.
+
+  EXPLICIT LOCKING
+    You can explicitly lock a database, so it remains locked for multiple
+    transactions. This is done by calling the "lock()" method, and passing
+    an optional lock mode argument (defaults to exclusive mode). This is
+    particularly useful for things like counters, where the current value
+    needs to be fetched, then incremented, then stored again.
+
+            $db->lock();
+            my $counter = $db->get("counter");
+            $counter++;
+            $db->put("counter", $counter);
+            $db->unlock();
+
+            # or...
+        
+            $db->lock();
+            $db->{counter}++;
+            $db->unlock();
+
+    You can pass "lock()" an optional argument, which specifies which mode
+    to use (exclusive or shared). Use one of these two constants:
+    "DBM::Deep::LOCK_EX" or "DBM::Deep::LOCK_SH". These are passed directly
+    to "flock()", and are the same as the constants defined in Perl's
+    "Fcntl" module.
+
+            $db->lock( DBM::Deep::LOCK_SH );
+            # something here
+            $db->unlock();
+
+    If you want to implement your own file locking scheme, be sure to create
+    your DBM::Deep objects setting the "volatile" option to true. This hints
+    to Deep that the DB file may change between transactions. See "LOW-LEVEL
+    ACCESS" below for more.
+
+IMPORTING/EXPORTING
+    You can import existing complex structures by calling the "import()"
+    method, and export an entire database into an in-memory structure using
+    the "export()" method. Both are examined here.
+
+  IMPORTING
+    Say you have an existing hash with nested hashes/arrays inside it.
+    Instead of walking the structure and adding keys/elements to the
+    database as you go, simply pass a reference to the "import()" method.
+    This recursively adds everything to an existing DBM::Deep object for
+    you. Here is an example:
+
+            my $struct = {
+                    key1 => "value1",
+                    key2 => "value2",
+                    array1 => [ "elem0", "elem1", "elem2" ],
+                    hash1 => {
+                            subkey1 => "subvalue1",
+                            subkey2 => "subvalue2"
+                    }
+            };
+        
+            my $db = new DBM::Deep "foo.db";
+            $db->import( $struct );
+        
+            print $db->{key1} . "\n"; # prints "value1"
+
+    This recursively imports the entire $struct object into $db, including
+    all nested hashes and arrays. If the DBM::Deep object contains exsiting
+    data, keys are merged with the existing ones, replacing if they already
+    exist. The "import()" method can be called on any database level (not
+    just the base level), and works with both hash and array DB types.
+
+    Note: Make sure your existing structure has no circular references in
+    it. These will cause an infinite loop when importing.
+
+  EXPORTING
+    Calling the "export()" method on an existing DBM::Deep object will
+    return a reference to a new in-memory copy of the database. The export
+    is done recursively, so all nested hashes/arrays are all exported to
+    standard Perl objects. Here is an example:
+
+            my $db = new DBM::Deep "foo.db";
+        
+            $db->{key1} = "value1";
+            $db->{key2} = "value2";
+            $db->{hash1} = {};
+            $db->{hash1}->{subkey1} = "subvalue1";
+            $db->{hash1}->{subkey2} = "subvalue2";
+        
+            my $struct = $db->export();
+        
+            print $struct->{key1} . "\n"; # prints "value1"
+
+    This makes a complete copy of the database in memory, and returns a
+    reference to it. The "export()" method can be called on any database
+    level (not just the base level), and works with both hash and array DB
+    types. Be careful of large databases -- you can store a lot more data in
+    a DBM::Deep object than an in-memory Perl structure.
+
+    Note: Make sure your database has no circular references in it. These
+    will cause an infinite loop when exporting.
+
+FILTERS
+    DBM::Deep has a number of hooks where you can specify your own Perl
+    function to perform filtering on incoming or outgoing data. This is a
+    perfect way to extend the engine, and implement things like real-time
+    compression or encryption. Filtering applies to the base DB level, and
+    all child hashes / arrays. Filter hooks can be specified when your
+    DBM::Deep object is first constructed, or by calling the "set_filter()"
+    method at any time. There are four available filter hooks, described
+    below:
+
+    * filter_store_key
+        This filter is called whenever a hash key is stored. It is passed
+        the incoming key, and expected to return a transformed key.
+
+    * filter_store_value
+        This filter is called whenever a hash key or array element is
+        stored. It is passed the incoming value, and expected to return a
+        transformed value.
+
+    * filter_fetch_key
+        This filter is called whenever a hash key is fetched (i.e. via
+        "first_key()" or "next_key()"). It is passed the transformed key,
+        and expected to return the plain key.
+
+    * filter_fetch_value
+        This filter is called whenever a hash key or array element is
+        fetched. It is passed the transformed value, and expected to return
+        the plain value.
+
+    Here are the two ways to setup a filter hook:
+
+            my $db = new DBM::Deep(
+                    file => "foo.db",
+                    filter_store_value => \&my_filter_store,
+                    filter_fetch_value => \&my_filter_fetch
+            );
+        
+            # or...
+        
+            $db->set_filter( "filter_store_value", \&my_filter_store );
+            $db->set_filter( "filter_fetch_value", \&my_filter_fetch );
+
+    Your filter function will be called only when dealing with SCALAR keys
+    or values. When nested hashes and arrays are being stored/fetched,
+    filtering is bypassed. Filters are called as static functions, passed a
+    single SCALAR argument, and expected to return a single SCALAR value. If
+    you want to remove a filter, set the function reference to "undef":
+
+            $db->set_filter( "filter_store_value", undef );
+
+  REAL-TIME ENCRYPTION EXAMPLE
+    Here is a working example that uses the *Crypt::Blowfish* module to do
+    real-time encryption / decryption of keys & values with DBM::Deep
+    Filters. Please visit
+    <http://search.cpan.org/search?module=Crypt::Blowfish> for more on
+    *Crypt::Blowfish*. You'll also need the *Crypt::CBC* module.
+
+            use DBM::Deep;
+            use Crypt::Blowfish;
+            use Crypt::CBC;
+        
+            my $cipher = new Crypt::CBC({
+                    'key'             => 'my secret key',
+                    'cipher'          => 'Blowfish',
+                    'iv'              => '$KJh#(}q',
+                    'regenerate_key'  => 0,
+                    'padding'         => 'space',
+                    'prepend_iv'      => 0
+            });
+        
+            my $db = new DBM::Deep(
+                    file => "foo-encrypt.db",
+                    filter_store_key => \&my_encrypt,
+                    filter_store_value => \&my_encrypt,
+                    filter_fetch_key => \&my_decrypt,
+                    filter_fetch_value => \&my_decrypt,
+            );
+        
+            $db->{key1} = "value1";
+            $db->{key2} = "value2";
+            print "key1: " . $db->{key1} . "\n";
+            print "key2: " . $db->{key2} . "\n";
+        
+            undef $db;
+            exit;
+        
+            sub my_encrypt {
+                    return $cipher->encrypt( $_[0] );
+            }
+            sub my_decrypt {
+                    return $cipher->decrypt( $_[0] );
+            }
+
+  REAL-TIME COMPRESSION EXAMPLE
+    Here is a working example that uses the *Compress::Zlib* module to do
+    real-time compression / decompression of keys & values with DBM::Deep
+    Filters. Please visit
+    <http://search.cpan.org/search?module=Compress::Zlib> for more on
+    *Compress::Zlib*.
+
+            use DBM::Deep;
+            use Compress::Zlib;
+        
+            my $db = new DBM::Deep(
+                    file => "foo-compress.db",
+                    filter_store_key => \&my_compress,
+                    filter_store_value => \&my_compress,
+                    filter_fetch_key => \&my_decompress,
+                    filter_fetch_value => \&my_decompress,
+            );
+        
+            $db->{key1} = "value1";
+            $db->{key2} = "value2";
+            print "key1: " . $db->{key1} . "\n";
+            print "key2: " . $db->{key2} . "\n";
+        
+            undef $db;
+            exit;
+        
+            sub my_compress {
+                    return Compress::Zlib::memGzip( $_[0] ) ;
+            }
+            sub my_decompress {
+                    return Compress::Zlib::memGunzip( $_[0] ) ;
+            }
+
+    Note: Filtering of keys only applies to hashes. Array "keys" are
+    actually numerical index numbers, and are not filtered.
+
+ERROR HANDLING
+    Most DBM::Deep methods return a true value for success, and call die()
+    on failure. You can wrap calls in an eval block to catch the die. Also,
+    the actual error message is stored in an internal scalar, which can be
+    fetched by calling the "error()" method.
+
+            my $db = new DBM::Deep "foo.db"; # create hash
+            eval { $db->push("foo"); }; # ILLEGAL -- push is array-only call
+        
+            print $db->error(); # prints error message
+
+    You can then call "clear_error()" to clear the current error state.
+
+            $db->clear_error();
+
+    If you set the "debug" option to true when creating your DBM::Deep
+    object, all errors are considered NON-FATAL, and dumped to STDERR. This
+    is only for debugging purposes.
+
+LARGEFILE SUPPORT
+    If you have a 64-bit system, and your Perl is compiled with both
+    LARGEFILE and 64-bit support, you *may* be able to create databases
+    larger than 2 GB. DBM::Deep by default uses 32-bit file offset tags, but
+    these can be changed by calling the static "set_pack()" method before
+    you do anything else.
+
+            DBM::Deep::set_pack(8, 'Q');
+
+    This tells DBM::Deep to pack all file offsets with 8-byte (64-bit) quad
+    words instead of 32-bit longs. After setting these values your DB files
+    have a theoretical maximum size of 16 XB (exabytes).
+
+    Note: Changing these values will NOT work for existing database files.
+    Only change this for new files, and make sure it stays set consistently
+    throughout the file's life. If you do set these values, you can no
+    longer access 32-bit DB files. You can, however, call "set_pack(4, 'N')"
+    to change back to 32-bit mode.
+
+    Note: I have not personally tested files > 2 GB -- all my systems have
+    only a 32-bit Perl. However, I have received user reports that this does
+    indeed work!
+
+LOW-LEVEL ACCESS
+    If you require low-level access to the underlying FileHandle that Deep
+    uses, you can call the "fh()" method, which returns the handle:
+
+            my $fh = $db->fh();
+
+    This method can be called on the root level of the datbase, or any child
+    hashes or arrays. All levels share a *root* structure, which contains
+    things like the FileHandle, a reference counter, and all your options
+    you specified when you created the object. You can get access to this
+    root structure by calling the "root()" method.
+
+            my $root = $db->root();
+
+    This is useful for changing options after the object has already been
+    created, such as enabling/disabling locking, volatile or debug modes.
+    You can also store your own temporary user data in this structure (be
+    wary of name collision), which is then accessible from any child hash or
+    array.
+
+CUSTOM DIGEST ALGORITHM
+    DBM::Deep by default uses the *Message Digest 5* (MD5) algorithm for
+    hashing keys. However you can override this, and use another algorithm
+    (such as SHA-256) or even write your own. But please note that Deep
+    currently expects zero collisions, so your algorithm has to be
+    *perfect*, so to speak. Collision detection may be introduced in a later
+    version.
+
+    You can specify a custom digest algorithm by calling the static
+    "set_digest()" function, passing a reference to a subroutine, and the
+    length of the algorithm's hashes (in bytes). This is a global static
+    function, which affects ALL Deep objects. Here is a working example that
+    uses a 256-bit hash from the *Digest::SHA256* module. Please see
+    <http://search.cpan.org/search?module=Digest::SHA256> for more.
+
+            use DBM::Deep;
+            use Digest::SHA256;
+        
+            my $context = Digest::SHA256::new(256);
+        
+            DBM::Deep::set_digest( \&my_digest, 32 );
+        
+            my $db = new DBM::Deep "foo-sha.db";
+        
+            $db->{key1} = "value1";
+            $db->{key2} = "value2";
+            print "key1: " . $db->{key1} . "\n";
+            print "key2: " . $db->{key2} . "\n";
+        
+            undef $db;
+            exit;
+        
+            sub my_digest {
+                    return substr( $context->hash($_[0]), 0, 32 );
+            }
+
+    Note: Your returned digest strings must be EXACTLY the number of bytes
+    you specify in the "set_digest()" function (in this case 32).
+
+CIRCULAR REFERENCES
+    DBM::Deep has experimental support for circular references. Meaning you
+    can have a nested hash key or array element that points to a parent
+    object. This relationship is stored in the DB file, and is preserved
+    between sessions. Here is an example:
+
+            my $db = new DBM::Deep "foo.db";
+        
+            $db->{foo} = "bar";
+            $db->{circle} = $db; # ref to self
+        
+            print $db->{foo} . "\n"; # prints "foo"
+            print $db->{circle}->{foo} . "\n"; # prints "foo" again
+
+    One catch is, passing the object to a function that recursively walks
+    the object tree (such as *Data::Dumper* or even the built-in
+    "optimize()" or "export()" methods) will result in an infinite loop. The
+    other catch is, if you fetch the *key* of a circular reference (i.e.
+    using the "first_key()" or "next_key()" methods), you will get the
+    *target object's key*, not the ref's key. This gets even more
+    interesting with the above example, where the *circle* key points to the
+    base DB object, which technically doesn't have a key. So I made
+    DBM::Deep return "[base]" as the key name in that special case.
+
+CAVEATS / ISSUES / BUGS
+    This section describes all the known issues with DBM::Deep. It you have
+    found something that is not listed here, please send e-mail to
+    jhuckaby@cpan.org.
+
+  UNUSED SPACE RECOVERY
+    One major caveat with Deep is that space occupied by existing keys and
+    values is not recovered when they are deleted. Meaning if you keep
+    deleting and adding new keys, your file will continuously grow. I am
+    working on this, but in the meantime you can call the built-in
+    "optimize()" method from time to time (perhaps in a crontab or
+    something) to recover all your unused space.
+
+            $db->optimize(); # returns true on success
+
+    This rebuilds the ENTIRE database into a new file, then moves it on top
+    of the original. The new file will have no unused space, thus it will
+    take up as little disk space as possible. Please note that this
+    operation can take a long time for large files, and you need enough disk
+    space to temporarily hold 2 copies of your DB file. The temporary file
+    is created in the same directory as the original, named with a ".tmp"
+    extension, and is deleted when the operation completes. Oh, and if
+    locking is enabled, the DB is automatically locked for the entire
+    duration of the copy.
+
+    WARNING: Only call optimize() on the top-level node of the database, and
+    make sure there are no child references lying around. Deep keeps a
+    reference counter, and if it is greater than 1, optimize() will abort
+    and return undef.
+
+  AUTOVIVIFICATION
+    Unfortunately, autovivification doesn't work with tied hashes. This
+    appears to be a bug in Perl's tie() system, as *Jakob Schmidt*
+    encountered the very same issue with his *DWH_FIle* module (see
+    <http://search.cpan.org/search?module=DWH_File>), and it is also
+    mentioned in the BUGS section for the *MLDBM* module <see
+    <http://search.cpan.org/search?module=MLDBM>). Basically, on a new db
+    file, this does not work:
+
+            $db->{foo}->{bar} = "hello";
+
+    Since "foo" doesn't exist, you cannot add "bar" to it. You end up with
+    "foo" being an empty hash. Try this instead, which works fine:
+
+            $db->{foo} = { bar => "hello" };
+
+    As of Perl 5.8.7, this bug still exists. I have walked very carefully
+    through the execution path, and Perl indeed passes an empty hash to the
+    STORE() method. Probably a bug in Perl.
+
+  FILE CORRUPTION
+    The current level of error handling in Deep is minimal. Files *are*
+    checked for a 32-bit signature on open(), but other corruption in files
+    can cause segmentation faults. Deep may try to seek() past the end of a
+    file, or get stuck in an infinite loop depending on the level of
+    corruption. File write operations are not checked for failure (for
+    speed), so if you happen to run out of disk space, Deep will probably
+    fail in a bad way. These things will be addressed in a later version of
+    DBM::Deep.
+
+  DB OVER NFS
+    Beware of using DB files over NFS. Deep uses flock(), which works well
+    on local filesystems, but will NOT protect you from file corruption over
+    NFS. I've heard about setting up your NFS server with a locking daemon,
+    then using lockf() to lock your files, but your milage may vary there as
+    well. From what I understand, there is no real way to do it. However, if
+    you need access to the underlying FileHandle in Deep for using some
+    other kind of locking scheme like lockf(), see the "LOW-LEVEL ACCESS"
+    section above.
+
+  COPYING OBJECTS
+    Beware of copying tied objects in Perl. Very strange things can happen.
+    Instead, use Deep's "clone()" method which safely copies the object and
+    returns a new, blessed, tied hash or array to the same level in the DB.
+
+            my $copy = $db->clone();
+
+  LARGE ARRAYS
+    Beware of using "shift()", "unshift()" or "splice()" with large arrays.
+    These functions cause every element in the array to move, which can be
+    murder on DBM::Deep, as every element has to be fetched from disk, then
+    stored again in a different location. This may be addressed in a later
+    version.
+
+PERFORMANCE
+    This section discusses DBM::Deep's speed and memory usage.
+
+  SPEED
+    Obviously, DBM::Deep isn't going to be as fast as some C-based DBMs,
+    such as the almighty *BerkeleyDB*. But it makes up for it in features
+    like true multi-level hash/array support, and cross-platform FTPable
+    files. Even so, DBM::Deep is still pretty fast, and the speed stays
+    fairly consistent, even with huge databases. Here is some test data:
+
+            Adding 1,000,000 keys to new DB file...
+        
+            At 100 keys, avg. speed is 2,703 keys/sec
+            At 200 keys, avg. speed is 2,642 keys/sec
+            At 300 keys, avg. speed is 2,598 keys/sec
+            At 400 keys, avg. speed is 2,578 keys/sec
+            At 500 keys, avg. speed is 2,722 keys/sec
+            At 600 keys, avg. speed is 2,628 keys/sec
+            At 700 keys, avg. speed is 2,700 keys/sec
+            At 800 keys, avg. speed is 2,607 keys/sec
+            At 900 keys, avg. speed is 2,190 keys/sec
+            At 1,000 keys, avg. speed is 2,570 keys/sec
+            At 2,000 keys, avg. speed is 2,417 keys/sec
+            At 3,000 keys, avg. speed is 1,982 keys/sec
+            At 4,000 keys, avg. speed is 1,568 keys/sec
+            At 5,000 keys, avg. speed is 1,533 keys/sec
+            At 6,000 keys, avg. speed is 1,787 keys/sec
+            At 7,000 keys, avg. speed is 1,977 keys/sec
+            At 8,000 keys, avg. speed is 2,028 keys/sec
+            At 9,000 keys, avg. speed is 2,077 keys/sec
+            At 10,000 keys, avg. speed is 2,031 keys/sec
+            At 20,000 keys, avg. speed is 1,970 keys/sec
+            At 30,000 keys, avg. speed is 2,050 keys/sec
+            At 40,000 keys, avg. speed is 2,073 keys/sec
+            At 50,000 keys, avg. speed is 1,973 keys/sec
+            At 60,000 keys, avg. speed is 1,914 keys/sec
+            At 70,000 keys, avg. speed is 2,091 keys/sec
+            At 80,000 keys, avg. speed is 2,103 keys/sec
+            At 90,000 keys, avg. speed is 1,886 keys/sec
+            At 100,000 keys, avg. speed is 1,970 keys/sec
+            At 200,000 keys, avg. speed is 2,053 keys/sec
+            At 300,000 keys, avg. speed is 1,697 keys/sec
+            At 400,000 keys, avg. speed is 1,838 keys/sec
+            At 500,000 keys, avg. speed is 1,941 keys/sec
+            At 600,000 keys, avg. speed is 1,930 keys/sec
+            At 700,000 keys, avg. speed is 1,735 keys/sec
+            At 800,000 keys, avg. speed is 1,795 keys/sec
+            At 900,000 keys, avg. speed is 1,221 keys/sec
+            At 1,000,000 keys, avg. speed is 1,077 keys/sec
+
+    This test was performed on a PowerMac G4 1gHz running Mac OS X 10.3.2 &
+    Perl 5.8.1, with an 80GB Ultra ATA/100 HD spinning at 7200RPM. The hash
+    keys and values were between 6 - 12 chars in length. The DB file ended
+    up at 210MB. Run time was 12 min 3 sec.
+
+  MEMORY USAGE
+    One of the great things about DBM::Deep is that it uses very little
+    memory. Even with huge databases (1,000,000+ keys) you will not see much
+    increased memory on your process. Deep relies solely on the filesystem
+    for storing and fetching data. Here is output from */usr/bin/top* before
+    even opening a database handle:
+
+              PID USER     PRI  NI  SIZE  RSS SHARE STAT %CPU %MEM   TIME COMMAND
+            22831 root      11   0  2716 2716  1296 R     0.0  0.2   0:07 perl
+
+    Basically the process is taking 2,716K of memory. And here is the same
+    process after storing and fetching 1,000,000 keys:
+
+              PID USER     PRI  NI  SIZE  RSS SHARE STAT %CPU %MEM   TIME COMMAND
+            22831 root      14   0  2772 2772  1328 R     0.0  0.2  13:32 perl
+
+    Notice the memory usage increased by only 56K. Test was performed on a
+    700mHz x86 box running Linux RedHat 7.2 & Perl 5.6.1.
+
+DB FILE FORMAT
+    In case you were interested in the underlying DB file format, it is
+    documented here in this section. You don't need to know this to use the
+    module, it's just included for reference.
+
+  SIGNATURE
+    DBM::Deep files always start with a 32-bit signature to identify the
+    file type. This is at offset 0. The signature is "DPDB" in network byte
+    order. This is checked upon each file open().
+
+  TAG
+    The DBM::Deep file is in a *tagged format*, meaning each section of the
+    file has a standard header containing the type of data, the length of
+    data, and then the data itself. The type is a single character (1 byte),
+    the length is a 32-bit unsigned long in network byte order, and the data
+    is, well, the data. Here is how it unfolds:
+
+  MASTER INDEX
+    Immediately after the 32-bit file signature is the *Master Index*
+    record. This is a standard tag header followed by 1024 bytes (in 32-bit
+    mode) or 2048 bytes (in 64-bit mode) of data. The type is *H* for hash
+    or *A* for array, depending on how the DBM::Deep object was constructed.
+
+    The index works by looking at a *MD5 Hash* of the hash key (or array
+    index number). The first 8-bit char of the MD5 signature is the offset
+    into the index, multipled by 4 in 32-bit mode, or 8 in 64-bit mode. The
+    value of the index element is a file offset of the next tag for the
+    key/element in question, which is usually a *Bucket List* tag (see
+    below).
+
+    The next tag *could* be another index, depending on how many
+    keys/elements exist. See RE-INDEXING below for details.
+
+  BUCKET LIST
+    A *Bucket List* is a collection of 16 MD5 hashes for keys/elements, plus
+    file offsets to where the actual data is stored. It starts with a
+    standard tag header, with type *B*, and a data size of 320 bytes in
+    32-bit mode, or 384 bytes in 64-bit mode. Each MD5 hash is stored in
+    full (16 bytes), plus the 32-bit or 64-bit file offset for the *Bucket*
+    containing the actual data. When the list fills up, a *Re-Index*
+    operation is performed (See RE-INDEXING below).
+
+  BUCKET
+    A *Bucket* is a tag containing a key/value pair (in hash mode), or a
+    index/value pair (in array mode). It starts with a standard tag header
+    with type *D* for scalar data (string, binary, etc.), or it could be a
+    nested hash (type *H*) or array (type *A*). The value comes just after
+    the tag header. The size reported in the tag header is only for the
+    value, but then, just after the value is another size (32-bit unsigned
+    long) and then the plain key itself. Since the value is likely to be
+    fetched more often than the plain key, I figured it would be *slightly*
+    faster to store the value first.
+
+    If the type is *H* (hash) or *A* (array), the value is another *Master
+    Index* record for the nested structure, where the process begins all
+    over again.
+
+  RE-INDEXING
+    After a *Bucket List* grows to 16 records, its allocated space in the
+    file is exhausted. Then, when another key/element comes in, the list is
+    converted to a new index record. However, this index will look at the
+    next char in the MD5 hash, and arrange new Bucket List pointers
+    accordingly. This process is called *Re-Indexing*. Basically, a new
+    index tag is created at the file EOF, and all 17 (16 + new one)
+    keys/elements are removed from the old Bucket List and inserted into the
+    new index. Several new Bucket Lists are created in the process, as a new
+    MD5 char from the key is being examined (it is unlikely that the keys
+    will all share the same next char of their MD5s).
+
+    Because of the way the *MD5* algorithm works, it is impossible to tell
+    exactly when the Bucket Lists will turn into indexes, but the first
+    round tends to happen right around 4,000 keys. You will see a *slight*
+    decrease in performance here, but it picks back up pretty quick (see
+    SPEED above). Then it takes a lot more keys to exhaust the next level of
+    Bucket Lists. It's right around 900,000 keys. This process can continue
+    nearly indefinitely -- right up until the point the *MD5* signatures
+    start colliding with each other, and this is EXTREMELY rare -- like
+    winning the lottery 5 times in a row AND getting struck by lightning
+    while you are walking to cash in your tickets. Theoretically, since
+    *MD5* hashes are 128-bit values, you *could* have up to
+    340,282,366,921,000,000,000,000,000,000,000,000,000 keys/elements (I
+    believe this is 340 unodecillion, but don't quote me).
+
+  STORING
+    When a new key/element is stored, the key (or index number) is first ran
+    through *Digest::MD5* to get a 128-bit signature (example, in hex:
+    b05783b0773d894396d475ced9d2f4f6). Then, the *Master Index* record is
+    checked for the first char of the signature (in this case *b*). If it
+    does not exist, a new *Bucket List* is created for our key (and the next
+    15 future keys that happen to also have *b* as their first MD5 char).
+    The entire MD5 is written to the *Bucket List* along with the offset of
+    the new *Bucket* record (EOF at this point, unless we are replacing an
+    existing *Bucket*), where the actual data will be stored.
+
+  FETCHING
+    Fetching an existing key/element involves getting a *Digest::MD5* of the
+    key (or index number), then walking along the indexes. If there are
+    enough keys/elements in this DB level, there might be nested indexes,
+    each linked to a particular char of the MD5. Finally, a *Bucket List* is
+    pointed to, which contains up to 16 full MD5 hashes. Each is checked for
+    equality to the key in question. If we found a match, the *Bucket* tag
+    is loaded, where the value and plain key are stored.
+
+    Fetching the plain key occurs when calling the *first_key()* and
+    *next_key()* methods. In this process the indexes are walked
+    systematically, and each key fetched in increasing MD5 order (which is
+    why it appears random). Once the *Bucket* is found, the value is skipped
+    the plain key returned instead. Note: Do not count on keys being fetched
+    as if the MD5 hashes were alphabetically sorted. This only happens on an
+    index-level -- as soon as the *Bucket Lists* are hit, the keys will come
+    out in the order they went in -- so it's pretty much undefined how the
+    keys will come out -- just like Perl's built-in hashes.
+
+AUTHOR
+    Joseph Huckaby, jhuckaby@cpan.org
+
+    Special thanks to Adam Sah and Rich Gaushell! You know why :-)
+
+SEE ALSO
+    perltie(1), Tie::Hash(3), Digest::MD5(3), Fcntl(3), flock(2), lockf(3),
+    nfs(5), Digest::SHA256(3), Crypt::Blowfish(3), Compress::Zlib(3)
+
+LICENSE
+    Copyright (c) 2002-2005 Joseph Huckaby. All Rights Reserved. This is
+    free software, you may use it and distribute it under the same terms as
+    Perl itself.
+

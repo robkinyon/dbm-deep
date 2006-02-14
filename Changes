@@ -1,0 +1,95 @@
+Revision history for DBM::Deep.
+
+0.97  ??? ?? ??:??:?? 2006 Pacific
+    - Reorganization of distribution
+    - Migration to Module::Build with EU::MM backwards compatibility
+    - Test coverage improved to ??%
+
+0.96  Oct 14 09:55:00 2005 Pacific
+    - Fixed build (OS X hidden files killed it)
+    - You can now pass in an optional filehandle to the constructor
+
+0.95  Oct 12 13:58:00 2005 Pacific
+    - Added optional autobless flag to preserve and restore blessed hashes
+    - Fixed bug where 0 could not be fetched using get_next_key
+    - Fixed bug where tie() constructor didn't accept a hash ref for args
+    - optimize() now preserves user/group/permissions
+    - Errors are now FATAL (meaning it calls die()), unless you set debug flag
+
+0.94  Apr 13 19:00:26 2004 Pacific
+    - Fixed bug reported by John Cardenas (corruption at key level when
+         replace of less data was done on bucket)
+
+0.93  Feb 15 19:53:17 2004 Pacific
+    - Fixed optmize() on Win32 where orig file couldn't be overwritten unless
+         filehandle was closed first.  This change introduces a potential race
+         condition when using locking and optmize() on Win32, but it can be 
+         fixed in the future using a soft copy instead of Perl's rename().
+
+0.92  Feb 12 19:10:22 2004 Pacific
+    - Fixed bug where passing a reference to a different DBM::Deep object
+         would still result in an internal reference.
+    - Added export() method for recursively extracting hashes/arrays into
+         standard in-memory Perl structures.
+    - Added import() method for recursively importing existing Perl hash/
+         array structures
+    - Fixed bug where optimize() wouldn't work if base level of DB was
+         an array instead of a hash.
+
+0.91  Feb 12 02:30:22 2004 Pacific
+    - Fixed bug with splice() when length of removed section was 0
+    - Updated POD re: circular refs and optimize()
+    - Had to jump version numbers to 0.91 because in previous releases
+         I used only a single digit after the decimal which was confusing
+         the CPAN indexer.
+
+0.10  Feb 11 08:58:35 2004 Pacific
+    - Fixed bug where default file mode was CLEARING files (Thanks Rich!)
+    - Added experimental support for circular references
+    - Fixed bugs in shift(), unshift() and splice() where nested objects
+      	in array would be recursively re-stored as basic hashes/arrays
+    - Fixed typos in POD docs
+
+0.9   Feb 10 03:25:48 2004 Pacific
+    - Added Filters for storing/fetching keys/values
+    - Added hook for supplying own hashing algorithm
+    - FIxed some typos in POD docs, added new sections
+
+0.8   Feb 8 02:38:22 2004 Pacific
+    - Renamed to DBM::Deep for CPAN
+    - Added optimize() method for rekindling unused space
+    - Now returning hybrid tie()/OO object from new()
+    - Basic error handling introduced
+    - Added debug mode for printing errors to STDERR
+    - Added TYPE_HASH and TYPE_ARRAY constants for "type" param
+    - Added clone() method for safe copying of objects
+    - Wrote POD documentation
+    - Added set_pack() function for manipulating LONG_SIZE / LONG_PACK
+    - Added aliases for most tied functions for public use
+    - Now setting binmode() on FileHandle for Win32
+    - Added 45 unit tests
+
+0.7   Jan 4 11:31:50 2003 UTC
+    - Renamed to DeepDB
+    - Changed file signature to DPDB (not compatible with older versions)
+    - Converted array length to packed long instead of sprintf()ed string
+
+0.6   Dec 31 15:12:03 2002 UTC
+    - Some misc optimizations for speed
+
+0.5   Oct 18 08:55:29 2002 UTC
+    - support for force_return_next parameter in traverse_index() method for 
+      ultra-fast combined key search/removal
+
+0.4   Oct 15 20:07:47 2002 UTC
+    - now making sure filehandle is open for all DB calls
+
+0.3   Oct 3 19:04:13 2002 UTC
+    - fixed bug that could cause corrupted data when using locking
+
+0.2   Aug 6 16:37:32 2002 UTC
+    - Removed base index caching, as it can cause problems when two processes 
+      are populating the db at the same time (even with locking)
+
+0.1   Jun 3 08:06:26 2002 UTC
+    - initial release

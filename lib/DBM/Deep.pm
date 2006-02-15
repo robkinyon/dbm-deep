@@ -30,6 +30,7 @@ package DBM::Deep;
 ##
 
 use strict;
+
 use FileHandle;
 use Fcntl qw/:flock/;
 use Digest::MD5 ();
@@ -129,7 +130,7 @@ sub new {
 
 {
     my @outer_params = qw( type base_offset );
-    sub init {
+    sub _init {
         ##
         # Setup $self and bless into this class.
         ##
@@ -195,7 +196,7 @@ sub TIEHASH {
     elsif (ref($_[0])) { $args = $_[0]; }
     else { $args = { file => shift }; }
 
-    return $class->init($args);
+    return $class->_init($args);
 }
 
 sub TIEARRAY {
@@ -209,7 +210,7 @@ if (scalar(@_) > 1) { $args = {@_}; }
 	elsif (ref($_[0])) { $args = $_[0]; }
 	else { $args = { file => shift }; }
 	
-	return $class->init($args);
+	return $class->_init($args);
 }
 
 sub DESTROY {

@@ -4,6 +4,8 @@ Revision history for DBM::Deep.
     - Reorganization of distribution
     - Migration to Module::Build with EU::MM backwards compatibility
     - Test coverage improved to ??%
+    - The following methods have been renamed to reflect their private nature:
+        - init() is now _init()
 
 0.96  Oct 14 09:55:00 2005 Pacific
     - Fixed build (OS X hidden files killed it)

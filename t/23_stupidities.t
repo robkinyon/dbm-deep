@@ -19,7 +19,7 @@ $db->{key1} = "value1";
 is( $db->{key1}, "value1", "Value set correctly" );
 
 # Testing to verify that the close() will occur if open is called on an open DB.
-$db->open;
+$db->_open;
 
 is( $db->{key1}, "value1", "Value still set after re-open" );
 

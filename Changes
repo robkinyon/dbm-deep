@@ -6,6 +6,7 @@ Revision history for DBM::Deep.
     - Test coverage improved to ??%
     - The following methods have been renamed to reflect their private nature:
         - init() is now _init()
+        - open() is now _open()
 
 0.96  Oct 14 09:55:00 2005 Pacific
     - Fixed build (OS X hidden files killed it)

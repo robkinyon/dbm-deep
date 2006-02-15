@@ -177,7 +177,7 @@ sub new {
         }
         $self->root->{links}++;
 
-        if (!defined($self->fh)) { $self->open(); }
+        if (!defined($self->fh)) { $self->_open(); }
 
         return $self;
     }
@@ -227,7 +227,7 @@ sub DESTROY {
 	}
 }
 
-sub open {
+sub _open {
 	##
 	# Open a FileHandle to the database, create if nonexistent.
 	# Make sure file signature matches DeepDB spec.
@@ -1052,7 +1052,7 @@ sub optimize {
 	
 	$self->unlock();
 	$self->close();
-	$self->open();
+	$self->_open();
 	
 	return 1;
 }
@@ -1231,7 +1231,7 @@ sub STORE {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh) && !$self->open()) {
+	if (!defined($self->fh) && !$self->_open()) {
 		return;
 	}
 	
@@ -1320,7 +1320,7 @@ sub FETCH {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { $self->open(); }
+	if (!defined($self->fh)) { $self->_open(); }
 	
 	##
 	# Request shared lock for reading
@@ -1358,7 +1358,7 @@ sub DELETE {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { $self->open(); }
+	if (!defined($self->fh)) { $self->_open(); }
 	
 	##
 	# Request exclusive lock for writing
@@ -1402,7 +1402,7 @@ sub EXISTS {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { $self->open(); }
+	if (!defined($self->fh)) { $self->_open(); }
 	
 	##
 	# Request shared lock for reading
@@ -1438,7 +1438,7 @@ sub CLEAR {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { $self->open(); }
+	if (!defined($self->fh)) { $self->_open(); }
 	
 	##
 	# Request exclusive lock for writing
@@ -1470,7 +1470,7 @@ sub FIRSTKEY {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { $self->open(); }
+	if (!defined($self->fh)) { $self->_open(); }
 	
 	##
 	# Request shared lock for reading
@@ -1498,7 +1498,7 @@ sub NEXTKEY {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { $self->open(); }
+	if (!defined($self->fh)) { $self->_open(); }
 	
 	##
 	# Request shared lock for reading
@@ -1939,8 +1939,8 @@ in that.
 =head1 TIE INTERFACE
 
 With DBM::Deep you can access your databases using Perl's standard hash/array
-syntax.  Because all Deep objects are I<tied> to hashes or arrays, you can treat
-them as such.  Deep will intercept all reads/writes and direct them to the right
+syntax.  Because all DBM::Deep objects are I<tied> to hashes or arrays, you can treat
+them as such.  DBM::Deep will intercept all reads/writes and direct them to the right
 place -- the DB file.  This has nothing to do with the L<TIE CONSTRUCTION> 
 section above.  This simply tells you how to use DBM::Deep using regular hashes 
 and arrays, rather than calling functions like C<get()> and C<put()> (although those 
@@ -2199,7 +2199,7 @@ parameter when constructing your DBM::Deep object (see L<SETUP> above).
 		locking => 1
 	);
 
-This causes Deep to C<flock()> the underlying FileHandle object with exclusive 
+This causes DBM::Deep to C<flock()> the underlying FileHandle object with exclusive 
 mode for writes, and shared mode for reads.  This is required if you have 
 multiple processes accessing the same database file, to avoid file corruption.  
 Please note that C<flock()> does NOT work for files over NFS.  See L<DB OVER 
@@ -2235,7 +2235,7 @@ same as the constants defined in Perl's C<Fcntl> module.
 	$db->unlock();
 
 If you want to implement your own file locking scheme, be sure to create your
-DBM::Deep objects setting the C<volatile> option to true.  This hints to Deep
+DBM::Deep objects setting the C<volatile> option to true.  This hints to DBM::Deep
 that the DB file may change between transactions.  See L<LOW-LEVEL ACCESS> 
 below for more.
 
@@ -2492,7 +2492,7 @@ indeed work!
 
 =head1 LOW-LEVEL ACCESS
 
-If you require low-level access to the underlying FileHandle that Deep uses,
+If you require low-level access to the underlying FileHandle that DBM::Deep uses,
 you can call the C<fh()> method, which returns the handle:
 
 	my $fh = $db->fh();
@@ -2514,7 +2514,7 @@ collision), which is then accessible from any child hash or array.
 
 DBM::Deep by default uses the I<Message Digest 5> (MD5) algorithm for hashing
 keys.  However you can override this, and use another algorithm (such as SHA-256)
-or even write your own.  But please note that Deep currently expects zero 
+or even write your own.  But please note that DBM::Deep currently expects zero 
 collisions, so your algorithm has to be I<perfect>, so to speak.
 Collision detection may be introduced in a later version.
 
@@ -2522,7 +2522,7 @@ Collision detection may be introduced in a later version.
 
 You can specify a custom digest algorithm by calling the static C<set_digest()> 
 function, passing a reference to a subroutine, and the length of the algorithm's 
-hashes (in bytes).  This is a global static function, which affects ALL Deep 
+hashes (in bytes).  This is a global static function, which affects ALL DBM::Deep 
 objects.  Here is a working example that uses a 256-bit hash from the 
 I<Digest::SHA256> module.  Please see 
 L<http://search.cpan.org/search?module=Digest::SHA256> for more.
@@ -2583,7 +2583,7 @@ something that is not listed here, please send e-mail to L<jhuckaby@cpan.org>.
 
 =head2 UNUSED SPACE RECOVERY
 
-One major caveat with Deep is that space occupied by existing keys and
+One major caveat with DBM::Deep is that space occupied by existing keys and
 values is not recovered when they are deleted.  Meaning if you keep deleting
 and adding new keys, your file will continuously grow.  I am working on this,
 but in the meantime you can call the built-in C<optimize()> method from time to 
@@ -2603,7 +2603,7 @@ locked for the entire duration of the copy.
 
 
 B<WARNING:> Only call optimize() on the top-level node of the database, and 
-make sure there are no child references lying around.  Deep keeps a reference 
+make sure there are no child references lying around.  DBM::Deep keeps a reference 
 counter, and if it is greater than 1, optimize() will abort and return undef.
 
 =head2 AUTOVIVIFICATION
@@ -2628,28 +2628,28 @@ Probably a bug in Perl.
 
 =head2 FILE CORRUPTION
 
-The current level of error handling in Deep is minimal.  Files I<are> checked
-for a 32-bit signature on open(), but other corruption in files can cause
-segmentation faults.  Deep may try to seek() past the end of a file, or get
+The current level of error handling in DBM::Deep is minimal.  Files I<are> checked
+for a 32-bit signature when opened, but other corruption in files can cause
+segmentation faults.  DBM::Deep may try to seek() past the end of a file, or get
 stuck in an infinite loop depending on the level of corruption.  File write
 operations are not checked for failure (for speed), so if you happen to run
-out of disk space, Deep will probably fail in a bad way.  These things will 
+out of disk space, DBM::Deep will probably fail in a bad way.  These things will 
 be addressed in a later version of DBM::Deep.
 
 =head2 DB OVER NFS
 
-Beware of using DB files over NFS.  Deep uses flock(), which works well on local
+Beware of using DB files over NFS.  DBM::Deep uses flock(), which works well on local
 filesystems, but will NOT protect you from file corruption over NFS.  I've heard 
 about setting up your NFS server with a locking daemon, then using lockf() to 
 lock your files, but your milage may vary there as well.  From what I 
 understand, there is no real way to do it.  However, if you need access to the 
-underlying FileHandle in Deep for using some other kind of locking scheme like 
+underlying FileHandle in DBM::Deep for using some other kind of locking scheme like 
 lockf(), see the L<LOW-LEVEL ACCESS> section above.
 
 =head2 COPYING OBJECTS
 
 Beware of copying tied objects in Perl.  Very strange things can happen.  
-Instead, use Deep's C<clone()> method which safely copies the object and 
+Instead, use DBM::Deep's C<clone()> method which safely copies the object and 
 returns a new, blessed, tied hash or array to the same level in the DB.
 
 	my $copy = $db->clone();
@@ -2722,7 +2722,7 @@ Run time was 12 min 3 sec.
 
 One of the great things about DBM::Deep is that it uses very little memory.
 Even with huge databases (1,000,000+ keys) you will not see much increased
-memory on your process.  Deep relies solely on the filesystem for storing
+memory on your process.  DBM::Deep relies solely on the filesystem for storing
 and fetching data.  Here is output from I</usr/bin/top> before even opening a
 database handle:
 
@@ -2748,7 +2748,7 @@ included for reference.
 
 DBM::Deep files always start with a 32-bit signature to identify the file type.
 This is at offset 0.  The signature is "DPDB" in network byte order.  This is
-checked upon each file open().
+checked when the file is opened.
 
 =head2 TAG
 

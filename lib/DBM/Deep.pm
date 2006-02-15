@@ -441,8 +441,9 @@ sub add_bucket {
 	# If this is an internal reference, return now.
 	# No need to write value or plain key
 	##
-#YYY
-	if ($internal_ref) { return $result; }
+	if ($internal_ref) {
+        return $result;
+    }
 	
 	##
 	# If bucket didn't fit into list, split into a new index level
@@ -454,12 +455,6 @@ sub add_bucket {
 		my $index_tag = $self->create_tag($self->root->{end}, SIG_INDEX, chr(0) x $INDEX_SIZE);
 		my @offsets = ();
 		
-#XXX We've already guaranteed that this cannot be true at YYY
-#		if ($internal_ref) {
-#			$keys .= $md5 . pack($LONG_PACK, $value->base_offset);
-#			$location = $value->base_offset;
-#		}
-#		else { $keys .= $md5 . pack($LONG_PACK, 0); }
 		$keys .= $md5 . pack($LONG_PACK, 0);
 		
 		for (my $i=0; $i<=$MAX_BUCKETS; $i++) {
@@ -540,24 +535,14 @@ sub add_bucket {
 		# If value is blessed, preserve class name
 		##
 		my $value_class = Scalar::Util::blessed($value);
-#XXX NO tests for this
-		if ($self->root->{autobless} && defined $value_class) {
-			if ($value_class ne 'DBM::Deep') {
-				##
-				# Blessed ref -- will restore later
-				##
-				$self->fh->print( chr(1) );
-				$self->fh->print( pack($DATA_LENGTH_PACK, length($value_class)) . $value_class );
-				$content_length += 1;
-				$content_length += $DATA_LENGTH_SIZE + length($value_class);
-			}
-			else {
-				##
-				# Simple unblessed ref -- no restore needed
-				##
-				$self->fh->print( chr(0) );
-				$content_length += 1;
-			}
+		if ($self->root->{autobless} && defined $value_class && $value_class ne 'DBM::Deep' ) {
+            ##
+            # Blessed ref -- will restore later
+            ##
+            $self->fh->print( chr(1) );
+            $self->fh->print( pack($DATA_LENGTH_PACK, length($value_class)) . $value_class );
+            $content_length += 1;
+            $content_length += $DATA_LENGTH_SIZE + length($value_class);
 		}
 		
 		##
@@ -646,7 +631,6 @@ sub get_bucket_value {
                 root => $self->root
             );
             
-#XXX NO tests for this
             if ($self->root->{autobless}) {
                 ##
                 # Skip over value and plain key to see if object needs
@@ -902,7 +886,7 @@ sub lock {
 	# be called before the lock is released.
 	##
     my $self = _get_self($_[0]);
-	my ($type) = @_;
+	my $type = $_[1];
     $type = LOCK_EX unless defined $type;
 	
 	if ($self->root->{locking}) {
@@ -917,7 +901,6 @@ sub unlock {
 	# regarding calling lock() multiple times.
 	##
     my $self = _get_self($_[0]);
-#	my $type = $_[1];
 	
 	if ($self->root->{locking} && $self->root->{locked} > 0) {
 		$self->root->{locked}--;
@@ -933,8 +916,8 @@ sub copy_node {
 	##
     my $self = _get_self($_[0]);
 	my $db_temp = $_[1];
-	
-	if ($self->{type} eq TYPE_HASH) {
+
+	if ($self->type eq TYPE_HASH) {
 		my $key = $self->first_key();
 		while ($key) {
 			my $value = $self->get($key);
@@ -953,6 +936,7 @@ sub copy_node {
 		for (my $index = 0; $index < $length; $index++) {
 			my $value = $self->get($index);
 			if (!ref($value)) { $db_temp->[$index] = $value; }
+            #XXX NO tests for this code
 			else {
 				my $type = $value->type;
 				if ($type eq TYPE_HASH) { $db_temp->[$index] = {}; }
@@ -1126,6 +1110,7 @@ sub fh {
 	##
 	# Get access to the raw FileHandle
 	##
+    #XXX It will be useful, though, when we split out HASH and ARRAY
     my $self = _get_self($_[0]);
 	return $self->root->{fh};
 }
@@ -1726,6 +1711,7 @@ sub SPLICE {
 }
 
 #XXX We don't need to define it.
+#XXX It will be useful, though, when we split out HASH and ARRAY
 #sub EXTEND {
 	##
 	# Perl will call EXTEND() when the array is likely to grow.

@@ -34,7 +34,6 @@ is($clone->{key1}, "value1");
 is($clone->{key2}, "value2");
 is($clone->{key3}, "value3");
 
-$db->close;
 undef $db;
 
 is($clone->{key1}, "value1");

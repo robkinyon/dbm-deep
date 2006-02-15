@@ -223,7 +223,7 @@ sub DESTROY {
 	$self->root->{links}--;
 	
 	if (!$self->root->{links}) {
-		$self->close();
+		$self->_close();
 	}
 }
 
@@ -234,7 +234,7 @@ sub _open {
 	##
     my $self = _get_self($_[0]);
 
-	if (defined($self->fh)) { $self->close(); }
+	if (defined($self->fh)) { $self->_close(); }
 	
 	if (!(-e $self->root->{file}) && $self->root->{mode} eq 'r+') {
 		my $temp = FileHandle->new( $self->root->{file}, 'w' );
@@ -277,7 +277,7 @@ sub _open {
     # Check signature was valid
     ##
     unless ($signature eq SIG_FILE) {
-        $self->close();
+        $self->_close();
         return $self->throw_error("Signature not found -- file is not a Deep DB");
     }
 
@@ -295,7 +295,7 @@ sub _open {
     return 1;
 }
 
-sub close {
+sub _close {
 	##
 	# Close database FileHandle
 	##
@@ -1041,7 +1041,7 @@ sub optimize {
 		# with a soft copy.
 		##
 		$self->unlock();
-		$self->close();
+		$self->_close();
 	}
 	
 	if (!rename $self->root->{file} . '.tmp', $self->root->{file}) {
@@ -1051,7 +1051,7 @@ sub optimize {
 	}
 	
 	$self->unlock();
-	$self->close();
+	$self->_close();
 	$self->_open();
 	
 	return 1;

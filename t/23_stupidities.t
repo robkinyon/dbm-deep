@@ -10,7 +10,7 @@ plan tests => 5;
 use_ok( 'DBM::Deep' );
 
 unlink "t/test.db";
-my $db = new DBM::Deep "t/test.db";
+my $db = DBM::Deep->new( "t/test.db" );
 if ($db->error()) {
 	die "ERROR: " . $db->error();
 }

@@ -195,6 +195,8 @@ sub TIEHASH {
     #XXX This use of ref() is bad and is a bug
     elsif (ref($_[0])) { $args = $_[0]; }
     else { $args = { file => shift }; }
+    
+    $args->{type} = TYPE_HASH;
 
     return $class->_init($args);
 }
@@ -209,6 +211,8 @@ if (scalar(@_) > 1) { $args = {@_}; }
     #XXX This use of ref() is bad and is a bug
 	elsif (ref($_[0])) { $args = $_[0]; }
 	else { $args = { file => shift }; }
+	
+	$args->{type} = TYPE_ARRAY;
 	
 	return $class->_init($args);
 }
@@ -287,11 +291,15 @@ sub _open {
     # Get our type from master index signature
     ##
     my $tag = $self->load_tag($self->base_offset);
-#XXX This is a problem - need to verify type, not override it!
 #XXX We probably also want to store the hash algorithm name, not assume anything
 #XXX Convert to set_type() when one is written
-    $self->{type} = $tag->{signature};
-        
+    if (!$tag) {
+    	return $self->throw_error("Corrupted file, no master index record");
+    }
+    if ($self->{type} ne $tag->{signature}) {
+    	return $self->throw_error("File type mismatch");
+    }
+    
     return 1;
 }
 
@@ -333,7 +341,7 @@ sub load_tag {
 	my $offset = shift;
 	
 	seek($self->fh, $offset, 0);
-	if ($self->fh->eof()) { return; }
+	if ($self->fh->eof()) { return undef; }
 	
 	my $sig;
 	$self->fh->read($sig, SIG_SIZE);
@@ -1222,6 +1230,8 @@ sub STORE {
     my $self = _get_self($_[0]);
 	my $key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
     #XXX What is ref() checking here?
+    #YYY User may be storing a hash, in which case we do not want it run 
+    #YYY through the filtering system
 	my $value = ($self->root->{filter_store_value} && !ref($_[2])) ? $self->root->{filter_store_value}->($_[2]) : $_[2];
 	
 	my $unpacked_key = $key;

@@ -20,7 +20,7 @@ use DBM::Deep;
         ok(0);
         exit(0);
     }
-    else { ok(1); }
+    else { ok(1, "Tied an hash with an array for params" ); }
 }
 
 {
@@ -35,7 +35,7 @@ use DBM::Deep;
         ok(0);
         exit(0);
     }
-    else { ok(1); }
+    else { ok(1, "Tied a hash with a hashref for params" ); }
 }
 
 {
@@ -48,12 +48,9 @@ use DBM::Deep;
         ok(0);
         exit(0);
     }
-    else { ok(1); }
+    else { ok(1, "Tied an array with an array for params" ); }
 
-    TODO: {
-        local $TODO = "TIE_ARRAY doesn't set the type correctly";
-        is( $db->{type}, DBM::Deep->TYPE_ARRAY, "TIE_ARRAY sets the correct type" );
-    }
+    is( $db->{type}, DBM::Deep->TYPE_ARRAY, "TIE_ARRAY sets the correct type" );
 }
 
 {
@@ -68,12 +65,9 @@ use DBM::Deep;
         ok(0);
         exit(0);
     }
-    else { ok(1); }
+    else { ok(1, "Tied an array with a hashref for params" ); }
 
-    TODO: {
-        local $TODO = "TIE_ARRAY doesn't set the type correctly";
-        is( $db->{type}, DBM::Deep->TYPE_ARRAY, "TIE_ARRAY sets the correct type" );
-    }
+    is( $db->{type}, DBM::Deep->TYPE_ARRAY, "TIE_ARRAY sets the correct type" );
 }
 
 # These are testing the naive use of ref() within TIEHASH and TIEARRAY.

@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 42;
+use Test::More tests => 44;
 use Test::Exception;
 
 use_ok( 'DBM::Deep' );
@@ -178,3 +178,7 @@ throws_ok {
 throws_ok {
     $db->unshift();
 } qr/UNSHIFT method only supported for arrays/, "Cannot call unshift on a hash type";
+
+ok( $db->error, "We have an error ..." );
+$db->clear_error();
+ok( !$db->error(), "... and we cleared the error" );

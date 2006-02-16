@@ -100,8 +100,8 @@ sub SIG_SIZE  () {  1  }
 ##
 # Setup constants for users to pass to new()
 ##
-sub TYPE_HASH  () { return SIG_HASH; }
-sub TYPE_ARRAY () { return SIG_ARRAY; }
+*TYPE_HASH = \&SIG_HASH;
+*TYPE_ARRAY = \&SIG_ARRAY;
 
 sub new {
 	##
@@ -291,8 +291,7 @@ sub _open {
     # Get our type from master index signature
     ##
     my $tag = $self->_load_tag($self->base_offset);
-#XXX We probably also want to store the hash algorithm name, not assume anything
-#XXX Convert to set_type() when one is written
+#XXX We probably also want to store the hash algorithm name and not assume anything
     if (!$tag) {
     	return $self->_throw_error("Corrupted file, no master index record");
     }
@@ -400,8 +399,9 @@ sub _add_bucket {
 			##
 			$result = 2;
 			
-			if ($internal_ref) { $location = $value->base_offset; }
-			else { $location = $self->root->{end}; }
+            $location = $internal_ref
+                ? $value->base_offset
+                :$location = $self->root->{end};
 			
 			seek($self->fh, $tag->{offset} + ($i * $BUCKET_SIZE), 0);
 			$self->fh->print( $md5 . pack($LONG_PACK, $location) );

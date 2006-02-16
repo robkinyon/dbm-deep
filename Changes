@@ -3,11 +3,23 @@ Revision history for DBM::Deep.
 0.97  ??? ?? ??:??:?? 2006 Pacific
     - Reorganization of distribution
     - Migration to Module::Build with EU::MM backwards compatibility
-    - Test coverage improved to ??%
+    - Test coverage improved to 89.6% (and climbing)
     - The following methods have been renamed to reflect their private nature:
         - init() is now _init()
         - open() is now _open()
         - close() is now _close()
+        - load_tag() is now _load_tag()
+        - index_lookup() is now _index_lookup()
+        - add_bucket() is now _add_bucket()
+        - get_bucket_value() is now _get_bucket_value()
+        - delete_bucket() is now _delete_bucket()
+        - bucket_exists() is now _bucket_exists()
+        - find_bucket_list() is now _find_bucket_list()
+        - traverse_index() is now _traverse_index()
+        - get_next_key() is now _get_next_key()
+        - copy_node() is now _copy_node()
+        - throw_error() is now _throw_error()
+    - Added Devel::Cover report
 
 0.96  Oct 14 09:55:00 2005 Pacific
     - Fixed build (OS X hidden files killed it)

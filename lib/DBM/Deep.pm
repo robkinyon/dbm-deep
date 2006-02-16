@@ -205,9 +205,9 @@ sub TIEARRAY {
 ##
 # Tied array constructor method, called by Perl's tie() function.
 ##
-my $class = shift;
-my $args;
-if (scalar(@_) > 1) { $args = {@_}; }
+    my $class = shift;
+    my $args;
+    if (scalar(@_) > 1) { $args = {@_}; }
     #XXX This use of ref() is bad and is a bug
 	elsif (ref($_[0])) { $args = $_[0]; }
 	else { $args = { file => shift }; }
@@ -248,7 +248,7 @@ sub _open {
     #XXX Convert to set_fh()
 	$self->root->{fh} = FileHandle->new( $self->root->{file}, $self->root->{mode} );
 	if (! defined($self->fh)) {
-		return $self->throw_error("Cannot open file: " . $self->root->{file} . ": $!");
+		return $self->_throw_error("Cannot open file: " . $self->root->{file} . ": $!");
 	}
 
     binmode $self->fh; # for win32
@@ -267,7 +267,7 @@ sub _open {
         seek($self->fh, 0, 0);
         $self->fh->print(SIG_FILE);
         $self->root->{end} = length(SIG_FILE);
-        $self->create_tag($self->base_offset, $self->type, chr(0) x $INDEX_SIZE);
+        $self->_create_tag($self->base_offset, $self->type, chr(0) x $INDEX_SIZE);
 
         my $plain_key = "[base]";
         $self->fh->print( pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
@@ -282,7 +282,7 @@ sub _open {
     ##
     unless ($signature eq SIG_FILE) {
         $self->_close();
-        return $self->throw_error("Signature not found -- file is not a Deep DB");
+        return $self->_throw_error("Signature not found -- file is not a Deep DB");
     }
 
     $self->root->{end} = (stat($self->fh))[7];
@@ -290,14 +290,14 @@ sub _open {
     ##
     # Get our type from master index signature
     ##
-    my $tag = $self->load_tag($self->base_offset);
+    my $tag = $self->_load_tag($self->base_offset);
 #XXX We probably also want to store the hash algorithm name, not assume anything
 #XXX Convert to set_type() when one is written
     if (!$tag) {
-    	return $self->throw_error("Corrupted file, no master index record");
+    	return $self->_throw_error("Corrupted file, no master index record");
     }
     if ($self->{type} ne $tag->{signature}) {
-    	return $self->throw_error("File type mismatch");
+    	return $self->_throw_error("File type mismatch");
     }
     
     return 1;
@@ -311,7 +311,7 @@ sub _close {
 	undef $self->root->{fh};
 }
 
-sub create_tag {
+sub _create_tag {
 	##
 	# Given offset, signature and content, create tag and write to disk
 	##
@@ -333,7 +333,7 @@ sub create_tag {
 	};
 }
 
-sub load_tag {
+sub _load_tag {
 	##
 	# Given offset, load single tag and return signature, size and data
 	##
@@ -361,7 +361,7 @@ sub load_tag {
 	};
 }
 
-sub index_lookup {
+sub _index_lookup {
 	##
 	# Given index tag, lookup single entry in index and return .
 	##
@@ -371,10 +371,10 @@ sub index_lookup {
 	my $location = unpack($LONG_PACK, substr($tag->{content}, $index * $LONG_SIZE, $LONG_SIZE) );
 	if (!$location) { return; }
 	
-	return $self->load_tag( $location );
+	return $self->_load_tag( $location );
 }
 
-sub add_bucket {
+sub _add_bucket {
 	##
 	# Adds one key/value pair to bucket list, given offset, MD5 digest of key,
 	# plain (undigested) key and value.
@@ -461,7 +461,7 @@ sub add_bucket {
 		seek($self->fh, $tag->{ref_loc}, 0);
 		$self->fh->print( pack($LONG_PACK, $self->root->{end}) );
 		
-		my $index_tag = $self->create_tag($self->root->{end}, SIG_INDEX, chr(0) x $INDEX_SIZE);
+		my $index_tag = $self->_create_tag($self->root->{end}, SIG_INDEX, chr(0) x $INDEX_SIZE);
 		my @offsets = ();
 		
 		$keys .= $md5 . pack($LONG_PACK, 0);
@@ -492,7 +492,7 @@ sub add_bucket {
 					seek($self->fh, $index_tag->{offset} + ($num * $LONG_SIZE), 0);
 					$self->fh->print( pack($LONG_PACK, $self->root->{end}) );
 					
-					my $blist_tag = $self->create_tag($self->root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
+					my $blist_tag = $self->_create_tag($self->root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
 					
 					seek($self->fh, $blist_tag->{offset}, 0);
 					$self->fh->print( $key . pack($LONG_PACK, $old_subloc || $self->root->{end}) );
@@ -593,10 +593,10 @@ sub add_bucket {
 		return $result;
 	}
 	
-	return $self->throw_error("Fatal error: indexing failed -- possibly due to corruption in file");
+	return $self->_throw_error("Fatal error: indexing failed -- possibly due to corruption in file");
 }
 
-sub get_bucket_value {
+sub _get_bucket_value {
 	##
 	# Fetch single value given tag and MD5 digested key.
 	##
@@ -687,7 +687,7 @@ sub get_bucket_value {
 	return;
 }
 
-sub delete_bucket {
+sub _delete_bucket {
 	##
 	# Delete single key/value pair given tag and MD5 digested key.
 	##
@@ -727,7 +727,7 @@ sub delete_bucket {
 	return;
 }
 
-sub bucket_exists {
+sub _bucket_exists {
 	##
 	# Check existence of single key given tag and MD5 digested key.
 	##
@@ -763,7 +763,7 @@ sub bucket_exists {
 	return;
 }
 
-sub find_bucket_list {
+sub _find_bucket_list {
 	##
 	# Locate offset for bucket list, given digested key
 	##
@@ -774,11 +774,11 @@ sub find_bucket_list {
 	# Locate offset for bucket list using digest index system
 	##
 	my $ch = 0;
-	my $tag = $self->load_tag($self->base_offset);
+	my $tag = $self->_load_tag($self->base_offset);
 	if (!$tag) { return; }
 	
 	while ($tag->{signature} ne SIG_BLIST) {
-		$tag = $self->index_lookup($tag, ord(substr($md5, $ch, 1)));
+		$tag = $self->_index_lookup($tag, ord(substr($md5, $ch, 1)));
 		if (!$tag) { return; }
 		$ch++;
 	}
@@ -786,14 +786,14 @@ sub find_bucket_list {
 	return $tag;
 }
 
-sub traverse_index {
+sub _traverse_index {
 	##
 	# Scan index and recursively step into deeper levels, looking for next key.
 	##
     my ($self, $offset, $ch, $force_return_next) = @_;
     $force_return_next = undef unless $force_return_next;
 	
-	my $tag = $self->load_tag( $offset );
+	my $tag = $self->_load_tag( $offset );
 	
 	if ($tag->{signature} ne SIG_BLIST) {
 		my $content = $tag->{content};
@@ -804,7 +804,7 @@ sub traverse_index {
 		for (my $index = $start; $index < 256; $index++) {
 			my $subloc = unpack($LONG_PACK, substr($content, $index * $LONG_SIZE, $LONG_SIZE) );
 			if ($subloc) {
-				my $result = $self->traverse_index( $subloc, $ch + 1, $force_return_next );
+				my $result = $self->_traverse_index( $subloc, $ch + 1, $force_return_next );
 				if (defined($result)) { return $result; }
 			}
 		} # index loop
@@ -867,7 +867,7 @@ sub traverse_index {
 	return;
 }
 
-sub get_next_key {
+sub _get_next_key {
 	##
 	# Locate next key, given digested previous one
 	##
@@ -885,7 +885,7 @@ sub get_next_key {
 		$self->{return_next} = 1;
 	}
 	
-	return $self->traverse_index( $self->base_offset, 0 );
+	return $self->_traverse_index( $self->base_offset, 0 );
 }
 
 sub lock {
@@ -918,7 +918,7 @@ sub unlock {
 }
 
 #XXX These uses of ref() need verified
-sub copy_node {
+sub _copy_node {
 	##
 	# Copy single level of keys or elements to new DB handle.
 	# Recurse for nested structures
@@ -935,7 +935,7 @@ sub copy_node {
 				my $type = $value->type;
 				if ($type eq TYPE_HASH) { $db_temp->{$key} = {}; }
 				else { $db_temp->{$key} = []; }
-				$value->copy_node( $db_temp->{$key} );
+				$value->_copy_node( $db_temp->{$key} );
 			}
 			$key = $self->next_key($key);
 		}
@@ -950,7 +950,7 @@ sub copy_node {
 				my $type = $value->type;
 				if ($type eq TYPE_HASH) { $db_temp->[$index] = {}; }
 				else { $db_temp->[$index] = []; }
-				$value->copy_node( $db_temp->[$index] );
+				$value->_copy_node( $db_temp->[$index] );
 			}
 		}
 	}
@@ -967,7 +967,7 @@ sub export {
 	elsif ($self->type eq TYPE_ARRAY) { $temp = []; }
 	
 	$self->lock();
-	$self->copy_node( $temp );
+	$self->_copy_node( $temp );
 	$self->unlock();
 	
 	return $temp;
@@ -1002,7 +1002,7 @@ sub import {
 		$self->push( @$struct );
 	}
 	else {
-		return $self->throw_error("Cannot import: type mismatch");
+		return $self->_throw_error("Cannot import: type mismatch");
 	}
 	
 	return 1;
@@ -1015,7 +1015,7 @@ sub optimize {
 	##
     my $self = _get_self($_[0]);
 	if ($self->root->{links} > 1) {
-		return $self->throw_error("Cannot optimize: reference count is greater than 1");
+		return $self->_throw_error("Cannot optimize: reference count is greater than 1");
 	}
 	
 	my $db_temp = DBM::Deep->new(
@@ -1023,11 +1023,11 @@ sub optimize {
 		type => $self->type
 	);
 	if (!$db_temp) {
-		return $self->throw_error("Cannot optimize: failed to open temp file: $!");
+		return $self->_throw_error("Cannot optimize: failed to open temp file: $!");
 	}
 	
 	$self->lock();
-	$self->copy_node( $db_temp );
+	$self->_copy_node( $db_temp );
 	undef $db_temp;
 	
 	##
@@ -1055,7 +1055,7 @@ sub optimize {
 	if (!rename $self->root->{file} . '.tmp', $self->root->{file}) {
 		unlink $self->root->{file} . '.tmp';
 		$self->unlock();
-		return $self->throw_error("Optimize failed: Cannot copy temp file over original: $!");
+		return $self->_throw_error("Optimize failed: Cannot copy temp file over original: $!");
 	}
 	
 	$self->unlock();
@@ -1153,7 +1153,7 @@ sub error {
 # Utility methods
 ##
 
-sub throw_error {
+sub _throw_error {
 	##
 	# Store error string in self
 	##
@@ -1261,21 +1261,21 @@ sub STORE {
 	##
 	# Locate offset for bucket list using digest index system
 	##
-	my $tag = $self->load_tag($self->base_offset);
+	my $tag = $self->_load_tag($self->base_offset);
 	if (!$tag) {
-		$tag = $self->create_tag($self->base_offset, SIG_INDEX, chr(0) x $INDEX_SIZE);
+		$tag = $self->_create_tag($self->base_offset, SIG_INDEX, chr(0) x $INDEX_SIZE);
 	}
 	
 	my $ch = 0;
 	while ($tag->{signature} ne SIG_BLIST) {
 		my $num = ord(substr($md5, $ch, 1));
-		my $new_tag = $self->index_lookup($tag, $num);
+		my $new_tag = $self->_index_lookup($tag, $num);
 		if (!$new_tag) {
 			my $ref_loc = $tag->{offset} + ($num * $LONG_SIZE);
 			seek($self->fh, $ref_loc, 0);
 			$self->fh->print( pack($LONG_PACK, $self->root->{end}) );
 			
-			$tag = $self->create_tag($self->root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
+			$tag = $self->_create_tag($self->root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
 			$tag->{ref_loc} = $ref_loc;
 			$tag->{ch} = $ch;
 			last;
@@ -1292,7 +1292,7 @@ sub STORE {
 	##
 	# Add key/value to bucket list
 	##
-	my $result = $self->add_bucket( $tag, $md5, $key, $value );
+	my $result = $self->_add_bucket( $tag, $md5, $key, $value );
 	
 	##
 	# If this object is an array, and bucket was not a replace, and key is numerical,
@@ -1337,7 +1337,7 @@ sub FETCH {
 	##
 	$self->lock( LOCK_SH );
 	
-	my $tag = $self->find_bucket_list( $md5 );
+	my $tag = $self->_find_bucket_list( $md5 );
 	if (!$tag) {
 		$self->unlock();
 		return;
@@ -1346,7 +1346,7 @@ sub FETCH {
 	##
 	# Get value from bucket list
 	##
-	my $result = $self->get_bucket_value( $tag, $md5 );
+	my $result = $self->_get_bucket_value( $tag, $md5 );
 	
 	$self->unlock();
 	
@@ -1375,7 +1375,7 @@ sub DELETE {
 	##
 	$self->lock( LOCK_EX );
 	
-	my $tag = $self->find_bucket_list( $md5 );
+	my $tag = $self->_find_bucket_list( $md5 );
 	if (!$tag) {
 		$self->unlock();
 		return;
@@ -1384,7 +1384,7 @@ sub DELETE {
 	##
 	# Delete bucket
 	##
-	my $result = $self->delete_bucket( $tag, $md5 );
+	my $result = $self->_delete_bucket( $tag, $md5 );
 	
 	##
 	# If this object is an array and the key deleted was on the end of the stack,
@@ -1419,7 +1419,7 @@ sub EXISTS {
 	##
 	$self->lock( LOCK_SH );
 	
-	my $tag = $self->find_bucket_list( $md5 );
+	my $tag = $self->_find_bucket_list( $md5 );
 	
 	##
 	# For some reason, the built-in exists() function returns '' for false
@@ -1432,7 +1432,7 @@ sub EXISTS {
 	##
 	# Check if bucket exists and return 1 or ''
 	##
-	my $result = $self->bucket_exists( $tag, $md5 ) || '';
+	my $result = $self->_bucket_exists( $tag, $md5 ) || '';
 	
 	$self->unlock();
 	
@@ -1461,7 +1461,7 @@ sub CLEAR {
 		return;
 	}
 	
-	$self->create_tag($self->base_offset, $self->type, chr(0) x $INDEX_SIZE);
+	$self->_create_tag($self->base_offset, $self->type, chr(0) x $INDEX_SIZE);
 	
 	$self->unlock();
 	
@@ -1474,7 +1474,7 @@ sub FIRSTKEY {
 	##
     my $self = _get_self($_[0]);
 	if ($self->type ne TYPE_HASH) {
-		return $self->throw_error("FIRSTKEY method only supported for hashes");
+		return $self->_throw_error("FIRSTKEY method only supported for hashes");
 	}
 
 	##
@@ -1487,7 +1487,7 @@ sub FIRSTKEY {
 	##
 	$self->lock( LOCK_SH );
 	
-	my $result = $self->get_next_key();
+	my $result = $self->_get_next_key();
 	
 	$self->unlock();
 	
@@ -1500,7 +1500,7 @@ sub NEXTKEY {
 	##
     my $self = _get_self($_[0]);
 	if ($self->type ne TYPE_HASH) {
-		return $self->throw_error("NEXTKEY method only supported for hashes");
+		return $self->_throw_error("NEXTKEY method only supported for hashes");
 	}
 	my $prev_key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
 	my $prev_md5 = $DIGEST_FUNC->($prev_key);
@@ -1515,7 +1515,7 @@ sub NEXTKEY {
 	##
 	$self->lock( LOCK_SH );
 	
-	my $result = $self->get_next_key( $prev_md5 );
+	my $result = $self->_get_next_key( $prev_md5 );
 	
 	$self->unlock();
 	
@@ -1532,7 +1532,7 @@ sub FETCHSIZE {
 	##
     my $self = _get_self($_[0]);
 	if ($self->type ne TYPE_ARRAY) {
-		return $self->throw_error("FETCHSIZE method only supported for arrays");
+		return $self->_throw_error("FETCHSIZE method only supported for arrays");
 	}
 	
 	my $SAVE_FILTER = $self->root->{filter_fetch_value};
@@ -1552,7 +1552,7 @@ sub STORESIZE {
 	##
     my $self = _get_self($_[0]);
 	if ($self->type ne TYPE_ARRAY) {
-		return $self->throw_error("STORESIZE method only supported for arrays");
+		return $self->_throw_error("STORESIZE method only supported for arrays");
 	}
 	my $new_length = $_[1];
 	
@@ -1572,7 +1572,7 @@ sub POP {
 	##
     my $self = _get_self($_[0]);
 	if ($self->type ne TYPE_ARRAY) {
-		return $self->throw_error("POP method only supported for arrays");
+		return $self->_throw_error("POP method only supported for arrays");
 	}
 	my $length = $self->FETCHSIZE();
 	
@@ -1592,7 +1592,7 @@ sub PUSH {
 	##
     my $self = _get_self(shift);
 	if ($self->type ne TYPE_ARRAY) {
-		return $self->throw_error("PUSH method only supported for arrays");
+		return $self->_throw_error("PUSH method only supported for arrays");
 	}
 	my $length = $self->FETCHSIZE();
 	
@@ -1609,7 +1609,7 @@ sub SHIFT {
 	##
     my $self = _get_self($_[0]);
 	if ($self->type ne TYPE_ARRAY) {
-		return $self->throw_error("SHIFT method only supported for arrays");
+		return $self->_throw_error("SHIFT method only supported for arrays");
 	}
 	my $length = $self->FETCHSIZE();
 	
@@ -1638,7 +1638,7 @@ sub UNSHIFT {
 	##
     my $self = _get_self($_[0]);shift @_;
 	if ($self->type ne TYPE_ARRAY) {
-		return $self->throw_error("UNSHIFT method only supported for arrays");
+		return $self->_throw_error("UNSHIFT method only supported for arrays");
 	}
 	my @new_elements = @_;
 	my $length = $self->FETCHSIZE();
@@ -1662,7 +1662,7 @@ sub SPLICE {
 	##
     my $self = _get_self($_[0]);shift @_;
 	if ($self->type ne TYPE_ARRAY) {
-		return $self->throw_error("SPLICE method only supported for arrays");
+		return $self->_throw_error("SPLICE method only supported for arrays");
 	}
 	my $length = $self->FETCHSIZE();
 	
@@ -2874,6 +2874,18 @@ alphabetically sorted.  This only happens on an index-level -- as soon as the
 I<Bucket Lists> are hit, the keys will come out in the order they went in -- 
 so it's pretty much undefined how the keys will come out -- just like Perl's 
 built-in hashes.
+
+=head1 CODE COVERAGE
+
+I use B<Devel::Cover> to test the code coverage of my tests, below is the B<Devel::Cover> report on this 
+module's test suite.
+
+  ---------------------------- ------ ------ ------ ------ ------ ------ ------
+  File                           stmt   bran   cond    sub    pod   time  total
+  ---------------------------- ------ ------ ------ ------ ------ ------ ------
+  blib/lib/DBM/Deep.pm           94.9   84.5   77.8  100.0   11.1  100.0   89.7
+  Total                          94.9   84.5   77.8  100.0   11.1  100.0   89.7
+  ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 AUTHOR
 

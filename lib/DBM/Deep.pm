@@ -253,12 +253,15 @@ sub _open {
 	}
 
     my $fh = $self->fh;
+
+    #XXX Can we remove this by using the right sysopen() flags?
     binmode $fh; # for win32
+
     if ($self->root->{autoflush}) {
+#        $self->fh->autoflush();
         my $old = select( $fh );
         $|++;
         select $old;
-#        $self->fh->autoflush();
     }
     
     my $signature;
@@ -277,7 +280,12 @@ sub _open {
         my $plain_key = "[base]";
         $fh->print( pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
         $self->root->{end} += $DATA_LENGTH_SIZE + length($plain_key);
-        $fh->flush();
+
+#        $fh->flush();
+        my $old_fh = select $fh;
+        local $| = 1;
+        print $fh q{};
+        select $old_fh;
 
         return 1;
     }

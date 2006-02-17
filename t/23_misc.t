@@ -5,7 +5,7 @@ use strict;
 use Test::More;
 use Test::Exception;
 
-plan tests => 5;
+plan tests => 7;
 
 use_ok( 'DBM::Deep' );
 
@@ -30,3 +30,24 @@ throws_ok {
 throws_ok {
     my $db = DBM::Deep->new( __FILE__ );
 } qr/^DBM::Deep: Signature not found -- file is not a Deep DB/, "Only DBM::Deep DB files will be opened";
+
+TODO: {
+    todo_skip "lock() doesn't check to see if the file is open", 1;
+    my $db = DBM::Deep->new(
+        file => 't/test.db',
+        locking => 1,
+    );
+    $db->_close;
+    ok( !$db->lock );
+}
+
+TODO: {
+    todo_skip "unlock() doesn't check to see if the file is open", 1;
+    my $db = DBM::Deep->new(
+        file => 't/test.db',
+        locking => 1,
+    );
+    $db->lock;
+    $db->_close;
+    ok( !$db->unlock );
+}

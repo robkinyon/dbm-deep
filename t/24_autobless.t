@@ -7,7 +7,7 @@ use strict;
     sub foo { 'foo' };
 }
 
-use Test::More no_plan => 1;
+use Test::More tests => 24;
 
 use_ok( 'DBM::Deep' );
 
@@ -38,7 +38,6 @@ undef $db;
 
 my $db2 = DBM::Deep->new(
     file     => 't/test.db',
-    autoflush => 1,
     autobless => 1,
 );
 if ($db2->error()) {
@@ -60,10 +59,14 @@ is( $db2->{unblessed}{b}[0], 1 );
 is( $db2->{unblessed}{b}[1], 2 );
 is( $db2->{unblessed}{b}[2], 3 );
 
+TODO: {
+    todo_skip "_copy_node() doesn't work with autobless", 1;
+    my $structure = $db2->export();
+    ok( 1 );
+}
+
 my $db3 = DBM::Deep->new(
     file     => 't/test.db',
-    autoflush => 1,
-#    autobless => 0,
 );
 if ($db3->error()) {
 	die "ERROR: " . $db3->error();

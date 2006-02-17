@@ -543,17 +543,23 @@ sub _add_bucket {
 		##
 		# If value is blessed, preserve class name
 		##
-		my $value_class = Scalar::Util::blessed($value);
-		if ($self->root->{autobless} && defined $value_class && $value_class ne 'DBM::Deep' ) {
-            ##
-            # Blessed ref -- will restore later
-            ##
-            $self->fh->print( chr(1) );
-            $self->fh->print( pack($DATA_LENGTH_PACK, length($value_class)) . $value_class );
-            $content_length += 1;
-            $content_length += $DATA_LENGTH_SIZE + length($value_class);
-		}
-		
+		if ( $self->root->{autobless} ) {
+            my $value_class = Scalar::Util::blessed($value);
+            if ( defined $value_class && $value_class ne 'DBM::Deep' ) {
+                ##
+                # Blessed ref -- will restore later
+                ##
+                $self->fh->print( chr(1) );
+                $self->fh->print( pack($DATA_LENGTH_PACK, length($value_class)) . $value_class );
+                $content_length += 1;
+                $content_length += $DATA_LENGTH_SIZE + length($value_class);
+            }
+            else {
+                $self->fh->print( chr(0) );
+                $content_length += 1;
+            }
+        }
+            
 		##
 		# If this is a new content area, advance EOF counter
 		##
@@ -930,6 +936,7 @@ sub _copy_node {
 		my $key = $self->first_key();
 		while ($key) {
 			my $value = $self->get($key);
+#XXX This doesn't work with autobless
 			if (!ref($value)) { $db_temp->{$key} = $value; }
 			else {
 				my $type = $value->type;

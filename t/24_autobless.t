@@ -7,7 +7,7 @@ use strict;
     sub foo { 'foo' };
 }
 
-use Test::More tests => 24;
+use Test::More tests => 26;
 
 use_ok( 'DBM::Deep' );
 
@@ -86,3 +86,39 @@ is( $db3->{unblessed}{a}, 1 );
 is( $db3->{unblessed}{b}[0], 1 );
 is( $db3->{unblessed}{b}[1], 2 );
 is( $db3->{unblessed}{b}[2], 3 );
+
+undef $db;
+undef $db2;
+undef $db3;
+
+{
+    unlink 't/test.db';
+    my $db = DBM::Deep->new(
+        file     => "t/test.db",
+        autobless => 1,
+    );
+    if ($db->error()) {
+        die "ERROR: " . $db->error();
+    }
+
+    my $obj = bless {
+        a => 1,
+        b => [ 1 .. 3 ],
+    }, 'Foo';
+
+    $db->import( { blessed => $obj } );
+
+    undef $db;
+
+    $db = DBM::Deep->new(
+        file     => "t/test.db",
+        autobless => 1,
+    );
+    if ($db->error()) {
+        die "ERROR: " . $db->error();
+    }
+
+    my $blessed = $db->{blessed};
+    isa_ok( $blessed, 'Foo' );
+    is( $blessed->{a}, 1 );
+}

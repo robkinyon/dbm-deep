@@ -100,8 +100,8 @@ sub SIG_SIZE  () {  1  }
 ##
 # Setup constants for users to pass to new()
 ##
-*TYPE_HASH = \&SIG_HASH;
-*TYPE_ARRAY = \&SIG_ARRAY;
+sub TYPE_HASH  () { return SIG_HASH; }
+sub TYPE_ARRAY () { return SIG_ARRAY; }
 
 sub new {
 	##
@@ -401,7 +401,7 @@ sub _add_bucket {
 			
             $location = $internal_ref
                 ? $value->base_offset
-                :$location = $self->root->{end};
+                : $self->root->{end};
 			
 			seek($self->fh, $tag->{offset} + ($i * $BUCKET_SIZE), 0);
 			$self->fh->print( $md5 . pack($LONG_PACK, $location) );

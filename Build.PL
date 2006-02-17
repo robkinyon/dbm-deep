@@ -20,6 +20,7 @@ my $build = Module::Build->new(
     add_to_cleanup => [
         'META.yml', '*.bak', '*.gz', 'Makefile.PL', 't/test*.db', 'cover_db'
     ],
+    test_files => 't/??_*.t',
 );
 
 $build->create_build_script;

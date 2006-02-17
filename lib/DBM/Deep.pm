@@ -231,9 +231,6 @@ sub DESTROY {
 	}
 }
 
-sub is_tainted {
-        return ! eval { eval("#" . substr(join("", @_), 0, 0)); 1 };
-    }
 sub _open {
 	##
 	# Open a FileHandle to the database, create if nonexistent.
@@ -262,7 +259,7 @@ sub _open {
     
     my $signature;
     seek($self->fh, 0, 0);
-    my $bytes_read = $self->fh->read($signature, length(SIG_FILE));
+    my $bytes_read = read( $self->fh, $signature, length(SIG_FILE));
     
     ##
     # File is empty -- write signature and master index
@@ -347,14 +344,14 @@ sub _load_tag {
 	if ($self->fh->eof()) { return undef; }
 	
 	my $sig;
-	$self->fh->read($sig, SIG_SIZE);
+	read( $self->fh, $sig, SIG_SIZE);
 	
 	my $size;
-	$self->fh->read($size, $DATA_LENGTH_SIZE);
+	read( $self->fh, $size, $DATA_LENGTH_SIZE);
 	$size = unpack($DATA_LENGTH_PACK, $size);
 	
 	my $buffer;
-	$self->fh->read($buffer, $size);
+	read( $self->fh, $buffer, $size);
 	
 	return {
 		signature => $sig,
@@ -425,7 +422,7 @@ sub _add_bucket {
 			else {
 				seek($self->fh, $subloc + SIG_SIZE, 0);
 				my $size;
-				$self->fh->read($size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+				read( $self->fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
 				
 				##
 				# If value is a hash, array, or raw value with equal or less size, we can
@@ -480,7 +477,7 @@ sub _add_bucket {
 					my $offset = $offsets[$num] + SIG_SIZE + $DATA_LENGTH_SIZE;
 					seek($self->fh, $offset, 0);
 					my $subkeys;
-					$self->fh->read($subkeys, $BUCKET_LIST_SIZE);
+					read( $self->fh, $subkeys, $BUCKET_LIST_SIZE);
 					
 					for (my $k=0; $k<$MAX_BUCKETS; $k++) {
 						my $subloc = unpack($LONG_PACK, substr($subkeys, ($k * $BUCKET_SIZE) + $HASH_SIZE, $LONG_SIZE));
@@ -638,7 +635,7 @@ sub _get_bucket_value {
         ##
         my $signature;
         seek($self->fh, $subloc, 0);
-        $self->fh->read($signature, SIG_SIZE);
+        read( $self->fh, $signature, SIG_SIZE);
         
         ##
         # If value is a hash or array, return new DeepDB object with correct offset
@@ -658,18 +655,18 @@ sub _get_bucket_value {
                 seek($self->fh, $DATA_LENGTH_SIZE + $INDEX_SIZE, 1);
                 
                 my $size;
-                $self->fh->read($size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+                read( $self->fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
                 if ($size) { seek($self->fh, $size, 1); }
                 
                 my $bless_bit;
-                $self->fh->read($bless_bit, 1);
+                read( $self->fh, $bless_bit, 1);
                 if (ord($bless_bit)) {
                     ##
                     # Yes, object needs to be re-blessed
                     ##
                     my $class_name;
-                    $self->fh->read($size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-                    if ($size) { $self->fh->read($class_name, $size); }
+                    read( $self->fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+                    if ($size) { read( $self->fh, $class_name, $size); }
                     if ($class_name) { $obj = bless( $obj, $class_name ); }
                 }
             }
@@ -683,8 +680,8 @@ sub _get_bucket_value {
         elsif ($signature eq SIG_DATA) {
             my $size;
             my $value = '';
-            $self->fh->read($size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-            if ($size) { $self->fh->read($value, $size); }
+            read( $self->fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+            if ($size) { read( $self->fh, $value, $size); }
             return $value;
         }
         
@@ -857,15 +854,15 @@ sub _traverse_index {
 				# Skip over value to get to plain key
 				##
 				my $size;
-				$self->fh->read($size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+				read( $self->fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
 				if ($size) { seek($self->fh, $size, 1); }
 				
 				##
 				# Read in plain key and return as scalar
 				##
 				my $plain_key;
-				$self->fh->read($size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-				if ($size) { $self->fh->read($plain_key, $size); }
+				read( $self->fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+				if ($size) { read( $self->fh, $plain_key, $size); }
 				
 				return $plain_key;
 			}

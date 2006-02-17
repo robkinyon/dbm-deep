@@ -340,18 +340,20 @@ sub _load_tag {
 	my $self = shift;
 	my $offset = shift;
 	
-	seek($self->fh, $offset, 0);
-	if ($self->fh->eof()) { return undef; }
+    my $fh = $self->fh;
+
+	seek($fh, $offset, 0);
+	if (eof $fh) { return undef; }
 	
 	my $sig;
-	read( $self->fh, $sig, SIG_SIZE);
+	read( $fh, $sig, SIG_SIZE);
 	
 	my $size;
-	read( $self->fh, $size, $DATA_LENGTH_SIZE);
+	read( $fh, $size, $DATA_LENGTH_SIZE);
 	$size = unpack($DATA_LENGTH_PACK, $size);
 	
 	my $buffer;
-	read( $self->fh, $buffer, $size);
+	read( $fh, $buffer, $size);
 	
 	return {
 		signature => $sig,
@@ -1463,8 +1465,10 @@ sub CLEAR {
 	##
 	$self->lock( LOCK_EX );
 	
-	seek($self->fh, $self->base_offset, 0);
-	if ($self->fh->eof()) {
+    my $fh = $self->fh;
+
+	seek($fh, $self->base_offset, 0);
+	if (eof $fh) {
 		$self->unlock();
 		return;
 	}

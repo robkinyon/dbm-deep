@@ -259,7 +259,7 @@ sub _open {
 
     if ($self->root->{autoflush}) {
 #        $self->fh->autoflush();
-        my $old = select( $fh );
+        my $old = select $fh;
         $|++;
         select $old;
     }
@@ -283,8 +283,9 @@ sub _open {
 
 #        $fh->flush();
         my $old_fh = select $fh;
-        local $| = 1;
-        print $fh q{};
+        my $old_af = $|;
+        $| = 1;
+        $| = $old_af;
         select $old_fh;
 
         return 1;

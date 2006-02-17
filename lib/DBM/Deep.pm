@@ -260,7 +260,7 @@ sub _open {
     if ($self->root->{autoflush}) {
 #        $self->fh->autoflush();
         my $old = select $fh;
-        $|++;
+        $|=1;
         select $old;
     }
     

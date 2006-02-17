@@ -1,4 +1,5 @@
 use strict;
+$|++;
 
 {
     package Foo;
@@ -44,6 +45,11 @@ is( $db2->{unblessed}{b}[2], 3 );
 
 $db2->{unblessed}{a} = 2;
 
+is( $db2->{unblessed}{a}, 2 );
+is( $db2->{unblessed}{b}[0], 1 );
+is( $db2->{unblessed}{b}[1], 2 );
+is( $db2->{unblessed}{b}[2], 3 );
+
 undef $db2;
 
 my $db3 = DBM::Deep->new(
@@ -56,5 +62,6 @@ if ($db3->error()) {
 
 is( $db3->{unblessed}{a}, 2 );
 is( $db3->{unblessed}{b}[0], 1 );
+__END__
 is( $db3->{unblessed}{b}[1], 2 );
 is( $db3->{unblessed}{b}[2], 3 );

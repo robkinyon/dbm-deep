@@ -29,3 +29,4 @@ t/21_tie_access.t
 t/22_internal_copy.t
 t/23_misc.t
 t/24_autobless.t
+t/25_tie_return_value.t

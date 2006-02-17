@@ -231,6 +231,9 @@ sub DESTROY {
 	}
 }
 
+sub is_tainted {
+        return ! eval { eval("#" . substr(join("", @_), 0, 0)); 1 };
+    }
 sub _open {
 	##
 	# Open a FileHandle to the database, create if nonexistent.
@@ -240,13 +243,14 @@ sub _open {
 
 	if (defined($self->fh)) { $self->_close(); }
 	
-	if (!(-e $self->root->{file}) && $self->root->{mode} eq 'r+') {
-		my $temp = FileHandle->new( $self->root->{file}, 'w' );
-		undef $temp;
-	}
+#    eval {
+        if (!(-e $self->root->{file}) && $self->root->{mode} eq 'r+') {
+            my $temp = FileHandle->new( $self->root->{file}, 'w' );
+        }
 	
-    #XXX Convert to set_fh()
-	$self->root->{fh} = FileHandle->new( $self->root->{file}, $self->root->{mode} );
+        #XXX Convert to set_fh()
+        $self->root->{fh} = FileHandle->new( $self->root->{file}, $self->root->{mode} );
+#    }; if ($@ ) { $self->_throw_error( "Received error: $@\n" ); }
 	if (! defined($self->fh)) {
 		return $self->_throw_error("Cannot open file: " . $self->root->{file} . ": $!");
 	}

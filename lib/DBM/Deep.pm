@@ -252,28 +252,32 @@ sub _open {
 		return $self->_throw_error("Cannot open file: " . $self->root->{file} . ": $!");
 	}
 
-    binmode $self->fh; # for win32
+    my $fh = $self->fh;
+    binmode $fh; # for win32
     if ($self->root->{autoflush}) {
-        $self->fh->autoflush();
+        my $old = select( $fh );
+        $|++;
+        select $old;
+#        $self->fh->autoflush();
     }
     
     my $signature;
-    seek($self->fh, 0, 0);
-    my $bytes_read = read( $self->fh, $signature, length(SIG_FILE));
+    seek($fh, 0, 0);
+    my $bytes_read = read( $fh, $signature, length(SIG_FILE));
     
     ##
     # File is empty -- write signature and master index
     ##
     if (!$bytes_read) {
-        seek($self->fh, 0, 0);
-        $self->fh->print(SIG_FILE);
+        seek($fh, 0, 0);
+        $fh->print(SIG_FILE);
         $self->root->{end} = length(SIG_FILE);
         $self->_create_tag($self->base_offset, $self->type, chr(0) x $INDEX_SIZE);
 
         my $plain_key = "[base]";
-        $self->fh->print( pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
+        $fh->print( pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
         $self->root->{end} += $DATA_LENGTH_SIZE + length($plain_key);
-        $self->fh->flush();
+        $fh->flush();
 
         return 1;
     }
@@ -286,7 +290,7 @@ sub _open {
         return $self->_throw_error("Signature not found -- file is not a Deep DB");
     }
 
-    $self->root->{end} = (stat($self->fh))[7];
+    $self->root->{end} = (stat($fh))[7];
         
     ##
     # Get our type from master index signature
@@ -318,8 +322,10 @@ sub _create_tag {
 	my ($self, $offset, $sig, $content) = @_;
 	my $size = length($content);
 	
-	seek($self->fh, $offset, 0);
-	$self->fh->print( $sig . pack($DATA_LENGTH_PACK, $size) . $content );
+    my $fh = $self->fh;
+
+	seek($fh, $offset, 0);
+	$fh->print( $sig . pack($DATA_LENGTH_PACK, $size) . $content );
 	
 	if ($offset == $self->root->{end}) {
 		$self->root->{end} += SIG_SIZE + $DATA_LENGTH_SIZE + $size;
@@ -390,6 +396,8 @@ sub _add_bucket {
     my $is_dbm_deep = eval { $value->isa( 'DBM::Deep' ) };
 	my $internal_ref = $is_dbm_deep && ($value->root eq $self->root);
 
+    my $fh = $self->fh;
+
 	##
 	# Iterate through buckets, seeing if this is a new entry or a replace.
 	##
@@ -406,8 +414,8 @@ sub _add_bucket {
                 ? $value->base_offset
                 : $self->root->{end};
 			
-			seek($self->fh, $tag->{offset} + ($i * $BUCKET_SIZE), 0);
-			$self->fh->print( $md5 . pack($LONG_PACK, $location) );
+			seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), 0);
+			$fh->print( $md5 . pack($LONG_PACK, $location) );
 			last;
 		}
 		elsif ($md5 eq $key) {
@@ -418,13 +426,13 @@ sub _add_bucket {
 			
 			if ($internal_ref) {
 				$location = $value->base_offset;
-				seek($self->fh, $tag->{offset} + ($i * $BUCKET_SIZE), 0);
-				$self->fh->print( $md5 . pack($LONG_PACK, $location) );
+				seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), 0);
+				$fh->print( $md5 . pack($LONG_PACK, $location) );
 			}
 			else {
-				seek($self->fh, $subloc + SIG_SIZE, 0);
+				seek($fh, $subloc + SIG_SIZE, 0);
 				my $size;
-				read( $self->fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+				read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
 				
 				##
 				# If value is a hash, array, or raw value with equal or less size, we can
@@ -441,8 +449,8 @@ sub _add_bucket {
 				}
 				else {
 					$location = $self->root->{end};
-					seek($self->fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $HASH_SIZE, 0);
-					$self->fh->print( pack($LONG_PACK, $location) );
+					seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $HASH_SIZE, 0);
+					$fh->print( pack($LONG_PACK, $location) );
 				}
 			}
 			last;
@@ -461,8 +469,8 @@ sub _add_bucket {
 	# If bucket didn't fit into list, split into a new index level
 	##
 	if (!$location) {
-		seek($self->fh, $tag->{ref_loc}, 0);
-		$self->fh->print( pack($LONG_PACK, $self->root->{end}) );
+		seek($fh, $tag->{ref_loc}, 0);
+		$fh->print( pack($LONG_PACK, $self->root->{end}) );
 		
 		my $index_tag = $self->_create_tag($self->root->{end}, SIG_INDEX, chr(0) x $INDEX_SIZE);
 		my @offsets = ();
@@ -477,28 +485,28 @@ sub _add_bucket {
 				
 				if ($offsets[$num]) {
 					my $offset = $offsets[$num] + SIG_SIZE + $DATA_LENGTH_SIZE;
-					seek($self->fh, $offset, 0);
+					seek($fh, $offset, 0);
 					my $subkeys;
-					read( $self->fh, $subkeys, $BUCKET_LIST_SIZE);
+					read( $fh, $subkeys, $BUCKET_LIST_SIZE);
 					
 					for (my $k=0; $k<$MAX_BUCKETS; $k++) {
 						my $subloc = unpack($LONG_PACK, substr($subkeys, ($k * $BUCKET_SIZE) + $HASH_SIZE, $LONG_SIZE));
 						if (!$subloc) {
-							seek($self->fh, $offset + ($k * $BUCKET_SIZE), 0);
-							$self->fh->print( $key . pack($LONG_PACK, $old_subloc || $self->root->{end}) );
+							seek($fh, $offset + ($k * $BUCKET_SIZE), 0);
+							$fh->print( $key . pack($LONG_PACK, $old_subloc || $self->root->{end}) );
 							last;
 						}
 					} # k loop
 				}
 				else {
 					$offsets[$num] = $self->root->{end};
-					seek($self->fh, $index_tag->{offset} + ($num * $LONG_SIZE), 0);
-					$self->fh->print( pack($LONG_PACK, $self->root->{end}) );
+					seek($fh, $index_tag->{offset} + ($num * $LONG_SIZE), 0);
+					$fh->print( pack($LONG_PACK, $self->root->{end}) );
 					
 					my $blist_tag = $self->_create_tag($self->root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
 					
-					seek($self->fh, $blist_tag->{offset}, 0);
-					$self->fh->print( $key . pack($LONG_PACK, $old_subloc || $self->root->{end}) );
+					seek($fh, $blist_tag->{offset}, 0);
+					$fh->print( $key . pack($LONG_PACK, $old_subloc || $self->root->{end}) );
 				}
 			} # key is real
 		} # i loop
@@ -511,37 +519,37 @@ sub _add_bucket {
 	##
 	if ($location) {
 		my $content_length;
-		seek($self->fh, $location, 0);
+		seek($fh, $location, 0);
 		
 		##
 		# Write signature based on content type, set content length and write actual value.
 		##
         my $r = Scalar::Util::reftype($value) || '';
 		if ($r eq 'HASH') {
-			$self->fh->print( TYPE_HASH );
-			$self->fh->print( pack($DATA_LENGTH_PACK, $INDEX_SIZE) . chr(0) x $INDEX_SIZE );
+			$fh->print( TYPE_HASH );
+			$fh->print( pack($DATA_LENGTH_PACK, $INDEX_SIZE) . chr(0) x $INDEX_SIZE );
 			$content_length = $INDEX_SIZE;
 		}
 		elsif ($r eq 'ARRAY') {
-			$self->fh->print( TYPE_ARRAY );
-			$self->fh->print( pack($DATA_LENGTH_PACK, $INDEX_SIZE) . chr(0) x $INDEX_SIZE );
+			$fh->print( TYPE_ARRAY );
+			$fh->print( pack($DATA_LENGTH_PACK, $INDEX_SIZE) . chr(0) x $INDEX_SIZE );
 			$content_length = $INDEX_SIZE;
 		}
 		elsif (!defined($value)) {
-			$self->fh->print( SIG_NULL );
-			$self->fh->print( pack($DATA_LENGTH_PACK, 0) );
+			$fh->print( SIG_NULL );
+			$fh->print( pack($DATA_LENGTH_PACK, 0) );
 			$content_length = 0;
 		}
 		else {
-			$self->fh->print( SIG_DATA );
-			$self->fh->print( pack($DATA_LENGTH_PACK, length($value)) . $value );
+			$fh->print( SIG_DATA );
+			$fh->print( pack($DATA_LENGTH_PACK, length($value)) . $value );
 			$content_length = length($value);
 		}
 		
 		##
 		# Plain key is stored AFTER value, as keys are typically fetched less often.
 		##
-		$self->fh->print( pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
+		$fh->print( pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
 		
 		##
 		# If value is blessed, preserve class name
@@ -552,13 +560,13 @@ sub _add_bucket {
                 ##
                 # Blessed ref -- will restore later
                 ##
-                $self->fh->print( chr(1) );
-                $self->fh->print( pack($DATA_LENGTH_PACK, length($value_class)) . $value_class );
+                $fh->print( chr(1) );
+                $fh->print( pack($DATA_LENGTH_PACK, length($value_class)) . $value_class );
                 $content_length += 1;
                 $content_length += $DATA_LENGTH_SIZE + length($value_class);
             }
             else {
-                $self->fh->print( chr(0) );
+                $fh->print( chr(0) );
                 $content_length += 1;
             }
         }
@@ -612,6 +620,8 @@ sub _get_bucket_value {
 	my $self = shift;
 	my ($tag, $md5) = @_;
 	my $keys = $tag->{content};
+
+    my $fh = $self->fh;
 	
 	##
 	# Iterate through buckets, looking for a key match
@@ -636,8 +646,8 @@ sub _get_bucket_value {
         # Found match -- seek to offset and read signature
         ##
         my $signature;
-        seek($self->fh, $subloc, 0);
-        read( $self->fh, $signature, SIG_SIZE);
+        seek($fh, $subloc, 0);
+        read( $fh, $signature, SIG_SIZE);
         
         ##
         # If value is a hash or array, return new DeepDB object with correct offset
@@ -654,21 +664,21 @@ sub _get_bucket_value {
                 # Skip over value and plain key to see if object needs
                 # to be re-blessed
                 ##
-                seek($self->fh, $DATA_LENGTH_SIZE + $INDEX_SIZE, 1);
+                seek($fh, $DATA_LENGTH_SIZE + $INDEX_SIZE, 1);
                 
                 my $size;
-                read( $self->fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-                if ($size) { seek($self->fh, $size, 1); }
+                read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+                if ($size) { seek($fh, $size, 1); }
                 
                 my $bless_bit;
-                read( $self->fh, $bless_bit, 1);
+                read( $fh, $bless_bit, 1);
                 if (ord($bless_bit)) {
                     ##
                     # Yes, object needs to be re-blessed
                     ##
                     my $class_name;
-                    read( $self->fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-                    if ($size) { read( $self->fh, $class_name, $size); }
+                    read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+                    if ($size) { read( $fh, $class_name, $size); }
                     if ($class_name) { $obj = bless( $obj, $class_name ); }
                 }
             }
@@ -682,8 +692,8 @@ sub _get_bucket_value {
         elsif ($signature eq SIG_DATA) {
             my $size;
             my $value = '';
-            read( $self->fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-            if ($size) { read( $self->fh, $value, $size); }
+            read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+            if ($size) { read( $fh, $value, $size); }
             return $value;
         }
         
@@ -703,6 +713,8 @@ sub _delete_bucket {
 	my $self = shift;
 	my ($tag, $md5) = @_;
 	my $keys = $tag->{content};
+
+    my $fh = $self->fh;
 	
 	##
 	# Iterate through buckets, looking for a key match
@@ -726,9 +738,9 @@ sub _delete_bucket {
         ##
         # Matched key -- delete bucket and return
         ##
-        seek($self->fh, $tag->{offset} + ($i * $BUCKET_SIZE), 0);
-        $self->fh->print( substr($keys, ($i+1) * $BUCKET_SIZE ) );
-        $self->fh->print( chr(0) x $BUCKET_SIZE );
+        seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), 0);
+        $fh->print( substr($keys, ($i+1) * $BUCKET_SIZE ) );
+        $fh->print( chr(0) x $BUCKET_SIZE );
         
         return 1;
 	} # i loop
@@ -803,6 +815,8 @@ sub _traverse_index {
     $force_return_next = undef unless $force_return_next;
 	
 	my $tag = $self->_load_tag( $offset );
+
+    my $fh = $self->fh;
 	
 	if ($tag->{signature} ne SIG_BLIST) {
 		my $content = $tag->{content};
@@ -850,21 +864,21 @@ sub _traverse_index {
 				##
 				# Seek to bucket location and skip over signature
 				##
-				seek($self->fh, $subloc + SIG_SIZE, 0);
+				seek($fh, $subloc + SIG_SIZE, 0);
 				
 				##
 				# Skip over value to get to plain key
 				##
 				my $size;
-				read( $self->fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-				if ($size) { seek($self->fh, $size, 1); }
+				read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+				if ($size) { seek($fh, $size, 1); }
 				
 				##
 				# Read in plain key and return as scalar
 				##
 				my $plain_key;
-				read( $self->fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-				if ($size) { read( $self->fh, $plain_key, $size); }
+				read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+				if ($size) { read( $fh, $plain_key, $size); }
 				
 				return $plain_key;
 			}
@@ -1254,6 +1268,8 @@ sub STORE {
 	if (!defined($self->fh) && !$self->_open()) {
 		return;
 	}
+
+    my $fh = $self->fh;
 	
 	##
 	# Request exclusive lock for writing
@@ -1265,7 +1281,7 @@ sub STORE {
 	# DB instance appended to our file while we were unlocked.
 	##
 	if ($self->root->{locking} || $self->root->{volatile}) {
-		$self->root->{end} = (stat($self->fh))[7];
+		$self->root->{end} = (stat($fh))[7];
 	}
 	
 	##
@@ -1282,8 +1298,8 @@ sub STORE {
 		my $new_tag = $self->_index_lookup($tag, $num);
 		if (!$new_tag) {
 			my $ref_loc = $tag->{offset} + ($num * $LONG_SIZE);
-			seek($self->fh, $ref_loc, 0);
-			$self->fh->print( pack($LONG_PACK, $self->root->{end}) );
+			seek($fh, $ref_loc, 0);
+			$fh->print( pack($LONG_PACK, $self->root->{end}) );
 			
 			$tag = $self->_create_tag($self->root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
 			$tag->{ref_loc} = $ref_loc;

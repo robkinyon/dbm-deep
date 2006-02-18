@@ -31,7 +31,7 @@ package DBM::Deep;
 
 use strict;
 
-#use FileHandle;
+use FileHandle;
 use Fcntl qw/:flock/;
 use Digest::MD5 ();
 use Scalar::Util ();
@@ -113,7 +113,7 @@ sub new {
 	my $args;
 	if (scalar(@_) > 1) { $args = {@_}; }
 	else { $args = { file => shift }; }
-    print "Calling new()\n";
+    #print "Calling new()\n";
 	
 	##
 	# Check if we want a tied hash or array.
@@ -121,17 +121,17 @@ sub new {
 	my $self;
 	if (defined($args->{type}) && $args->{type} eq TYPE_ARRAY) {
 		my $foo = tie @$self, $class, %$args;
-        print "Tied '$foo' to array\n";
+        #print "Tied '$foo' to array\n";
 #        return $foo;
 	}
 	else {
 		my $foo = tie %$self, $class, %$args;
-        print "Tied '$foo' to hash\n";
+        #print "Tied '$foo' to hash\n";
 #        return $foo;
 	}
 
 	bless $self, $class;
-    print "Created '$self'\n";
+    #print "Created '$self'\n";
     return $self;
 }
 
@@ -234,7 +234,7 @@ sub DESTROY {
     return unless $self;
 	
 	$self->root->{links}--;
-    print "DESTROY( $self ): ", $self->root, ':', $self->root->{links}, "\n";
+    #print "DESTROY( $self ): ", $self->root, ':', $self->root->{links}, "\n";
 	
 	if (!$self->root->{links}) {
 		$self->_close();
@@ -261,7 +261,7 @@ sub _open {
     eval {
         my $filename = $self->root->{file};
         my $mode = $translate_mode{ $self->root->{mode} };
-        print "Opening '$filename' as '$mode'\n";
+        #print "Opening '$filename' as '$mode'\n";
 
         #if (!(-e $filename) && $self->root->{mode} eq 'r+') {
         if (!(-e $filename) && $mode eq '+<') {
@@ -271,11 +271,11 @@ sub _open {
         }
 	
         #XXX Convert to set_fh()
-#        $self->root->{fh} = FileHandle->new( $self->root->{file}, $self->root->{mode} );
-        my $fh;
-        open( $fh, $mode, $filename )
-            or $fh = undef;
-        $self->root->{fh} = $fh;
+        $self->root->{fh} = FileHandle->new( $self->root->{file}, $self->root->{mode} );
+#        my $fh;
+#        open( $fh, $mode, $filename )
+#            or $fh = undef;
+#        $self->root->{fh} = $fh;
     }; if ($@ ) { $self->_throw_error( "Received error: $@\n" ); }
 	if (! defined($self->fh)) {
 		return $self->_throw_error("Cannot open file: " . $self->root->{file} . ": $!");
@@ -349,7 +349,7 @@ sub _close {
 	##
 	# Close database FileHandle
 	##
-    print "_close()\n";
+    #print "_close()\n";
     my $self = _get_self($_[0]);
 	undef $self->root->{fh};
 }
@@ -435,7 +435,7 @@ sub _add_bucket {
     my $is_dbm_deep = eval { $value->isa( 'DBM::Deep' ) };
 	my $internal_ref = $is_dbm_deep && ($value->root eq $self->root);
 
-    print "_add: 1\n";
+    #print "_add: 1\n";
     my $fh = $self->fh;
 
 	##
@@ -624,7 +624,7 @@ sub _add_bucket {
 		# If content is a hash or array, create new child DeepDB object and
 		# pass each key or element to it.
 		##
-    print "_add: 2\n";
+        #print "_add: 2\n";
 		if ($r eq 'HASH') {
 			my $branch = DBM::Deep->new(
 				type => TYPE_HASH,
@@ -637,22 +637,22 @@ sub _add_bucket {
 			}
 		}
 		elsif ($r eq 'ARRAY') {
-            print "$self -> ", $self->root, $/;
+            #print "$self -> ", $self->root, $/;
 			my $branch = DBM::Deep->new(
 				type => TYPE_ARRAY,
 				base_offset => $location,
 				root => $self->root,
 			);
-            print "After new - $branch -> ", $branch->root, "\n";
+            #print "After new - $branch -> ", $branch->root, "\n";
 			my $index = 0;
 			foreach my $element (@{$value}) {
                 #$branch->[$index] = $element;
                 $branch->STORE( $index, $element );
 				$index++;
 			}
-            print "After elements\n";
+            #print "After elements\n";
 		}
-    print "_add: 3\n";
+        #print "_add: 3\n";
 		
 		return $result;
 	}
@@ -1299,7 +1299,7 @@ sub STORE {
 	# Store single hash key/value or array element in database.
 	##
     my $self = _get_self($_[0]);
-    print "STORE: $self ... $_[0]\n";
+    #print "STORE: $self ... $_[0]\n";
 	my $key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
     #XXX What is ref() checking here?
     #YYY User may be storing a hash, in which case we do not want it run 
@@ -1310,7 +1310,7 @@ sub STORE {
 	if (($self->type eq TYPE_ARRAY) && ($key =~ /^\d+$/)) { $key = pack($LONG_PACK, $key); }
 	my $md5 = $DIGEST_FUNC->($key);
 	
-    print "1\n";
+    #print "1\n";
 	##
 	# Make sure file is open
 	##
@@ -1369,7 +1369,7 @@ sub STORE {
 	# Add key/value to bucket list
 	##
 	my $result = $self->_add_bucket( $tag, $md5, $key, $value );
-    print "2\n";
+    #print "2\n";
 	
 	##
 	# If this object is an array, and bucket was not a replace, and key is numerical,
@@ -1389,7 +1389,7 @@ sub FETCH {
 	# Fetch single value or element given plain key or array index
 	##
     my $self = _get_self($_[0]);
-    print "FETCH: $self ... $_[0]\n";
+    #print "FETCH: $self ... $_[0]\n";
 
     my $key = $_[1];
     if ( $self->type eq TYPE_HASH ) {
@@ -1408,7 +1408,9 @@ sub FETCH {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { print "Calling _open from FETCH for '$key'\n";$self->_open(); }
+	if (!defined($self->fh)) {
+        #print "Calling _open from FETCH for '$key'\n";
+        $self->_open(); }
 	
 	##
 	# Request shared lock for reading
@@ -1618,9 +1620,9 @@ sub FETCHSIZE {
 	my $SAVE_FILTER = $self->root->{filter_fetch_value};
 	$self->root->{filter_fetch_value} = undef;
 	
-    print "Fetching size ...\n";
+    #print "Fetching size ...\n";
 	my $packed_size = $self->FETCH('length');
-    print "size is '$packed_size'\n";
+    #print "size is '$packed_size'\n";
 	
 	$self->root->{filter_fetch_value} = $SAVE_FILTER;
 	

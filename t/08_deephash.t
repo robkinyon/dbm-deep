@@ -22,7 +22,6 @@ if ($db->error()) {
 # basic deep hash
 ##
 $db->{company} = {};
-__END__
 $db->{company}->{name} = "My Co.";
 $db->{company}->{employees} = {};
 $db->{company}->{employees}->{"Henry Higgins"} = {};

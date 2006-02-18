@@ -5,7 +5,7 @@ use strict;
 use Test::More;
 
 my $max_keys = 4000;
-plan tests => 2 + $max_keys;
+plan tests => 2;
 
 use_ok( 'DBM::Deep' );
 
@@ -25,6 +25,11 @@ for ( 0 .. $max_keys ) {
     $db->put( $_ => $_ * 2 );
 }
 
+my $count = -1;
 for ( 0 .. $max_keys ) {
-    is( $db->get( $_ ), $_ * 2, "The ${_}th value is correct" );
+    $count = $_;
+    unless( $db->get( $_ ) eq $_ * 2 ) {
+        last;
+    };
 }
+is( $count, $max_keys, "We read $count keys" );

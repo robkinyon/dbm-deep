@@ -31,7 +31,6 @@ package DBM::Deep;
 
 use strict;
 
-use FileHandle;
 use Fcntl qw/:flock/;
 use Digest::MD5 ();
 use Scalar::Util ();
@@ -113,26 +112,19 @@ sub new {
 	my $args;
 	if (scalar(@_) > 1) { $args = {@_}; }
 	else { $args = { file => shift }; }
-    #print "Calling new()\n";
 	
 	##
 	# Check if we want a tied hash or array.
 	##
 	my $self;
 	if (defined($args->{type}) && $args->{type} eq TYPE_ARRAY) {
-		my $foo = tie @$self, $class, %$args;
-        #print "Tied '$foo' to array\n";
-#        return $foo;
+		tie @$self, $class, %$args;
 	}
 	else {
-		my $foo = tie %$self, $class, %$args;
-        #print "Tied '$foo' to hash\n";
-#        return $foo;
+		tie %$self, $class, %$args;
 	}
 
-	bless $self, $class;
-    #print "Created '$self'\n";
-    return $self;
+	return bless $self, $class;
 }
 
 {
@@ -147,42 +139,18 @@ sub new {
         my $self = {
             type => TYPE_HASH,
             base_offset => length(SIG_FILE),
-            root => {
-                file => undef,
-                fh => undef,
-                end => 0,
-                links => 0,
-                autoflush => undef,
-                locking => undef,
-                volatile => undef,
-                debug => undef,
-                mode => 'r+',
-                filter_store_key => undef,
-                filter_store_value => undef,
-                filter_fetch_key => undef,
-                filter_fetch_value => undef,
-                autobless => undef,
-                locked => 0,
-                %$args,
-            },
         };
 
         bless $self, $class;
 
         foreach my $outer_parm ( @outer_params ) {
             next unless exists $args->{$outer_parm};
-            $self->{$outer_parm} = $args->{$outer_parm}
+            $self->{$outer_parm} = delete $args->{$outer_parm}
         }
         
-        if ( exists $args->{root} ) {
-            $self->{root} = $args->{root};
-        }
-        else {
-            # This is cleanup based on the fact that the $args
-            # coming in is for both the root and non-root items
-            delete $self->root->{$_} for @outer_params;
-        }
-        $self->root->{links}++;
+        $self->{root} = exists $args->{root}
+            ? $args->{root}
+            : DBM::Deep::_::Root->new( $args );
 
         if (!defined($self->fh)) { $self->_open(); }
 
@@ -226,20 +194,9 @@ sub TIEARRAY {
 	return $class->_init($args);
 }
 
-sub DESTROY {
-	##
-	# Class deconstructor.  Close file handle if there are no more refs.
-	##
-    my $self = _get_self($_[0]);
-    return unless $self;
-	
-	$self->root->{links}--;
-    #print "DESTROY( $self ): ", $self->root, ':', $self->root->{links}, "\n";
-	
-	if (!$self->root->{links}) {
-		$self->_close();
-	}
-}
+#XXX Unneeded now ...
+#sub DESTROY {
+#}
 
 my %translate_mode = (
     'r' => '<',
@@ -261,21 +218,16 @@ sub _open {
     eval {
         my $filename = $self->root->{file};
         my $mode = $translate_mode{ $self->root->{mode} };
-        #print "Opening '$filename' as '$mode'\n";
 
-        #if (!(-e $filename) && $self->root->{mode} eq 'r+') {
         if (!(-e $filename) && $mode eq '+<') {
-            #FileHandle->new( $filename, 'w' );
             open( FH, '>', $filename );
             close FH;
         }
 	
-        #XXX Convert to set_fh()
-        $self->root->{fh} = FileHandle->new( $self->root->{file}, $self->root->{mode} );
-#        my $fh;
-#        open( $fh, $mode, $filename )
-#            or $fh = undef;
-#        $self->root->{fh} = $fh;
+        my $fh;
+        open( $fh, $mode, $filename )
+            or $fh = undef;
+        $self->root->{fh} = $fh;
     }; if ($@ ) { $self->_throw_error( "Received error: $@\n" ); }
 	if (! defined($self->fh)) {
 		return $self->_throw_error("Cannot open file: " . $self->root->{file} . ": $!");
@@ -287,7 +239,6 @@ sub _open {
     binmode $fh; # for win32
 
     if ($self->root->{autoflush}) {
-#        $self->fh->autoflush();
         my $old = select $fh;
         $|=1;
         select $old;
@@ -310,7 +261,7 @@ sub _open {
         print($fh pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
         $self->root->{end} += $DATA_LENGTH_SIZE + length($plain_key);
 
-#        $fh->flush();
+        # Flush the filehandle
         my $old_fh = select $fh;
         my $old_af = $|;
         $| = 1;
@@ -334,7 +285,9 @@ sub _open {
     # Get our type from master index signature
     ##
     my $tag = $self->_load_tag($self->base_offset);
+
 #XXX We probably also want to store the hash algorithm name and not assume anything
+
     if (!$tag) {
     	return $self->_throw_error("Corrupted file, no master index record");
     }
@@ -349,9 +302,10 @@ sub _close {
 	##
 	# Close database FileHandle
 	##
-    #print "_close()\n";
-    my $self = _get_self($_[0]);
-	undef $self->root->{fh};
+#    my $self = _get_self($_[0]);
+#    undef $self->root->{fh};
+    #XXX Should it be this??
+    #close $self->root->{fh};
 }
 
 sub _create_tag {
@@ -435,7 +389,6 @@ sub _add_bucket {
     my $is_dbm_deep = eval { $value->isa( 'DBM::Deep' ) };
 	my $internal_ref = $is_dbm_deep && ($value->root eq $self->root);
 
-    #print "_add: 1\n";
     my $fh = $self->fh;
 
 	##
@@ -624,7 +577,6 @@ sub _add_bucket {
 		# If content is a hash or array, create new child DeepDB object and
 		# pass each key or element to it.
 		##
-        #print "_add: 2\n";
 		if ($r eq 'HASH') {
 			my $branch = DBM::Deep->new(
 				type => TYPE_HASH,
@@ -637,22 +589,18 @@ sub _add_bucket {
 			}
 		}
 		elsif ($r eq 'ARRAY') {
-            #print "$self -> ", $self->root, $/;
 			my $branch = DBM::Deep->new(
 				type => TYPE_ARRAY,
 				base_offset => $location,
 				root => $self->root,
 			);
-            #print "After new - $branch -> ", $branch->root, "\n";
 			my $index = 0;
 			foreach my $element (@{$value}) {
                 #$branch->[$index] = $element;
                 $branch->STORE( $index, $element );
 				$index++;
 			}
-            #print "After elements\n";
 		}
-        #print "_add: 3\n";
 		
 		return $result;
 	}
@@ -1085,9 +1033,11 @@ sub optimize {
 	# it back on top of original.
 	##
     my $self = _get_self($_[0]);
-	if ($self->root->{links} > 1) {
-		return $self->_throw_error("Cannot optimize: reference count is greater than 1");
-	}
+
+#XXX Need to create a new test for this
+#	if ($self->root->{links} > 1) {
+#		return $self->_throw_error("Cannot optimize: reference count is greater than 1");
+#	}
 	
 	my $db_temp = DBM::Deep->new(
 		file => $self->root->{file} . '.tmp',
@@ -1299,7 +1249,6 @@ sub STORE {
 	# Store single hash key/value or array element in database.
 	##
     my $self = _get_self($_[0]);
-    #print "STORE: $self ... $_[0]\n";
 	my $key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
     #XXX What is ref() checking here?
     #YYY User may be storing a hash, in which case we do not want it run 
@@ -1310,7 +1259,6 @@ sub STORE {
 	if (($self->type eq TYPE_ARRAY) && ($key =~ /^\d+$/)) { $key = pack($LONG_PACK, $key); }
 	my $md5 = $DIGEST_FUNC->($key);
 	
-    #print "1\n";
 	##
 	# Make sure file is open
 	##
@@ -1369,7 +1317,6 @@ sub STORE {
 	# Add key/value to bucket list
 	##
 	my $result = $self->_add_bucket( $tag, $md5, $key, $value );
-    #print "2\n";
 	
 	##
 	# If this object is an array, and bucket was not a replace, and key is numerical,
@@ -1389,7 +1336,6 @@ sub FETCH {
 	# Fetch single value or element given plain key or array index
 	##
     my $self = _get_self($_[0]);
-    #print "FETCH: $self ... $_[0]\n";
 
     my $key = $_[1];
     if ( $self->type eq TYPE_HASH ) {
@@ -1408,9 +1354,7 @@ sub FETCH {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) {
-        #print "Calling _open from FETCH for '$key'\n";
-        $self->_open(); }
+	if (!defined($self->fh)) { $self->_open(); }
 	
 	##
 	# Request shared lock for reading
@@ -1620,9 +1564,7 @@ sub FETCHSIZE {
 	my $SAVE_FILTER = $self->root->{filter_fetch_value};
 	$self->root->{filter_fetch_value} = undef;
 	
-    #print "Fetching size ...\n";
 	my $packed_size = $self->FETCH('length');
-    #print "size is '$packed_size'\n";
 	
 	$self->root->{filter_fetch_value} = $SAVE_FILTER;
 	
@@ -1830,6 +1772,42 @@ sub SPLICE {
 *shift = *SHIFT;
 *unshift = *UNSHIFT;
 *splice = *SPLICE;
+
+package DBM::Deep::_::Root;
+
+sub new {
+    my $class = shift;
+    my ($args) = @_;
+
+    my $self = bless {
+        file => undef,
+        fh => undef,
+        end => 0,
+        autoflush => undef,
+        locking => undef,
+        volatile => undef,
+        debug => undef,
+        mode => 'r+',
+        filter_store_key => undef,
+        filter_store_value => undef,
+        filter_fetch_key => undef,
+        filter_fetch_value => undef,
+        autobless => undef,
+        locked => 0,
+        %$args,
+    }, $class;
+
+    return $self;
+}
+
+sub DESTROY {
+    my $self = shift;
+    return unless $self;
+
+    close $self->{fh} if $self->{fh};
+
+    return;
+}
 
 1;
 

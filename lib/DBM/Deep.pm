@@ -302,10 +302,8 @@ sub _close {
 	##
 	# Close database FileHandle
 	##
-#    my $self = _get_self($_[0]);
-#    undef $self->root->{fh};
-    #XXX Should it be this??
-    #close $self->root->{fh};
+    my $self = _get_self($_[0]);
+    close $self->root->{fh};
 }
 
 sub _create_tag {
@@ -919,7 +917,11 @@ sub lock {
 	if ($self->root->{locking}) {
 		if (!$self->root->{locked}) { flock($self->fh, $type); }
 		$self->root->{locked}++;
+
+        return 1;
 	}
+
+    return;
 }
 
 sub unlock {
@@ -932,7 +934,11 @@ sub unlock {
 	if ($self->root->{locking} && $self->root->{locked} > 0) {
 		$self->root->{locked}--;
 		if (!$self->root->{locked}) { flock($self->fh, LOCK_UN); }
+
+        return 1;
 	}
+
+    return;
 }
 
 #XXX These uses of ref() need verified

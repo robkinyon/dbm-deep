@@ -1,7 +1,7 @@
 ##
 # DBM::Deep Test
 ##
-
+$|++;
 use strict;
 use Test::More tests => 6;
 use Test::Exception;
@@ -25,7 +25,6 @@ throws_ok {
     unlink "t/test.db";
     my %hash;
     tie %hash, 'DBM::Deep', 't/test.db';
-    $hash{'foo'} = 'bar';
     undef %hash;
 
     my @array;
@@ -42,7 +41,6 @@ throws_ok {
     unlink "t/test.db";
     my @array;
     tie @array, 'DBM::Deep', 't/test.db';
-    $array[0] = 'bar';
     undef @array;
 
     my %hash;

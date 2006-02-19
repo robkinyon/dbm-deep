@@ -31,7 +31,7 @@ package DBM::Deep;
 
 use strict;
 
-use Fcntl qw/:flock/;
+use Fcntl qw(:DEFAULT :flock :seek);
 use Digest::MD5 ();
 use Scalar::Util ();
 use vars qw/$VERSION/;
@@ -201,25 +201,29 @@ sub _open {
 	
     eval {
         my $filename = $self->root->{file};
+        #XXX Can the mode be anything but r+, w+, or a+??
+        #XXX ie, it has to be in read-write mode
         my $mode = $translate_mode{ $self->root->{mode} };
 
         if (!(-e $filename) && $mode eq '+<') {
-            open( FH, '>', $filename );
+            sysopen( FH, $filename, O_CREAT | O_WRONLY, 0666 );
             close FH;
         }
 	
         my $fh;
-        open( $fh, $mode, $filename )
+        sysopen( $fh, $filename, O_RDWR )
             or $fh = undef;
         $self->root->{fh} = $fh;
     }; if ($@ ) { $self->_throw_error( "Received error: $@\n" ); }
 	if (! defined($self->fh)) {
-		return $self->_throw_error("Cannot open file: " . $self->root->{file} . ": $!");
+		return $self->_throw_error("Cannot sysopen file: " . $self->root->{file} . ": $!");
 	}
 
     my $fh = $self->fh;
 
     #XXX Can we remove this by using the right sysopen() flags?
+    #XXX I don't think so - there's an item in fopen(3) about rb+, but I'm not sure
+    #XXX That will work.
     binmode $fh; # for win32
 
     if ($self->root->{autoflush}) {
@@ -229,14 +233,14 @@ sub _open {
     }
     
     my $signature;
-    seek($fh, 0, 0);
+    seek($fh, 0, SEEK_SET);
     my $bytes_read = read( $fh, $signature, length(SIG_FILE));
     
     ##
     # File is empty -- write signature and master index
     ##
     if (!$bytes_read) {
-        seek($fh, 0, 0);
+        seek($fh, 0, SEEK_SET);
         print($fh SIG_FILE);
         $self->root->{end} = length(SIG_FILE);
         $self->_create_tag($self->base_offset, $self->type, chr(0) x $INDEX_SIZE);
@@ -299,7 +303,7 @@ sub _create_tag {
 	
     my $fh = $self->fh;
 
-	seek($fh, $offset, 0);
+	seek($fh, $offset, SEEK_SET);
 	print($fh $sig . pack($DATA_LENGTH_PACK, $size) . $content );
 	
 	if ($offset == $self->root->{end}) {
@@ -323,7 +327,7 @@ sub _load_tag {
 	
     my $fh = $self->fh;
 
-	seek($fh, $offset, 0);
+	seek($fh, $offset, SEEK_SET);
 	if (eof $fh) { return undef; }
 	
 	my $sig;
@@ -389,7 +393,7 @@ sub _add_bucket {
                 ? $value->base_offset
                 : $self->root->{end};
 			
-			seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), 0);
+			seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), SEEK_SET);
 			print($fh $md5 . pack($LONG_PACK, $location) );
 			last;
 		}
@@ -401,11 +405,11 @@ sub _add_bucket {
 			
 			if ($internal_ref) {
 				$location = $value->base_offset;
-				seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), 0);
+				seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), SEEK_SET);
 				print($fh $md5 . pack($LONG_PACK, $location) );
 			}
 			else {
-				seek($fh, $subloc + SIG_SIZE, 0);
+				seek($fh, $subloc + SIG_SIZE, SEEK_SET);
 				my $size;
 				read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
 				
@@ -424,7 +428,7 @@ sub _add_bucket {
 				}
 				else {
 					$location = $self->root->{end};
-					seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $HASH_SIZE, 0);
+					seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $HASH_SIZE, SEEK_SET);
 					print($fh pack($LONG_PACK, $location) );
 				}
 			}
@@ -444,7 +448,7 @@ sub _add_bucket {
 	# If bucket didn't fit into list, split into a new index level
 	##
 	if (!$location) {
-		seek($fh, $tag->{ref_loc}, 0);
+		seek($fh, $tag->{ref_loc}, SEEK_SET);
 		print($fh pack($LONG_PACK, $self->root->{end}) );
 		
 		my $index_tag = $self->_create_tag($self->root->{end}, SIG_INDEX, chr(0) x $INDEX_SIZE);
@@ -460,14 +464,14 @@ sub _add_bucket {
 				
 				if ($offsets[$num]) {
 					my $offset = $offsets[$num] + SIG_SIZE + $DATA_LENGTH_SIZE;
-					seek($fh, $offset, 0);
+					seek($fh, $offset, SEEK_SET);
 					my $subkeys;
 					read( $fh, $subkeys, $BUCKET_LIST_SIZE);
 					
 					for (my $k=0; $k<$MAX_BUCKETS; $k++) {
 						my $subloc = unpack($LONG_PACK, substr($subkeys, ($k * $BUCKET_SIZE) + $HASH_SIZE, $LONG_SIZE));
 						if (!$subloc) {
-							seek($fh, $offset + ($k * $BUCKET_SIZE), 0);
+							seek($fh, $offset + ($k * $BUCKET_SIZE), SEEK_SET);
 							print($fh $key . pack($LONG_PACK, $old_subloc || $self->root->{end}) );
 							last;
 						}
@@ -475,12 +479,12 @@ sub _add_bucket {
 				}
 				else {
 					$offsets[$num] = $self->root->{end};
-					seek($fh, $index_tag->{offset} + ($num * $LONG_SIZE), 0);
+					seek($fh, $index_tag->{offset} + ($num * $LONG_SIZE), SEEK_SET);
 					print($fh pack($LONG_PACK, $self->root->{end}) );
 					
 					my $blist_tag = $self->_create_tag($self->root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
 					
-					seek($fh, $blist_tag->{offset}, 0);
+					seek($fh, $blist_tag->{offset}, SEEK_SET);
 					print($fh $key . pack($LONG_PACK, $old_subloc || $self->root->{end}) );
 				}
 			} # key is real
@@ -494,7 +498,7 @@ sub _add_bucket {
 	##
 	if ($location) {
 		my $content_length;
-		seek($fh, $location, 0);
+		seek($fh, $location, SEEK_SET);
 		
 		##
 		# Write signature based on content type, set content length and write actual value.
@@ -623,7 +627,7 @@ sub _get_bucket_value {
         # Found match -- seek to offset and read signature
         ##
         my $signature;
-        seek($fh, $subloc, 0);
+        seek($fh, $subloc, SEEK_SET);
         read( $fh, $signature, SIG_SIZE);
         
         ##
@@ -641,11 +645,11 @@ sub _get_bucket_value {
                 # Skip over value and plain key to see if object needs
                 # to be re-blessed
                 ##
-                seek($fh, $DATA_LENGTH_SIZE + $INDEX_SIZE, 1);
+                seek($fh, $DATA_LENGTH_SIZE + $INDEX_SIZE, SEEK_CUR);
                 
                 my $size;
                 read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-                if ($size) { seek($fh, $size, 1); }
+                if ($size) { seek($fh, $size, SEEK_CUR); }
                 
                 my $bless_bit;
                 read( $fh, $bless_bit, 1);
@@ -715,7 +719,7 @@ sub _delete_bucket {
         ##
         # Matched key -- delete bucket and return
         ##
-        seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), 0);
+        seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), SEEK_SET);
         print($fh substr($keys, ($i+1) * $BUCKET_SIZE ) );
         print($fh chr(0) x $BUCKET_SIZE );
         
@@ -841,14 +845,14 @@ sub _traverse_index {
 				##
 				# Seek to bucket location and skip over signature
 				##
-				seek($fh, $subloc + SIG_SIZE, 0);
+				seek($fh, $subloc + SIG_SIZE, SEEK_SET);
 				
 				##
 				# Skip over value to get to plain key
 				##
 				my $size;
 				read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-				if ($size) { seek($fh, $size, 1); }
+				if ($size) { seek($fh, $size, SEEK_CUR); }
 				
 				##
 				# Read in plain key and return as scalar
@@ -1286,7 +1290,7 @@ sub STORE {
 		my $new_tag = $self->_index_lookup($tag, $num);
 		if (!$new_tag) {
 			my $ref_loc = $tag->{offset} + ($num * $LONG_SIZE);
-			seek($fh, $ref_loc, 0);
+			seek($fh, $ref_loc, SEEK_SET);
 			print($fh pack($LONG_PACK, $self->root->{end}) );
 			
 			$tag = $self->_create_tag($self->root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
@@ -1471,7 +1475,7 @@ sub CLEAR {
 	
     my $fh = $self->fh;
 
-	seek($fh, $self->base_offset, 0);
+	seek($fh, $self->base_offset, SEEK_SET);
 	if (eof $fh) {
 		$self->unlock();
 		return;

@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 44;
+use Test::More tests => 29;
 use Test::Exception;
 
 use_ok( 'DBM::Deep' );
@@ -123,62 +123,3 @@ ok(
 	($first_key ne $next_key)
     ,"keys() still works if you replace long values with shorter ones"
 );
-
-# These tests verify that the array methods cannot be called on hashtypes.
-# They will be removed once the ARRAY and HASH types are refactored into their own classes.
-
-throws_ok {
-    $db->splice();
-} qr/SPLICE method only supported for arrays/, "Cannot call splice on a hash type";
-
-throws_ok {
-    $db->SPLICE();
-} qr/SPLICE method only supported for arrays/, "Cannot call SPLICE on a hash type";
-
-throws_ok {
-    $db->length();
-} qr/FETCHSIZE method only supported for arrays/, "Cannot call length on a hash type";
-
-throws_ok {
-    $db->FETCHSIZE();
-} qr/FETCHSIZE method only supported for arrays/, "Cannot call FETCHSIZE on a hash type";
-
-throws_ok {
-    $db->STORESIZE();
-} qr/STORESIZE method only supported for arrays/, "Cannot call STORESIZE on a hash type";
-
-throws_ok {
-    $db->POP();
-} qr/POP method only supported for arrays/, "Cannot call POP on a hash type";
-
-throws_ok {
-    $db->pop();
-} qr/POP method only supported for arrays/, "Cannot call pop on a hash type";
-
-throws_ok {
-    $db->PUSH();
-} qr/PUSH method only supported for arrays/, "Cannot call PUSH on a hash type";
-
-throws_ok {
-    $db->push();
-} qr/PUSH method only supported for arrays/, "Cannot call push on a hash type";
-
-throws_ok {
-    $db->SHIFT();
-} qr/SHIFT method only supported for arrays/, "Cannot call SHIFT on a hash type";
-
-throws_ok {
-    $db->shift();
-} qr/SHIFT method only supported for arrays/, "Cannot call shift on a hash type";
-
-throws_ok {
-    $db->UNSHIFT();
-} qr/UNSHIFT method only supported for arrays/, "Cannot call UNSHIFT on a hash type";
-
-throws_ok {
-    $db->unshift();
-} qr/UNSHIFT method only supported for arrays/, "Cannot call unshift on a hash type";
-
-ok( $db->error, "We have an error ..." );
-$db->clear_error();
-ok( !$db->error(), "... and we cleared the error" );

@@ -55,7 +55,7 @@ $VERSION = "0.96";
 ##
 #my $DATA_LENGTH_SIZE = 4;
 #my $DATA_LENGTH_PACK = 'N';
-my ($LONG_SIZE, $LONG_PACK, $DATA_LENGTH_SIZE, $DATA_LENGTH_PACK);
+our ($LONG_SIZE, $LONG_PACK, $DATA_LENGTH_SIZE, $DATA_LENGTH_PACK);
 
 ##
 # Maximum number of buckets per list before another level of indexing is done.
@@ -71,7 +71,7 @@ my $MAX_BUCKETS = 16;
 ##
 # Setup digest function for keys
 ##
-my ($DIGEST_FUNC, $HASH_SIZE);
+our ($DIGEST_FUNC, $HASH_SIZE);
 #my $DIGEST_FUNC = \&Digest::MD5::md5;
 
 ##
@@ -118,9 +118,13 @@ sub new {
 	##
 	my $self;
 	if (defined($args->{type}) && $args->{type} eq TYPE_ARRAY) {
+        $class = 'DBM::Deep::Array';
+        require DBM::Deep::Array;
 		tie @$self, $class, %$args;
 	}
 	else {
+        $class = 'DBM::Deep::Hash';
+        require DBM::Deep::Hash;
 		tie %$self, $class, %$args;
 	}
 
@@ -163,35 +167,15 @@ sub _get_self {
 }
 
 sub TIEHASH {
-    ##
-    # Tied hash constructor method, called by Perl's tie() function.
-    ##
-    my $class = shift;
-    my $args;
-    if (scalar(@_) > 1) { $args = {@_}; }
-    #XXX This use of ref() is bad and is a bug
-    elsif (ref($_[0])) { $args = $_[0]; }
-    else { $args = { file => shift }; }
-    
-    $args->{type} = TYPE_HASH;
-
-    return $class->_init($args);
+    shift;
+    require DBM::Deep::Hash;
+    return DBM::Deep::Hash->TIEHASH( @_ );
 }
 
 sub TIEARRAY {
-##
-# Tied array constructor method, called by Perl's tie() function.
-##
-    my $class = shift;
-    my $args;
-    if (scalar(@_) > 1) { $args = {@_}; }
-    #XXX This use of ref() is bad and is a bug
-	elsif (ref($_[0])) { $args = $_[0]; }
-	else { $args = { file => shift }; }
-	
-	$args->{type} = TYPE_ARRAY;
-	
-	return $class->_init($args);
+    shift;
+    require DBM::Deep::Array;
+    return DBM::Deep::Array->TIEARRAY( @_ );
 }
 
 #XXX Unneeded now ...
@@ -1500,268 +1484,6 @@ sub CLEAR {
 	return 1;
 }
 
-sub FIRSTKEY {
-	##
-	# Locate and return first key (in no particular order)
-	##
-    my $self = _get_self($_[0]);
-	if ($self->type ne TYPE_HASH) {
-		return $self->_throw_error("FIRSTKEY method only supported for hashes");
-	}
-
-	##
-	# Make sure file is open
-	##
-	if (!defined($self->fh)) { $self->_open(); }
-	
-	##
-	# Request shared lock for reading
-	##
-	$self->lock( LOCK_SH );
-	
-	my $result = $self->_get_next_key();
-	
-	$self->unlock();
-	
-	return ($result && $self->root->{filter_fetch_key}) ? $self->root->{filter_fetch_key}->($result) : $result;
-}
-
-sub NEXTKEY {
-	##
-	# Return next key (in no particular order), given previous one
-	##
-    my $self = _get_self($_[0]);
-	if ($self->type ne TYPE_HASH) {
-		return $self->_throw_error("NEXTKEY method only supported for hashes");
-	}
-	my $prev_key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
-	my $prev_md5 = $DIGEST_FUNC->($prev_key);
-
-	##
-	# Make sure file is open
-	##
-	if (!defined($self->fh)) { $self->_open(); }
-	
-	##
-	# Request shared lock for reading
-	##
-	$self->lock( LOCK_SH );
-	
-	my $result = $self->_get_next_key( $prev_md5 );
-	
-	$self->unlock();
-	
-	return ($result && $self->root->{filter_fetch_key}) ? $self->root->{filter_fetch_key}->($result) : $result;
-}
-
-##
-# The following methods are for arrays only
-##
-
-sub FETCHSIZE {
-	##
-	# Return the length of the array
-	##
-    my $self = _get_self($_[0]);
-	if ($self->type ne TYPE_ARRAY) {
-		return $self->_throw_error("FETCHSIZE method only supported for arrays");
-	}
-	
-	my $SAVE_FILTER = $self->root->{filter_fetch_value};
-	$self->root->{filter_fetch_value} = undef;
-	
-	my $packed_size = $self->FETCH('length');
-	
-	$self->root->{filter_fetch_value} = $SAVE_FILTER;
-	
-	if ($packed_size) { return int(unpack($LONG_PACK, $packed_size)); }
-	else { return 0; } 
-}
-
-sub STORESIZE {
-	##
-	# Set the length of the array
-	##
-    my $self = _get_self($_[0]);
-	if ($self->type ne TYPE_ARRAY) {
-		return $self->_throw_error("STORESIZE method only supported for arrays");
-	}
-	my $new_length = $_[1];
-	
-	my $SAVE_FILTER = $self->root->{filter_store_value};
-	$self->root->{filter_store_value} = undef;
-	
-	my $result = $self->STORE('length', pack($LONG_PACK, $new_length));
-	
-	$self->root->{filter_store_value} = $SAVE_FILTER;
-	
-	return $result;
-}
-
-sub POP {
-	##
-	# Remove and return the last element on the array
-	##
-    my $self = _get_self($_[0]);
-	if ($self->type ne TYPE_ARRAY) {
-		return $self->_throw_error("POP method only supported for arrays");
-	}
-	my $length = $self->FETCHSIZE();
-	
-	if ($length) {
-		my $content = $self->FETCH( $length - 1 );
-		$self->DELETE( $length - 1 );
-		return $content;
-	}
-	else {
-		return;
-	}
-}
-
-sub PUSH {
-	##
-	# Add new element(s) to the end of the array
-	##
-    my $self = _get_self(shift);
-	if ($self->type ne TYPE_ARRAY) {
-		return $self->_throw_error("PUSH method only supported for arrays");
-	}
-	my $length = $self->FETCHSIZE();
-	
-	while (my $content = shift @_) {
-		$self->STORE( $length, $content );
-		$length++;
-	}
-}
-
-sub SHIFT {
-	##
-	# Remove and return first element on the array.
-	# Shift over remaining elements to take up space.
-	##
-    my $self = _get_self($_[0]);
-	if ($self->type ne TYPE_ARRAY) {
-		return $self->_throw_error("SHIFT method only supported for arrays");
-	}
-	my $length = $self->FETCHSIZE();
-	
-	if ($length) {
-		my $content = $self->FETCH( 0 );
-		
-		##
-		# Shift elements over and remove last one.
-		##
-		for (my $i = 0; $i < $length - 1; $i++) {
-			$self->STORE( $i, $self->FETCH($i + 1) );
-		}
-		$self->DELETE( $length - 1 );
-		
-		return $content;
-	}
-	else {
-		return;
-	}
-}
-
-sub UNSHIFT {
-	##
-	# Insert new element(s) at beginning of array.
-	# Shift over other elements to make space.
-	##
-    my $self = _get_self($_[0]);shift @_;
-	if ($self->type ne TYPE_ARRAY) {
-		return $self->_throw_error("UNSHIFT method only supported for arrays");
-	}
-	my @new_elements = @_;
-	my $length = $self->FETCHSIZE();
-	my $new_size = scalar @new_elements;
-	
-	if ($length) {
-		for (my $i = $length - 1; $i >= 0; $i--) {
-			$self->STORE( $i + $new_size, $self->FETCH($i) );
-		}
-	}
-	
-	for (my $i = 0; $i < $new_size; $i++) {
-		$self->STORE( $i, $new_elements[$i] );
-	}
-}
-
-sub SPLICE {
-	##
-	# Splices section of array with optional new section.
-	# Returns deleted section, or last element deleted in scalar context.
-	##
-    my $self = _get_self($_[0]);shift @_;
-	if ($self->type ne TYPE_ARRAY) {
-		return $self->_throw_error("SPLICE method only supported for arrays");
-	}
-	my $length = $self->FETCHSIZE();
-	
-	##
-	# Calculate offset and length of splice
-	##
-	my $offset = shift || 0;
-	if ($offset < 0) { $offset += $length; }
-	
-	my $splice_length;
-	if (scalar @_) { $splice_length = shift; }
-	else { $splice_length = $length - $offset; }
-	if ($splice_length < 0) { $splice_length += ($length - $offset); }
-	
-	##
-	# Setup array with new elements, and copy out old elements for return
-	##
-	my @new_elements = @_;
-	my $new_size = scalar @new_elements;
-	
-	my @old_elements = ();
-	for (my $i = $offset; $i < $offset + $splice_length; $i++) {
-		push @old_elements, $self->FETCH( $i );
-	}
-	
-	##
-	# Adjust array length, and shift elements to accomodate new section.
-	##
-    if ( $new_size != $splice_length ) {
-        if ($new_size > $splice_length) {
-            for (my $i = $length - 1; $i >= $offset + $splice_length; $i--) {
-                $self->STORE( $i + ($new_size - $splice_length), $self->FETCH($i) );
-            }
-        }
-        else {
-            for (my $i = $offset + $splice_length; $i < $length; $i++) {
-                $self->STORE( $i + ($new_size - $splice_length), $self->FETCH($i) );
-            }
-            for (my $i = 0; $i < $splice_length - $new_size; $i++) {
-                $self->DELETE( $length - 1 );
-                $length--;
-            }
-        }
-	}
-	
-	##
-	# Insert new elements into array
-	##
-	for (my $i = $offset; $i < $offset + $new_size; $i++) {
-		$self->STORE( $i, shift @new_elements );
-	}
-	
-	##
-	# Return deleted section, or last element in scalar context.
-	##
-	return wantarray ? @old_elements : $old_elements[-1];
-}
-
-#XXX We don't need to define it.
-#XXX It will be useful, though, when we split out HASH and ARRAY
-#sub EXTEND {
-	##
-	# Perl will call EXTEND() when the array is likely to grow.
-	# We don't care, but include it for compatibility.
-	##
-#}
-
 ##
 # Public method aliases
 ##
@@ -1770,14 +1492,6 @@ sub SPLICE {
 *delete = *DELETE;
 *exists = *EXISTS;
 *clear = *CLEAR;
-*first_key = *FIRSTKEY;
-*next_key = *NEXTKEY;
-*length = *FETCHSIZE;
-*pop = *POP;
-*push = *PUSH;
-*shift = *SHIFT;
-*unshift = *UNSHIFT;
-*splice = *SPLICE;
 
 package DBM::Deep::_::Root;
 
@@ -2951,8 +2665,10 @@ module's test suite.
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
   File                           stmt   bran   cond    sub    pod   time  total
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm           94.9   84.5   77.8  100.0   11.1  100.0   89.7
-  Total                          94.9   84.5   77.8  100.0   11.1  100.0   89.7
+  blib/lib/DBM/Deep.pm           94.1   82.9   74.5   98.0   10.5   98.1   88.2
+  blib/lib/DBM/Deep/Array.pm     97.8   83.3   50.0  100.0    n/a    1.6   94.4
+  blib/lib/DBM/Deep/Hash.pm      93.3   85.7  100.0  100.0    n/a    0.3   92.7
+  Total                          94.5   83.1   75.5   98.4   10.5  100.0   89.0
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 AUTHOR

@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 93;
+use Test::More tests => 89;
 use Test::Exception;
 
 use_ok( 'DBM::Deep' );
@@ -199,19 +199,3 @@ $db->[0] = [ 1 .. 3 ];
 $db->[1] = { a => 'foo' };
 is( $db->[0]->length, 3, "Reuse of same space with array successful" );
 is( $db->[1]->fetch('a'), 'foo', "Reuse of same space with hash successful" );
-
-throws_ok {
-    $db->FIRSTKEY();
-} qr/FIRSTKEY method only supported for hashes/, "Cannot call FIRSTKEY on an array type";
-
-throws_ok {
-    $db->first_key();
-} qr/FIRSTKEY method only supported for hashes/, "Cannot call first_key on an array type";
-
-throws_ok {
-    $db->NEXTKEY();
-} qr/NEXTKEY method only supported for hashes/, "Cannot call NEXTKEY on an array type";
-
-throws_ok {
-    $db->next_key();
-} qr/NEXTKEY method only supported for hashes/, "Cannot call next_key on an array type";

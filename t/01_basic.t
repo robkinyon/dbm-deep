@@ -4,6 +4,8 @@
 use strict;
 use Test::More tests => 3;
 
+diag "Testing DBM::Deep against Perl $] located at $^X";
+
 use_ok( 'DBM::Deep' );
 
 ##

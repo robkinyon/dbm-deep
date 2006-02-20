@@ -4,6 +4,10 @@ use strict;
 
 use base 'DBM::Deep';
 
+sub _get_self {
+    eval { tied( @{$_[0]} ) } || $_[0]
+}
+
 sub TIEARRAY {
 ##
 # Tied array constructor method, called by Perl's tie() function.
@@ -28,7 +32,7 @@ sub FETCHSIZE {
 	##
 	# Return the length of the array
 	##
-    my $self = DBM::Deep::_get_self($_[0]);
+    my $self = $_[0]->_get_self;#DBM::Deep::_get_self($_[0]);
 	
 	my $SAVE_FILTER = $self->root->{filter_fetch_value};
 	$self->root->{filter_fetch_value} = undef;
@@ -45,7 +49,7 @@ sub STORESIZE {
 	##
 	# Set the length of the array
 	##
-    my $self = DBM::Deep::_get_self($_[0]);
+    my $self = $_[0]->_get_self;#DBM::Deep::_get_self($_[0]);
 	my $new_length = $_[1];
 	
 	my $SAVE_FILTER = $self->root->{filter_store_value};
@@ -62,7 +66,7 @@ sub POP {
 	##
 	# Remove and return the last element on the array
 	##
-    my $self = DBM::Deep::_get_self($_[0]);
+    my $self = $_[0]->_get_self;#DBM::Deep::_get_self($_[0]);
 	my $length = $self->FETCHSIZE();
 	
 	if ($length) {
@@ -79,7 +83,7 @@ sub PUSH {
 	##
 	# Add new element(s) to the end of the array
 	##
-    my $self = DBM::Deep::_get_self(shift);
+    my $self = (shift(@_))->_get_self;#DBM::Deep::_get_self(shift);
 	my $length = $self->FETCHSIZE();
 	
 	while (my $content = shift @_) {
@@ -93,7 +97,7 @@ sub SHIFT {
 	# Remove and return first element on the array.
 	# Shift over remaining elements to take up space.
 	##
-    my $self = DBM::Deep::_get_self($_[0]);
+    my $self = $_[0]->_get_self;#DBM::Deep::_get_self($_[0]);
 	my $length = $self->FETCHSIZE();
 	
 	if ($length) {
@@ -119,7 +123,7 @@ sub UNSHIFT {
 	# Insert new element(s) at beginning of array.
 	# Shift over other elements to make space.
 	##
-    my $self = DBM::Deep::_get_self($_[0]);shift @_;
+    my $self = $_[0]->_get_self;shift;#DBM::Deep::_get_self($_[0]);shift @_;
 	my @new_elements = @_;
 	my $length = $self->FETCHSIZE();
 	my $new_size = scalar @new_elements;
@@ -140,7 +144,7 @@ sub SPLICE {
 	# Splices section of array with optional new section.
 	# Returns deleted section, or last element deleted in scalar context.
 	##
-    my $self = DBM::Deep::_get_self($_[0]);shift @_;
+    my $self = $_[0]->_get_self;shift;#DBM::Deep::_get_self($_[0]);shift @_;
 	my $length = $self->FETCHSIZE();
 	
 	##

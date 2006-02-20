@@ -31,11 +31,11 @@ package DBM::Deep;
 
 use strict;
 
-use Fcntl qw(:DEFAULT :flock :seek);
+use Fcntl qw( :DEFAULT :flock :seek );
 use Digest::MD5 ();
 use Scalar::Util ();
-use vars qw/$VERSION/;
 
+use vars qw( $VERSION );
 $VERSION = "0.96";
 
 ##
@@ -102,6 +102,7 @@ sub SIG_SIZE  () {  1  }
 sub TYPE_HASH  () { return SIG_HASH; }
 sub TYPE_ARRAY () { return SIG_ARRAY; }
 
+sub _get_self { $_[0] }
 sub new {
 	##
 	# Class constructor method for Perl OO interface.
@@ -162,10 +163,6 @@ sub new {
     }
 }
 
-sub _get_self {
-    tied( %{$_[0]} ) || $_[0]
-}
-
 sub TIEHASH {
     shift;
     require DBM::Deep::Hash;
@@ -182,36 +179,32 @@ sub TIEARRAY {
 #sub DESTROY {
 #}
 
-my %translate_mode = (
-    'r' => '<',
-    'r+' => '+<',
-    'w' => '>',
-    'w+' => '+>',
-    'a' => '>>',
-    'a+' => '+>>',
-);
 sub _open {
 	##
 	# Open a FileHandle to the database, create if nonexistent.
 	# Make sure file signature matches DeepDB spec.
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 
 	if (defined($self->fh)) { $self->_close(); }
 	
     eval {
-        my $filename = $self->root->{file};
+        # Theoretically, adding O_BINARY should remove the need for the binmode
+        # Of course, testing it is going to be ... interesting.
+        my $flags = O_RDWR | O_CREAT | O_BINARY;
+
         #XXX Can the mode be anything but r+, w+, or a+??
         #XXX ie, it has to be in read-write mode
-        my $mode = $translate_mode{ $self->root->{mode} };
+        #XXX So, should we verify that the mode is legitimate?
 
-        if (!(-e $filename) && $mode eq '+<') {
-            sysopen( FH, $filename, O_CREAT | O_WRONLY, 0666 );
-            close FH;
+        #XXX Maybe the mode thingy should just go away. There's no good
+        #XXX reason for it ...
+        if ( $self->root->{mode} eq 'w+' ) {
+            $flags |= O_TRUNC;
         }
 	
         my $fh;
-        sysopen( $fh, $filename, O_RDWR )
+        sysopen( $fh, $self->root->{file}, $flags )
             or $fh = undef;
         $self->root->{fh} = $fh;
     }; if ($@ ) { $self->_throw_error( "Received error: $@\n" ); }
@@ -222,8 +215,7 @@ sub _open {
     my $fh = $self->fh;
 
     #XXX Can we remove this by using the right sysopen() flags?
-    #XXX I don't think so - there's an item in fopen(3) about rb+, but I'm not sure
-    #XXX That will work.
+    # Maybe ... q.v. above
     binmode $fh; # for win32
 
     if ($self->root->{autoflush}) {
@@ -232,8 +224,10 @@ sub _open {
         select $old;
     }
     
-    my $signature;
+    # Set the 
     seek($fh, 0, SEEK_SET);
+
+    my $signature;
     my $bytes_read = read( $fh, $signature, length(SIG_FILE));
     
     ##
@@ -290,7 +284,7 @@ sub _close {
 	##
 	# Close database FileHandle
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
     close $self->root->{fh};
 }
 
@@ -875,7 +869,7 @@ sub _get_next_key {
 	##
 	# Locate next key, given digested previous one
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	
 	$self->{prev_md5} = $_[1] ? $_[1] : undef;
 	$self->{return_next} = 0;
@@ -898,7 +892,7 @@ sub lock {
 	# times before unlock(), then the same number of unlocks() must
 	# be called before the lock is released.
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	my $type = $_[1];
     $type = LOCK_EX unless defined $type;
 	
@@ -917,7 +911,7 @@ sub unlock {
 	# If db locking is set, unlock the db file.  See note in lock()
 	# regarding calling lock() multiple times.
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	
 	if ($self->root->{locking} && $self->root->{locked} > 0) {
 		$self->root->{locked}--;
@@ -935,7 +929,7 @@ sub _copy_node {
 	# Copy single level of keys or elements to new DB handle.
 	# Recurse for nested structures
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	my $db_temp = $_[1];
 
 	if ($self->type eq TYPE_HASH) {
@@ -973,7 +967,7 @@ sub export {
 	##
 	# Recursively export into standard Perl hashes and arrays.
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	
 	my $temp;
 	if ($self->type eq TYPE_HASH) { $temp = {}; }
@@ -993,7 +987,7 @@ sub import {
     #XXX This use of ref() seems to be ok
 	if (!ref($_[0])) { return; } # Perl calls import() on use -- ignore
 	
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	my $struct = $_[1];
 	
     #XXX This use of ref() seems to be ok
@@ -1026,7 +1020,7 @@ sub optimize {
 	# Rebuild entire database into new file, then move
 	# it back on top of original.
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 
 #XXX Need to create a new test for this
 #	if ($self->root->{links} > 1) {
@@ -1084,7 +1078,7 @@ sub clone {
 	##
 	# Make copy of object and return
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	
 	return DBM::Deep->new(
 		type => $self->type,
@@ -1105,7 +1099,7 @@ sub clone {
         ##
         # Setup filter function for storing or fetching the key or value
         ##
-        my $self = _get_self($_[0]);
+        my $self = $_[0]->_get_self;#_get_self($_[0]);
         my $type = lc $_[1];
         my $func = $_[2] ? $_[2] : undef;
 	
@@ -1126,7 +1120,7 @@ sub root {
 	##
 	# Get access to the root structure
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	return $self->{root};
 }
 
@@ -1135,7 +1129,7 @@ sub fh {
 	# Get access to the raw FileHandle
 	##
     #XXX It will be useful, though, when we split out HASH and ARRAY
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	return $self->root->{fh};
 }
 
@@ -1143,7 +1137,7 @@ sub type {
 	##
 	# Get type of current node (TYPE_HASH or TYPE_ARRAY)
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	return $self->{type};
 }
 
@@ -1151,7 +1145,7 @@ sub base_offset {
 	##
 	# Get base_offset of current node (TYPE_HASH or TYPE_ARRAY)
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	return $self->{base_offset};
 }
 
@@ -1160,7 +1154,8 @@ sub error {
 	# Get last error string, or undef if no error
 	##
 	return $_[0]
-        ? ( _get_self($_[0])->{root}->{error} or undef )
+        #? ( _get_self($_[0])->{root}->{error} or undef )
+        ? ( $_[0]->_get_self->{root}->{error} or undef )
         : $@;
 }
 
@@ -1172,7 +1167,7 @@ sub _throw_error {
 	##
 	# Store error string in self
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	my $error_text = $_[1];
 	
 	$self->root->{error} = $error_text;
@@ -1189,7 +1184,7 @@ sub clear_error {
 	##
 	# Clear error state
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	
 	undef $self->root->{error};
 }
@@ -1242,7 +1237,7 @@ sub STORE {
 	##
 	# Store single hash key/value or array element in database.
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	my $key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
     #XXX What is ref() checking here?
     #YYY User may be storing a hash, in which case we do not want it run 
@@ -1329,7 +1324,7 @@ sub FETCH {
 	##
 	# Fetch single value or element given plain key or array index
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 
     my $key = $_[1];
     if ( $self->type eq TYPE_HASH ) {
@@ -1376,7 +1371,7 @@ sub DELETE {
 	##
 	# Delete single key/value pair or element given plain key or array index
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	my $key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
 	
 	my $unpacked_key = $key;
@@ -1421,7 +1416,7 @@ sub EXISTS {
 	##
 	# Check if a single key or element exists given plain key or array index
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 	my $key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
 	
 	if (($self->type eq TYPE_ARRAY) && ($key =~ /^\d+$/)) { $key = pack($LONG_PACK, $key); }
@@ -1461,7 +1456,7 @@ sub CLEAR {
 	##
 	# Clear all keys from hash, or all elements from array.
 	##
-    my $self = _get_self($_[0]);
+    my $self = $_[0]->_get_self;#_get_self($_[0]);
 
 	##
 	# Make sure file is open

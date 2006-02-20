@@ -6,7 +6,6 @@ my $build = Module::Build->new(
     module_name => 'DBM::Deep',
     license => 'perl',
     requires => {
-#        'Carp'         => '0.01',
         'Digest::MD5'  => '1.00',
         'Scalar::Util' => '1.18',
     },

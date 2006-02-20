@@ -4,6 +4,10 @@ use strict;
 
 use base 'DBM::Deep';
 
+sub _get_self {
+    tied( %{$_[0]} ) || $_[0]
+}
+
 sub TIEHASH {
     ##
     # Tied hash constructor method, called by Perl's tie() function.
@@ -24,7 +28,7 @@ sub FIRSTKEY {
 	##
 	# Locate and return first key (in no particular order)
 	##
-    my $self = DBM::Deep::_get_self($_[0]);
+    my $self = $_[0]->_get_self;#DBM::Deep::_get_self($_[0]);
 
 	##
 	# Make sure file is open
@@ -49,7 +53,7 @@ sub NEXTKEY {
 	##
 	# Return next key (in no particular order), given previous one
 	##
-    my $self = DBM::Deep::_get_self($_[0]);
+    my $self = $_[0]->_get_self;#DBM::Deep::_get_self($_[0]);
 
 	my $prev_key = ($self->root->{filter_store_key})
         ? $self->root->{filter_store_key}->($_[1])

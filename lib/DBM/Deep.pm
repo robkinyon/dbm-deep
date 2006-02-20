@@ -264,6 +264,7 @@ sub _open {
     my $tag = $self->_load_tag($self->base_offset);
 
 #XXX We probably also want to store the hash algorithm name and not assume anything
+#XXX The cool thing would be to allow a different hashing algorithm at every level
 
     if (!$tag) {
     	return $self->_throw_error("Corrupted file, no master index record");

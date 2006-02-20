@@ -102,7 +102,6 @@ sub SIG_SIZE  () {  1  }
 sub TYPE_HASH  () { return SIG_HASH; }
 sub TYPE_ARRAY () { return SIG_ARRAY; }
 
-sub _get_self { $_[0] }
 sub new {
 	##
 	# Class constructor method for Perl OO interface.
@@ -141,6 +140,7 @@ sub new {
         my $class = shift;
         my $args = shift;
 
+        # These are the defaults to be optionally overridden below
         my $self = {
             type => TYPE_HASH,
             base_offset => length(SIG_FILE),
@@ -184,7 +184,7 @@ sub _open {
 	# Open a FileHandle to the database, create if nonexistent.
 	# Make sure file signature matches DeepDB spec.
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 
 	if (defined($self->fh)) { $self->_close(); }
 	
@@ -284,7 +284,7 @@ sub _close {
 	##
 	# Close database FileHandle
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
     close $self->root->{fh};
 }
 
@@ -869,7 +869,7 @@ sub _get_next_key {
 	##
 	# Locate next key, given digested previous one
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	
 	$self->{prev_md5} = $_[1] ? $_[1] : undef;
 	$self->{return_next} = 0;
@@ -892,7 +892,7 @@ sub lock {
 	# times before unlock(), then the same number of unlocks() must
 	# be called before the lock is released.
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	my $type = $_[1];
     $type = LOCK_EX unless defined $type;
 	
@@ -911,7 +911,7 @@ sub unlock {
 	# If db locking is set, unlock the db file.  See note in lock()
 	# regarding calling lock() multiple times.
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	
 	if ($self->root->{locking} && $self->root->{locked} > 0) {
 		$self->root->{locked}--;
@@ -929,7 +929,7 @@ sub _copy_node {
 	# Copy single level of keys or elements to new DB handle.
 	# Recurse for nested structures
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	my $db_temp = $_[1];
 
 	if ($self->type eq TYPE_HASH) {
@@ -967,7 +967,7 @@ sub export {
 	##
 	# Recursively export into standard Perl hashes and arrays.
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	
 	my $temp;
 	if ($self->type eq TYPE_HASH) { $temp = {}; }
@@ -987,7 +987,7 @@ sub import {
     #XXX This use of ref() seems to be ok
 	if (!ref($_[0])) { return; } # Perl calls import() on use -- ignore
 	
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	my $struct = $_[1];
 	
     #XXX This use of ref() seems to be ok
@@ -1020,7 +1020,7 @@ sub optimize {
 	# Rebuild entire database into new file, then move
 	# it back on top of original.
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 
 #XXX Need to create a new test for this
 #	if ($self->root->{links} > 1) {
@@ -1078,7 +1078,7 @@ sub clone {
 	##
 	# Make copy of object and return
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	
 	return DBM::Deep->new(
 		type => $self->type,
@@ -1099,7 +1099,7 @@ sub clone {
         ##
         # Setup filter function for storing or fetching the key or value
         ##
-        my $self = $_[0]->_get_self;#_get_self($_[0]);
+        my $self = $_[0]->_get_self;
         my $type = lc $_[1];
         my $func = $_[2] ? $_[2] : undef;
 	
@@ -1120,7 +1120,7 @@ sub root {
 	##
 	# Get access to the root structure
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	return $self->{root};
 }
 
@@ -1129,7 +1129,7 @@ sub fh {
 	# Get access to the raw FileHandle
 	##
     #XXX It will be useful, though, when we split out HASH and ARRAY
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	return $self->root->{fh};
 }
 
@@ -1137,7 +1137,7 @@ sub type {
 	##
 	# Get type of current node (TYPE_HASH or TYPE_ARRAY)
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	return $self->{type};
 }
 
@@ -1145,7 +1145,7 @@ sub base_offset {
 	##
 	# Get base_offset of current node (TYPE_HASH or TYPE_ARRAY)
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	return $self->{base_offset};
 }
 
@@ -1167,7 +1167,7 @@ sub _throw_error {
 	##
 	# Store error string in self
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	my $error_text = $_[1];
 	
 	$self->root->{error} = $error_text;
@@ -1184,7 +1184,7 @@ sub clear_error {
 	##
 	# Clear error state
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	
 	undef $self->root->{error};
 }
@@ -1237,7 +1237,7 @@ sub STORE {
 	##
 	# Store single hash key/value or array element in database.
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	my $key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
     #XXX What is ref() checking here?
     #YYY User may be storing a hash, in which case we do not want it run 
@@ -1324,7 +1324,7 @@ sub FETCH {
 	##
 	# Fetch single value or element given plain key or array index
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 
     my $key = $_[1];
     if ( $self->type eq TYPE_HASH ) {
@@ -1371,7 +1371,7 @@ sub DELETE {
 	##
 	# Delete single key/value pair or element given plain key or array index
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	my $key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
 	
 	my $unpacked_key = $key;
@@ -1416,7 +1416,7 @@ sub EXISTS {
 	##
 	# Check if a single key or element exists given plain key or array index
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 	my $key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
 	
 	if (($self->type eq TYPE_ARRAY) && ($key =~ /^\d+$/)) { $key = pack($LONG_PACK, $key); }
@@ -1456,7 +1456,7 @@ sub CLEAR {
 	##
 	# Clear all keys from hash, or all elements from array.
 	##
-    my $self = $_[0]->_get_self;#_get_self($_[0]);
+    my $self = $_[0]->_get_self;
 
 	##
 	# Make sure file is open
@@ -2664,10 +2664,10 @@ module's test suite.
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
   File                           stmt   bran   cond    sub    pod   time  total
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm           94.1   82.9   74.5   98.0   10.5   98.1   88.2
-  blib/lib/DBM/Deep/Array.pm     97.8   83.3   50.0  100.0    n/a    1.6   94.4
-  blib/lib/DBM/Deep/Hash.pm      93.3   85.7  100.0  100.0    n/a    0.3   92.7
-  Total                          94.5   83.1   75.5   98.4   10.5  100.0   89.0
+  blib/lib/DBM/Deep.pm           93.9   82.4   74.7   97.9   10.5   85.7   88.0
+  blib/lib/DBM/Deep/Array.pm     97.8   84.6   50.0  100.0    n/a    9.0   94.6
+  blib/lib/DBM/Deep/Hash.pm      93.9   87.5  100.0  100.0    n/a    5.3   93.4
+  Total                          94.4   82.9   75.8   98.5   10.5  100.0   89.0
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 AUTHOR

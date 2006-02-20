@@ -36,7 +36,7 @@ use Digest::MD5 ();
 use Scalar::Util ();
 
 use vars qw( $VERSION );
-$VERSION = "0.96";
+$VERSION = q(0.96);
 
 ##
 # Set to 4 and 'N' for 32-bit offset tags (default).  Theoretical limit of 4 GB per file.
@@ -131,36 +131,31 @@ sub new {
 	return bless $self, $class;
 }
 
-{
-    my @outer_params = qw( type base_offset );
-    sub _init {
-        ##
-        # Setup $self and bless into this class.
-        ##
-        my $class = shift;
-        my $args = shift;
+sub _init {
+    ##
+    # Setup $self and bless into this class.
+    ##
+    my $class = shift;
+    my $args = shift;
 
-        # These are the defaults to be optionally overridden below
-        my $self = {
-            type => TYPE_HASH,
-            base_offset => length(SIG_FILE),
-        };
+    # These are the defaults to be optionally overridden below
+    my $self = bless {
+        type => TYPE_HASH,
+        base_offset => length(SIG_FILE),
+    }, $class;
 
-        bless $self, $class;
-
-        foreach my $outer_parm ( @outer_params ) {
-            next unless exists $args->{$outer_parm};
-            $self->{$outer_parm} = delete $args->{$outer_parm}
-        }
-        
-        $self->{root} = exists $args->{root}
-            ? $args->{root}
-            : DBM::Deep::_::Root->new( $args );
-
-        if (!defined($self->fh)) { $self->_open(); }
-
-        return $self;
+    foreach my $param ( keys %$self ) {
+        next unless exists $args->{$param};
+        $self->{$param} = delete $args->{$param}
     }
+    
+    $self->{root} = exists $args->{root}
+        ? $args->{root}
+        : DBM::Deep::_::Root->new( $args );
+
+    if (!defined($self->fh)) { $self->_open(); }
+
+    return $self;
 }
 
 sub TIEHASH {

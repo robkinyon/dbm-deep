@@ -4,6 +4,8 @@ use strict;
 
 use base 'DBM::Deep';
 
+use Scalar::Util ();
+
 sub _get_self {
     eval { tied( @{$_[0]} ) } || $_[0]
 }
@@ -20,9 +22,15 @@ sub TIEARRAY {
         }
         $args = {@_};
     }
-    #XXX This use of ref() is bad and is a bug
-	elsif (ref($_[0])) { $args = $_[0]; }
-	else { $args = { file => shift }; }
+	elsif ( my $type = Scalar::Util::reftype($_[0]) ) {
+        if ( $type ne 'HASH' ) {
+            $class->_throw_error( "Not a hashref in TIEARRAY" );
+        }
+        $args = $_[0];
+    }
+	else {
+        $args = { file => shift };
+    }
 	
 	$args->{type} = $class->TYPE_ARRAY;
 	

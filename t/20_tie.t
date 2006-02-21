@@ -70,40 +70,15 @@ use_ok( 'DBM::Deep' );
     is( $db->{type}, DBM::Deep->TYPE_ARRAY, "TIE_ARRAY sets the correct type" );
 }
 
-# These are testing the naive use of ref() within TIEHASH and TIEARRAY.
-# They should be doing (Scalar::Util::reftype($_[0]) eq 'HASH') and then
-# erroring out if it's not.
-TODO: {
-    todo_skip( "Naive use of {\@_}", 1 );
-    unlink "t/test.db";
-    my %hash;
-    my $db = tie %hash, 'DBM::Deep', [
-        file => 't/test.db',
-    ];
+unlink "t/test.db";
+throws_ok {
+    tie my %hash, 'DBM::Deep', [ file => 't/test.db' ];
+} qr/Not a hashref/, "Passing an arrayref to TIEHASH fails";
 
-    if ($db->error()) {
-        print "ERROR: " . $db->error();
-        ok(0);
-        exit(0);
-    }
-    else { ok(1); }
-}
-
-TODO: {
-    todo_skip( "Naive use of {\@_}", 1 );
-    unlink "t/test.db";
-    my @array;
-    my $db = tie @array, 'DBM::Deep', [
-        file => 't/test.db',
-    ];
-
-    if ($db->error()) {
-        print "ERROR: " . $db->error();
-        ok(0);
-        exit(0);
-    }
-    else { ok(1); }
-}
+unlink "t/test.db";
+throws_ok {
+    tie my @array, 'DBM::Deep', [ file => 't/test.db' ];
+} qr/Not a hashref/, "Passing an arrayref to TIEARRAY fails";
 
 unlink "t/test.db";
 throws_ok {

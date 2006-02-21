@@ -20,8 +20,12 @@ sub TIEHASH {
         }
         $args = {@_};
     }
-    #XXX This use of ref() is bad and is a bug
-    elsif (ref($_[0])) { $args = $_[0]; }
+	elsif ( my $type = Scalar::Util::reftype($_[0]) ) {
+        if ( $type ne 'HASH' ) {
+            $class->_throw_error( "Not a hashref in TIEHASH" );
+        }
+        $args = $_[0];
+    }
     else { $args = { file => shift }; }
     
     $args->{type} = $class->TYPE_HASH;

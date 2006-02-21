@@ -31,24 +31,19 @@ unlink "t/test.db";
     ok( exists $hash{key1}, "... and it's key1" );
 }
 
-TODO: {
-    local $TODO = "Sig doesn't match, but it's legal??";
-    my @array;
-    throws_ok {
-        tie @array, 'DBM::Deep', {
-            file => 't/test.db',
-            type => DBM::Deep->TYPE_ARRAY,
-        };
-    } qr/DBM::Deep: Cannot open a hash-based file with an array/, "\$SIG_TYPE doesn't match file's type";
+throws_ok {
+    tie my @array, 'DBM::Deep', {
+        file => 't/test.db',
+        type => DBM::Deep->TYPE_ARRAY,
+    };
+} qr/DBM::Deep: File type mismatch/, "\$SIG_TYPE doesn't match file's type";
 
-    unlink "t/test.db";
-    DBM::Deep->new( file => 't/test.db', type => DBM::Deep->TYPE_ARRAY );
+unlink "t/test.db";
+DBM::Deep->new( file => 't/test.db', type => DBM::Deep->TYPE_ARRAY );
 
-    my %hash;
-    throws_ok {
-        tie %hash, 'DBM::Deep', {
-            file => 't/test.db',
-            type => DBM::Deep->TYPE_HASH,
-        };
-    } qr/DBM::Deep: Cannot open a array-based file with a hash/, "\$SIG_TYPE doesn't match file's type";
-}
+throws_ok {
+    tie my %hash, 'DBM::Deep', {
+        file => 't/test.db',
+        type => DBM::Deep->TYPE_HASH,
+    };
+} qr/DBM::Deep: File type mismatch/, "\$SIG_TYPE doesn't match file's type";

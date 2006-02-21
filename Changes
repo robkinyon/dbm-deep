@@ -26,6 +26,7 @@ Revision history for DBM::Deep.
         "eval { $obj->isa( 'DBM::Deep' ) }".
     - The various methods like push and delete now have the same return values as
       the standard builtins.
+    - TIEARRAY and TIEHASH now check their parameters more thoroughly
 
 0.96  Oct 14 09:55:00 2005 Pacific
     - Fixed build (OS X hidden files killed it)

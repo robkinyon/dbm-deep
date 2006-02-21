@@ -2,10 +2,10 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More;
-BEGIN { plan tests => 10 }
+use Test::More tests => 11;
+use Test::Exception;
 
-use DBM::Deep;
+use_ok( 'DBM::Deep' );
 
 ##
 # testing the various modes of opening a file
@@ -74,7 +74,7 @@ use DBM::Deep;
 # They should be doing (Scalar::Util::reftype($_[0]) eq 'HASH') and then
 # erroring out if it's not.
 TODO: {
-    todo_skip "Naive use of ref()", 1;
+    todo_skip( "Naive use of {\@_}", 1 );
     unlink "t/test.db";
     my %hash;
     my $db = tie %hash, 'DBM::Deep', [
@@ -90,7 +90,7 @@ TODO: {
 }
 
 TODO: {
-    todo_skip "Naive use of ref()", 1;
+    todo_skip( "Naive use of {\@_}", 1 );
     unlink "t/test.db";
     my @array;
     my $db = tie @array, 'DBM::Deep', [
@@ -105,37 +105,12 @@ TODO: {
     else { ok(1); }
 }
 
-# These are testing the naive use of the {@_} construct within TIEHASH and
-# TIEARRAY. Instead, they should be checking (@_ % 2 == 0) and erroring out
-# if it's not.
-TODO: {
-    todo_skip( "Naive use of {\@_}", 1 );
-    unlink "t/test.db";
-    my %hash;
-    my $db = tie %hash, 'DBM::Deep',
-        undef, file => 't/test.db'
-    ;
+unlink "t/test.db";
+throws_ok {
+    tie my %hash, 'DBM::Deep', undef, file => 't/test.db';
+} qr/Odd number of parameters/, "Odd number of params to TIEHASH fails";
 
-    if ($db->error()) {
-        print "ERROR: " . $db->error();
-        ok(0);
-        exit(0);
-    }
-    else { ok(1); }
-}
-
-TODO: {
-    todo_skip( "Naive use of {\@_}", 1 );
-    unlink "t/test.db";
-    my @array;
-    my $db = tie @array, 'DBM::Deep',
-        undef, file => 't/test.db'
-    ;
-
-    if ($db->error()) {
-        print "ERROR: " . $db->error();
-        ok(0);
-        exit(0);
-    }
-    else { ok(1); }
-}
+unlink "t/test.db";
+throws_ok {
+    tie my @array, 'DBM::Deep', undef, file => 't/test.db';
+} qr/Odd number of parameters/, "Odd number of params to TIEARRAY fails";

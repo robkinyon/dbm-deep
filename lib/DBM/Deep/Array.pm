@@ -14,7 +14,12 @@ sub TIEARRAY {
 ##
     my $class = shift;
     my $args;
-    if (scalar(@_) > 1) { $args = {@_}; }
+    if (scalar(@_) > 1) {
+        if ( @_ % 2 ) {
+            $class->_throw_error( "Odd number of parameters to TIEARRAY" );
+        }
+        $args = {@_};
+    }
     #XXX This use of ref() is bad and is a bug
 	elsif (ref($_[0])) { $args = $_[0]; }
 	else { $args = { file => shift }; }

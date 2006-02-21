@@ -3,6 +3,7 @@ Revision history for DBM::Deep.
 0.97  ??? ?? ??:??:?? 2006 Pacific
     - Reorganization of distribution
     - Migration to Module::Build with EU::MM backwards compatibility
+    - Migration to Test::More (using Test::Exception)
     - Test coverage improved to 89.6% (and climbing)
     - The following methods have been renamed to reflect their private nature:
         - init() is now _init()
@@ -20,6 +21,11 @@ Revision history for DBM::Deep.
         - copy_node() is now _copy_node()
         - throw_error() is now _throw_error()
     - Added Devel::Cover report
+    - The various tied classes have been broken out. This means that testing
+        "ref( $obj ) eq 'DBM::Deep'" will now fail. The correct test is
+        "eval { $obj->isa( 'DBM::Deep' ) }".
+    - The various methods like push and delete now have the same return values as
+      the standard builtins.
 
 0.96  Oct 14 09:55:00 2005 Pacific
     - Fixed build (OS X hidden files killed it)

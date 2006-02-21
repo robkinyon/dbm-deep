@@ -1168,14 +1168,19 @@ sub _throw_error {
     my $self = $_[0]->_get_self;
 	my $error_text = $_[1];
 	
-	$self->root->{error} = $error_text;
+    if ( Scalar::Util::blessed $self ) {
+        $self->root->{error} = $error_text;
 	
-	unless ($self->root->{debug}) {
+        unless ($self->root->{debug}) {
+            die "DBM::Deep: $error_text\n";
+        }
+
+        warn "DBM::Deep: $error_text\n";
+        return;
+    }
+    else {
         die "DBM::Deep: $error_text\n";
     }
-
-    warn "DBM::Deep: $error_text\n";
-	return;
 }
 
 sub clear_error {

@@ -90,6 +90,8 @@ sub PUSH {
 		$self->STORE( $length, $content );
 		$length++;
 	}
+
+    return $length;
 }
 
 sub SHIFT {
@@ -137,6 +139,8 @@ sub UNSHIFT {
 	for (my $i = 0; $i < $new_size; $i++) {
 		$self->STORE( $i, $new_elements[$i] );
 	}
+
+    return $length + $new_size;
 }
 
 sub SPLICE {

@@ -140,12 +140,10 @@ is( $db->length(), 0, "After pop() on empty array, length is still 0" );
 is( $db->shift, undef, "shift on an empty array returns undef" );
 is( $db->length(), 0, "After shift() on empty array, length is still 0" );
 
-TODO: {
-    local $TODO = "unshift returns the number of elements in the array";
-    is( $db->unshift( 1, 2, 3 ), 3, "unshift returns the number of elements in the array" );
-    is( $db->unshift( 1, 2, 3 ), 6, "unshift returns the number of elements in the array" );
-    is( $db->push( 1, 2, 3 ), 9, "unshift returns the number of elements in the array" );
-}
+is( $db->unshift( 1, 2, 3 ), 3, "unshift returns the number of elements in the array" );
+is( $db->unshift( 1, 2, 3 ), 6, "unshift returns the number of elements in the array" );
+is( $db->push( 1, 2, 3 ), 9, "push returns the number of elements in the array" );
+
 is( $db->length(), 9, "After unshift and push on empty array, length is now 9" );
 
 $db->clear;

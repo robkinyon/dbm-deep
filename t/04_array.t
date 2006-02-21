@@ -87,10 +87,7 @@ is( $db->length, 3, "... and we still have three after deleting" );
 is( $db->[0], undef, "0th element now undef" );
 is( $db->[1], 'elem2', "1st element still there after deleting" );
 is( $db->[2], 'elem3', "2nd element still there after deleting" );
-TODO: {
-    local $TODO = "delete on an array element should return the deleted value";
-    is( $deleted, 'elem1', "Deleted value is correct" );
-}
+is( $deleted, 'elem1', "Deleted value is correct" );
 
 is( $db->delete(99), undef, 'delete on an element not in the array returns undef' );
 is( $db->length, 3, "... and we still have three after a delete on an out-of-range index" );
@@ -113,7 +110,7 @@ TODO: {
 }
 is( $db->[2], 'elem3', "2nd element still there after deleting" );
 TODO: {
-    local $TODO = "delete on an array element should return the deleted value";
+    local $TODO = "delete on a negative array element should return the deleted value";
     is( $deleted, 'elem2', "Deleted value is correct" );
 }
 

@@ -65,11 +65,8 @@ is( $temphash->{key3}, 'value3', "Third key copied successfully" );
 ##
 # delete keys
 ##
-TODO: {
-    local $TODO = "Delete should return the deleted value";
-    is( delete $db->{key1}, 'value1', "delete through tied inteface works" );
-    is( $db->delete("key2"), undef, "delete through OO inteface works" );
-}
+is( delete $db->{key1}, 'value1', "delete through tied inteface works" );
+is( $db->delete("key2"), undef, "delete through OO inteface works" );
 
 is( scalar keys %$db, 1, "After deleting two keys, 1 remains" );
 

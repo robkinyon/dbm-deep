@@ -87,20 +87,22 @@ set_digest();
 ##
 # Setup file and tag signatures.  These should never change.
 ##
-sub SIG_FILE  () { 'DPDB' }
-sub SIG_HASH  () { 'H' }
-sub SIG_ARRAY () { 'A' }
-sub SIG_NULL  () { 'N' }
-sub SIG_DATA  () { 'D' }
-sub SIG_INDEX () { 'I' }
-sub SIG_BLIST () { 'B' }
-sub SIG_SIZE  () {  1  }
+sub SIG_FILE   () { 'DPDB' }
+sub SIG_HASH   () { 'H' }
+sub SIG_ARRAY  () { 'A' }
+sub SIG_SCALAR () { 'S' }
+sub SIG_NULL   () { 'N' }
+sub SIG_DATA   () { 'D' }
+sub SIG_INDEX  () { 'I' }
+sub SIG_BLIST  () { 'B' }
+sub SIG_SIZE   () {  1  }
 
 ##
 # Setup constants for users to pass to new()
 ##
-sub TYPE_HASH  () { return SIG_HASH; }
-sub TYPE_ARRAY () { return SIG_ARRAY; }
+sub TYPE_HASH   () { return SIG_HASH; }
+sub TYPE_ARRAY  () { return SIG_ARRAY; }
+sub TYPE_SCALAR () { return SIG_SCALAR; }
 
 sub new {
 	##
@@ -1234,14 +1236,18 @@ sub STORE {
 	# Store single hash key/value or array element in database.
 	##
     my $self = $_[0]->_get_self;
-	my $key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
+	my $key = $_[1];
+
     #XXX What is ref() checking here?
     #YYY User may be storing a hash, in which case we do not want it run 
     #YYY through the filtering system
-	my $value = ($self->root->{filter_store_value} && !ref($_[2])) ? $self->root->{filter_store_value}->($_[2]) : $_[2];
+	my $value = ($self->root->{filter_store_value} && !ref($_[2]))
+        ? $self->root->{filter_store_value}->($_[2])
+        : $_[2];
 	
 	my $unpacked_key = $key;
 	if (($self->type eq TYPE_ARRAY) && ($key =~ /^\d+$/)) { $key = pack($LONG_PACK, $key); }
+
 	my $md5 = $DIGEST_FUNC->($key);
 	
 	##
@@ -1393,6 +1399,7 @@ sub DELETE {
 	##
 	# Delete bucket
 	##
+    my $value = $self->FETCH( $unpacked_key );
 	my $result = $self->_delete_bucket( $tag, $md5 );
 	
 	##
@@ -1405,7 +1412,7 @@ sub DELETE {
 	
 	$self->unlock();
 	
-	return $result;
+	return $value;
 }
 
 sub EXISTS {

@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 90;
+use Test::More tests => 94;
 use Test::Exception;
 
 use_ok( 'DBM::Deep' );
@@ -61,13 +61,19 @@ is( $db->[-5], $db->[0], "-5th index is 0th index" );
 is( $db->[-6], undef, "-6th index is undef" );
 is( $db->length, 5, "... and we have five elements after abortive -6 index lookup" );
 
+$db->[-1] = 'elem4.1';
+is( $db->[-1], 'elem4.1' );
+is( $db->[4], 'elem4.1' );
+is( $db->get(4), 'elem4.1' );
+is( $db->fetch(4), 'elem4.1' );
+
 my $popped = $db->pop;
 is( $db->length, 4, "... and we have four after popping" );
 is( $db->[0], 'elem0', "0th element still there after popping" );
 is( $db->[1], 'elem1', "1st element still there after popping" );
 is( $db->[2], 'elem2', "2nd element still there after popping" );
 is( $db->[3], 'elem3', "3rd element still there after popping" );
-is( $popped, 'elem4', "Popped value is correct" );
+is( $popped, 'elem4.1', "Popped value is correct" );
 
 my $shifted = $db->shift;
 is( $db->length, 3, "... and we have three after shifting" );

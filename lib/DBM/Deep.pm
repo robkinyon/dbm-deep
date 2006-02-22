@@ -1255,9 +1255,6 @@ sub STORE {
         ? $self->root->{filter_store_value}->($_[2])
         : $_[2];
 	
-	my $unpacked_key = $key;
-	if (($self->type eq TYPE_ARRAY) && ($key =~ /^\d+$/)) { $key = pack($LONG_PACK, $key); }
-
 	my $md5 = $DIGEST_FUNC->($key);
 	
 	##
@@ -1319,14 +1316,6 @@ sub STORE {
 	##
 	my $result = $self->_add_bucket( $tag, $md5, $key, $value );
 	
-	##
-	# If this object is an array, and bucket was not a replace, and key is numerical,
-	# and index is equal or greater than current length, advance length variable.
-	##
-	if (($result == 2) && ($self->type eq TYPE_ARRAY) && ($unpacked_key =~ /^\d+$/) && ($unpacked_key >= $self->FETCHSIZE())) {
-		$self->STORESIZE( $unpacked_key + 1 );
-	}
-	
 	$self->unlock();
 
 	return $result;
@@ -1336,22 +1325,16 @@ sub FETCH {
 	##
 	# Fetch single value or element given plain key or array index
 	##
-    my $self = $_[0]->_get_self;
-
-    my $key = $_[1];
-    if ( $self->type eq TYPE_HASH ) {
-        if ( my $filter = $self->root->{filter_store_key} ) {
-            $key = $filter->( $key );
-        }
-    }
-
-	my $md5 = $DIGEST_FUNC->($key);
+    my $self = shift->_get_self;
+    my $key = shift;
 
 	##
 	# Make sure file is open
 	##
 	if (!defined($self->fh)) { $self->_open(); }
 	
+	my $md5 = $DIGEST_FUNC->($key);
+
 	##
 	# Request shared lock for reading
 	##
@@ -1371,7 +1354,9 @@ sub FETCH {
 	$self->unlock();
 	
     #XXX What is ref() checking here?
-	return ($result && !ref($result) && $self->root->{filter_fetch_value}) ? $self->root->{filter_fetch_value}->($result) : $result;
+	return ($result && !ref($result) && $self->root->{filter_fetch_value})
+        ? $self->root->{filter_fetch_value}->($result)
+        : $result;
 }
 
 sub DELETE {

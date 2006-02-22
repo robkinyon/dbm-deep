@@ -33,6 +33,15 @@ sub TIEHASH {
     return $class->_init($args);
 }
 
+sub FETCH {
+    my $self = shift->_get_self;
+    my $key = ($self->root->{filter_store_key})
+        ? $self->root->{filter_store_key}->($_[0])
+        : $_[0];
+
+    return $self->SUPER::FETCH( $key );
+}
+
 sub STORE {
     my $self = shift->_get_self;
 	my $key = ($self->root->{filter_store_key})

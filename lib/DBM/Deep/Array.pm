@@ -39,10 +39,6 @@ sub TIEARRAY {
 	return $class->_init($args);
 }
 
-##
-# The following methods are for arrays only
-##
-
 sub FETCH {
     my $self = $_[0]->_get_self;
     my $key = $_[1];
@@ -57,6 +53,34 @@ sub FETCH {
     }
 
     return $self->SUPER::FETCH( $key );
+}
+
+sub STORE {
+    my $self = shift->_get_self;
+    my ($key, $value) = @_;
+
+    my $unpacked_key = $key;
+    my $size = $self->FETCHSIZE;
+
+    my $numeric_idx;
+    if ( $key =~ /^-?\d+$/ ) {
+        $numeric_idx = 1;
+        if ( $key < 0 ) {
+            $key += $size;
+            #XXX What to do here?
+#            return unless $key >= 0;
+        }
+
+        $key = pack($DBM::Deep::LONG_PACK, $key);
+    }
+
+    my $rv = $self->SUPER::STORE( $key, $value );
+
+    if ( $numeric_idx && $rv == 2 && $unpacked_key >= $size ) {
+        $self->STORESIZE( $unpacked_key + 1 );
+    }
+
+    return $rv;
 }
 
 sub FETCHSIZE {
@@ -75,7 +99,8 @@ sub FETCHSIZE {
 	if ($packed_size) {
         return int(unpack($DBM::Deep::LONG_PACK, $packed_size));
     }
-	else { return 0; } 
+
+	return 0;
 }
 
 sub STORESIZE {

@@ -1,5 +1,7 @@
 package DBM::Deep::Array;
 
+$NEGATIVE_INDICES = 1;
+
 use strict;
 
 use base 'DBM::Deep';
@@ -41,6 +43,22 @@ sub TIEARRAY {
 # The following methods are for arrays only
 ##
 
+sub FETCH {
+    my $self = $_[0]->_get_self;
+    my $key = $_[1];
+
+    if ( $key =~ /^-?\d+$/ ) {
+        if ( $key < 0 ) {
+            $key += $self->FETCHSIZE;
+            return unless $key >= 0;
+        }
+
+        $key = pack($DBM::Deep::LONG_PACK, $key);
+    }
+
+    return $self->SUPER::FETCH( $key );
+}
+
 sub FETCHSIZE {
 	##
 	# Return the length of the array
@@ -54,7 +72,9 @@ sub FETCHSIZE {
 	
 	$self->root->{filter_fetch_value} = $SAVE_FILTER;
 	
-	if ($packed_size) { return int(unpack($DBM::Deep::LONG_PACK, $packed_size)); }
+	if ($packed_size) {
+        return int(unpack($DBM::Deep::LONG_PACK, $packed_size));
+    }
 	else { return 0; } 
 }
 

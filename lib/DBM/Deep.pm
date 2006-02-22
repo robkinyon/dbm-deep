@@ -284,6 +284,7 @@ sub _close {
 	##
     my $self = $_[0]->_get_self;
     close $self->root->{fh};
+    $self->root->{fh} = undef;
 }
 
 sub _create_tag {
@@ -894,6 +895,8 @@ sub lock {
 	my $type = $_[1];
     $type = LOCK_EX unless defined $type;
 	
+	if (!defined($self->fh)) { return; }
+
 	if ($self->root->{locking}) {
 		if (!$self->root->{locked}) { flock($self->fh, $type); }
 		$self->root->{locked}++;
@@ -910,6 +913,8 @@ sub unlock {
 	# regarding calling lock() multiple times.
 	##
     my $self = $_[0]->_get_self;
+
+	if (!defined($self->fh)) { return; }
 	
 	if ($self->root->{locking} && $self->root->{locked} > 0) {
 		$self->root->{locked}--;
@@ -1339,11 +1344,6 @@ sub FETCH {
             $key = $filter->( $key );
         }
     }
-    elsif ( $self->type eq TYPE_ARRAY ) { 
-        if ( $key =~ /^\d+$/ ) {
-            $key = pack($LONG_PACK, $key);
-        }
-    }
 
 	my $md5 = $DIGEST_FUNC->($key);
 
@@ -1494,8 +1494,10 @@ sub CLEAR {
 ##
 # Public method aliases
 ##
-*put = *store = *STORE;
-*get = *fetch = *FETCH;
+sub put { (shift)->STORE( @_ ) }
+sub store { (shift)->STORE( @_ ) }
+sub get { (shift)->FETCH( @_ ) }
+sub fetch { (shift)->FETCH( @_ ) }
 *delete = *DELETE;
 *exists = *EXISTS;
 *clear = *CLEAR;

@@ -31,8 +31,7 @@ throws_ok {
     my $db = DBM::Deep->new( __FILE__ );
 } qr/^DBM::Deep: Signature not found -- file is not a Deep DB/, "Only DBM::Deep DB files will be opened";
 
-TODO: {
-    local $TODO = "lock() doesn't check to see if the file is open";
+{
     my $db = DBM::Deep->new(
         file => 't/test.db',
         locking => 1,
@@ -41,8 +40,7 @@ TODO: {
     ok( !$db->lock );
 }
 
-TODO: {
-    local $TODO = "unlock() doesn't check to see if the file is open";
+{
     my $db = DBM::Deep->new(
         file => 't/test.db',
         locking => 1,

@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 89;
+use Test::More tests => 90;
 use Test::Exception;
 
 use_ok( 'DBM::Deep' );
@@ -53,15 +53,12 @@ is( $db->fetch(4), 'elem4', "fetch() for store() works" );
 
 is( $db->length, 5, "... and we have five elements" );
 
-is( $db->[-1], $db->[4], "-1st index is 4th value" );
-is( $db->[-2], $db->[3], "-2nd index is 3rd value" );
-is( $db->[-3], $db->[2], "-3rd index is 2nd value" );
-is( $db->[-4], $db->[1], "-4th index is 1st value" );
-is( $db->[-5], $db->[0], "-5th index is 0th value" );
-TODO: {
-    local $TODO = "Going off the end of the array from the back is legal";
-    eval { is( $db->[-6], undef, "-6th index is undef" ); };
-}
+is( $db->[-1], $db->[4], "-1st index is 4th index" );
+is( $db->[-2], $db->[3], "-2nd index is 3rd index" );
+is( $db->[-3], $db->[2], "-3rd index is 2nd index" );
+is( $db->[-4], $db->[1], "-4th index is 1st index" );
+is( $db->[-5], $db->[0], "-5th index is 0th index" );
+is( $db->[-6], undef, "-6th index is undef" );
 is( $db->length, 5, "... and we have five elements after abortive -6 index lookup" );
 
 my $popped = $db->pop;

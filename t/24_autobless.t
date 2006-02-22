@@ -7,7 +7,7 @@ use strict;
     sub foo { 'foo' };
 }
 
-use Test::More tests => 26;
+use Test::More tests => 28;
 
 use_ok( 'DBM::Deep' );
 
@@ -58,6 +58,17 @@ is( $db2->{unblessed}{a}, 1 );
 is( $db2->{unblessed}{b}[0], 1 );
 is( $db2->{unblessed}{b}[1], 2 );
 is( $db2->{unblessed}{b}[2], 3 );
+
+$obj2->{c} = 'new';
+is( $db2->{blessed}{c}, 'new' );
+
+undef $db2;
+
+$db2 = DBM::Deep->new(
+    file     => 't/test.db',
+    autobless => 1,
+);
+is( $db2->{blessed}{c}, 'new' );
 
 TODO: {
     todo_skip "_copy_node() doesn't work with autobless", 1;

@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 94;
+use Test::More tests => 95;
 use Test::Exception;
 
 use_ok( 'DBM::Deep' );
@@ -67,6 +67,10 @@ is( $db->[4], 'elem4.1' );
 is( $db->get(4), 'elem4.1' );
 is( $db->fetch(4), 'elem4.1' );
 
+throws_ok {
+    $db->[-6] = 'whoops!';
+} qr/Modification of non-creatable array value attempted, subscript -6/, "Correct error thrown"; 
+
 my $popped = $db->pop;
 is( $db->length, 4, "... and we have four after popping" );
 is( $db->[0], 'elem0', "0th element still there after popping" );
@@ -125,10 +129,7 @@ $db->[1] = 'elem2';
 ok( $db->exists(1), "The 1st value exists" );
 ok( !$db->exists(0), "The 0th value doesn't exists" );
 ok( !$db->exists(22), "The 22nd value doesn't exists" );
-TODO: {
-    local $TODO = "exists on negative values should work";
-    ok( $db->exists(-1), "The -1st value does exists" );
-}
+ok( $db->exists(-1), "The -1st value does exists" );
 ok( !$db->exists(-22), "The -22nd value doesn't exists" );
 
 ##

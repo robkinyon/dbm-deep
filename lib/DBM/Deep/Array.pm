@@ -59,7 +59,7 @@ sub STORE {
     my $self = shift->_get_self;
     my ($key, $value) = @_;
 
-    my $unpacked_key = $key;
+    my $orig = $key;
     my $size = $self->FETCHSIZE;
 
     my $numeric_idx;
@@ -67,8 +67,9 @@ sub STORE {
         $numeric_idx = 1;
         if ( $key < 0 ) {
             $key += $size;
-            #XXX What to do here?
-#            return unless $key >= 0;
+            if ( $key < 0 ) {
+                die( "Modification of non-creatable array value attempted, subscript $orig" );
+            }
         }
 
         $key = pack($DBM::Deep::LONG_PACK, $key);
@@ -76,11 +77,27 @@ sub STORE {
 
     my $rv = $self->SUPER::STORE( $key, $value );
 
-    if ( $numeric_idx && $rv == 2 && $unpacked_key >= $size ) {
-        $self->STORESIZE( $unpacked_key + 1 );
+    if ( $numeric_idx && $rv == 2 && $orig >= $size ) {
+        $self->STORESIZE( $orig + 1 );
     }
 
     return $rv;
+}
+
+sub EXISTS {
+    my $self = $_[0]->_get_self;
+    my $key = $_[1];
+
+    if ( $key =~ /^-?\d+$/ ) {
+        if ( $key < 0 ) {
+            $key += $self->FETCHSIZE;
+            return unless $key >= 0;
+        }
+
+        $key = pack($DBM::Deep::LONG_PACK, $key);
+    }
+
+    return $self->SUPER::EXISTS( $key );
 }
 
 sub FETCHSIZE {

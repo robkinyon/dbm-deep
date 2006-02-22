@@ -1410,9 +1410,8 @@ sub EXISTS {
 	# Check if a single key or element exists given plain key or array index
 	##
     my $self = $_[0]->_get_self;
-	my $key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
+	my $key = $_[1];
 	
-	if (($self->type eq TYPE_ARRAY) && ($key =~ /^\d+$/)) { $key = pack($LONG_PACK, $key); }
 	my $md5 = $DIGEST_FUNC->($key);
 
 	##
@@ -1483,9 +1482,9 @@ sub put { (shift)->STORE( @_ ) }
 sub store { (shift)->STORE( @_ ) }
 sub get { (shift)->FETCH( @_ ) }
 sub fetch { (shift)->FETCH( @_ ) }
-*delete = *DELETE;
-*exists = *EXISTS;
-*clear = *CLEAR;
+sub delete { (shift)->DELETE( @_ ) }
+sub exists { (shift)->EXISTS( @_ ) }
+sub clear { (shift)->CLEAR( @_ ) }
 
 package DBM::Deep::_::Root;
 

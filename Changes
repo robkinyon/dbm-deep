@@ -1,10 +1,11 @@
 Revision history for DBM::Deep.
 
 0.97  ??? ?? ??:??:?? 2006 Pacific
-    - Reorganization of distribution
+    - Reorganization of distribution to a more standard layout
     - Migration to Module::Build with EU::MM backwards compatibility
-    - Migration to Test::More (using Test::Exception)
-    - Test coverage improved to 89.6% (and climbing)
+    - Migration of all tests to use Test::More and Test::Exception
+    - Added Devel::Cover report to DBM::Deep POD
+      - Test coverage improved to 89.6% (and climbing)
     - The following methods have been renamed to reflect their private nature:
         - init() is now _init()
         - open() is now _open()
@@ -20,13 +21,16 @@ Revision history for DBM::Deep.
         - get_next_key() is now _get_next_key()
         - copy_node() is now _copy_node()
         - throw_error() is now _throw_error()
-    - Added Devel::Cover report
     - The various tied classes have been broken out. This means that testing
         "ref( $obj ) eq 'DBM::Deep'" will now fail. The correct test is
         "eval { $obj->isa( 'DBM::Deep' ) }".
     - The various methods like push and delete now have the same return values as
       the standard builtins.
     - TIEARRAY and TIEHASH now check their parameters more thoroughly
+    - Negative indices for arrays works as expected, including throwing the appropriate
+      errors.
+    - RT #16877 is fixed (DBM::Deep broken with Perl 5.9.3+)
+    - TODO: RT #14893 is fixed (tie() and new() use different parameter lists)
 
 0.96  Oct 14 09:55:00 2005 Pacific
     - Fixed build (OS X hidden files killed it)

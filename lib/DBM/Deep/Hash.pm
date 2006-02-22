@@ -61,6 +61,15 @@ sub EXISTS {
     return $self->SUPER::EXISTS( $key );
 }
 
+sub DELETE {
+    my $self = shift->_get_self;
+	my $key = ($self->root->{filter_store_key})
+        ? $self->root->{filter_store_key}->($_[0])
+        : $_[0];
+
+    return $self->SUPER::DELETE( $key );
+}
+
 sub FIRSTKEY {
 	##
 	# Locate and return first key (in no particular order)

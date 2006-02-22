@@ -1364,7 +1364,7 @@ sub DELETE {
 	# Delete single key/value pair or element given plain key or array index
 	##
     my $self = $_[0]->_get_self;
-	my $key = ($self->root->{filter_store_key} && $self->type eq TYPE_HASH) ? $self->root->{filter_store_key}->($_[1]) : $_[1];
+	my $key = $_[1];
 	
 	my $unpacked_key = $key;
 	if (($self->type eq TYPE_ARRAY) && ($key =~ /^\d+$/)) { $key = pack($LONG_PACK, $key); }

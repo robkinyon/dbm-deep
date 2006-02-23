@@ -2,16 +2,15 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test;
-BEGIN { plan tests => 2 }
+use Test::More tests => 3;
 
-use DBM::Deep;
+use_ok( 'DBM::Deep' );
 
 ##
 # basic file open
 ##
 unlink "t/test.db";
-my $db = new DBM::Deep(
+my $db = DBM::Deep->new(
 	file => "t/test.db",
 	locking => 1
 );
@@ -23,19 +22,12 @@ if ($db->error()) {
 # basic put/get
 ##
 $db->{key1} = "value1";
-ok( $db->{key1} eq "value1" );
+is( $db->{key1}, "value1", "key1 is set" );
 
 ##
 # explicit lock
 ##
-$db->lock( DBM::Deep::LOCK_EX );
+$db->lock( DBM::Deep->LOCK_EX );
 $db->{key1} = "value2";
 $db->unlock();
-ok( $db->{key1} eq "value2" );
-
-##
-# close, delete file, exit
-##
-undef $db;
-unlink "t/test.db";
-exit(0);
+is( $db->{key1}, "value2", "key1 is overridden" );

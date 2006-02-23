@@ -254,12 +254,10 @@ sub _open {
     if (!$bytes_read) {
         seek($fh, 0, SEEK_SET);
         print($fh SIG_FILE);
-        $self->root->{end} = length(SIG_FILE);
         $self->_create_tag($self->base_offset, $self->type, chr(0) x $INDEX_SIZE);
 
         my $plain_key = "[base]";
         print($fh pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
-        $self->root->{end} += $DATA_LENGTH_SIZE + length($plain_key);
 
         # Flush the filehandle
         my $old_fh = select $fh;
@@ -267,6 +265,10 @@ sub _open {
         $| = 1;
         $| = $old_af;
         select $old_fh;
+
+        my @stats = stat($fh);
+        $self->root->{inode} = $stats[1];
+        $self->root->{end} = $stats[7];
 
         return 1;
     }

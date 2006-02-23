@@ -279,7 +279,9 @@ sub _open {
         return $self->_throw_error("Signature not found -- file is not a Deep DB");
     }
 
-    $self->root->{end} = (stat($fh))[7];
+	my @stats = stat($fh);
+	$self->root->{inode} = $stats[1];
+    $self->root->{end} = $stats[7];
         
     ##
     # Get our type from master index signature
@@ -919,7 +921,16 @@ sub lock {
 	if (!defined($self->fh)) { return; }
 
 	if ($self->root->{locking}) {
-		if (!$self->root->{locked}) { flock($self->fh, $type); }
+		if (!$self->root->{locked}) {
+			flock($self->fh, $type);
+			
+			# double-check file inode, in case another process
+			# has optimize()d our file while we were waiting.
+			if ((stat($self->root->{file}))[1] != $self->root->{inode}) {
+				$self->_open(); # re-open
+				flock($self->fh, $type); # re-lock
+			}
+		}
 		$self->root->{locked}++;
 
         return 1;
@@ -1284,13 +1295,13 @@ sub STORE {
 		return;
 	}
 	##
-
-    my $fh = $self->fh;
 	
 	##
 	# Request exclusive lock for writing
 	##
 	$self->lock( LOCK_EX );
+	
+	my $fh = $self->fh;
 
 	##
 	# If locking is enabled, set 'end' parameter again, in case another

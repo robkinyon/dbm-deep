@@ -7,7 +7,7 @@ use strict;
     sub foo { 'foo' };
 }
 
-use Test::More tests => 28;
+use Test::More tests => 29;
 
 use_ok( 'DBM::Deep' );
 
@@ -133,3 +133,31 @@ undef $db3;
     isa_ok( $blessed, 'Foo' );
     is( $blessed->{a}, 1 );
 }
+
+{
+	##
+	# test blessing hash into short named class (Foo), then re-blessing into
+	# longer named class (FooFoo) and replacing key in db file, then validating
+	# content after that point in file to check for corruption.
+	##
+    unlink 't/test.db';
+    my $db = DBM::Deep->new(
+        file     => "t/test.db",
+        autobless => 1,
+    );
+    if ($db->error()) {
+        die "ERROR: " . $db->error();
+    }
+
+    my $obj = bless {}, 'Foo';
+
+    $db->{blessed} = $obj;
+    $db->{after} = "hello";
+    
+    my $obj2 = bless {}, 'FooFoo';
+    
+    $db->{blessed} = $obj2;
+
+    is( $db->{after}, "hello" );
+}
+

@@ -2,6 +2,9 @@ package DBM::Deep::Array;
 
 use strict;
 
+# This is to allow DBM::Deep::Array to handle negative indices on
+# its own. Otherwise, Perl would intercept the call to negative
+# indices for us. This was causing bugs for negative index handling.
 use vars qw( $NEGATIVE_INDICES );
 $NEGATIVE_INDICES = 1;
 

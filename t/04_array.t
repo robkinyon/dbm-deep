@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 95;
+use Test::More tests => 99;
 use Test::Exception;
 
 use_ok( 'DBM::Deep' );
@@ -158,7 +158,9 @@ is($db->[2], "elem last", "Third element is 'elem last'");
 ##
 # splice with length 1
 ##
-$db->splice( 1, 1, "middle A", "middle B" );
+my @returned = $db->splice( 1, 1, "middle A", "middle B" );
+is( scalar(@returned), 1, "One element was removed" );
+is( $returned[0], 'elem middle', "... and it was correctly removed" );
 is($db->length(), 4);
 is($db->[0], "elem first");
 is($db->[1], "middle A");
@@ -168,7 +170,8 @@ is($db->[3], "elem last");
 ##
 # splice with length of 0
 ##
-$db->splice( -1, 0, "middle C" );
+@returned = $db->splice( -1, 0, "middle C" );
+is( scalar(@returned), 0, "No elements were removed" );
 is($db->length(), 5);
 is($db->[0], "elem first");
 is($db->[1], "middle A");
@@ -179,7 +182,8 @@ is($db->[4], "elem last");
 ##
 # splice with length of 3
 ##
-$db->splice( 1, 3, "middle ABC" );
+my $returned = $db->splice( 1, 3, "middle ABC" );
+is( $returned, 'middle C', "Just the last element was returned" );
 is($db->length(), 3);
 is($db->[0], "elem first");
 is($db->[1], "middle ABC");

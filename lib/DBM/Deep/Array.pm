@@ -17,22 +17,7 @@ sub TIEARRAY {
 # Tied array constructor method, called by Perl's tie() function.
 ##
     my $class = shift;
-    my $args;
-    if (scalar(@_) > 1) {
-        if ( @_ % 2 ) {
-            $class->_throw_error( "Odd number of parameters to TIEARRAY" );
-        }
-        $args = {@_};
-    }
-	elsif ( my $type = Scalar::Util::reftype($_[0]) ) {
-        if ( $type ne 'HASH' ) {
-            $class->_throw_error( "Not a hashref in TIEARRAY" );
-        }
-        $args = $_[0];
-    }
-	else {
-        $args = { file => shift };
-    }
+    my $args = $class->_get_args( @_ );
 	
 	$args->{type} = $class->TYPE_ARRAY;
 	

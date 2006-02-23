@@ -104,6 +104,29 @@ sub TYPE_HASH   () { return SIG_HASH; }
 sub TYPE_ARRAY  () { return SIG_ARRAY; }
 sub TYPE_SCALAR () { return SIG_SCALAR; }
 
+sub _get_args {
+    my $proto = shift;
+
+    my $args;
+    if (scalar(@_) > 1) {
+        if ( @_ % 2 ) {
+            $proto->_throw_error( "Odd number of parameters to " . (caller(1))[2] );
+        }
+        $args = {@_};
+    }
+	elsif ( my $type = Scalar::Util::reftype($_[0]) ) {
+        if ( $type ne 'HASH' ) {
+            $proto->_throw_error( "Not a hashref in args to " . (caller(1))[2] );
+        }
+        $args = $_[0];
+    }
+	else {
+        $args = { file => shift };
+    }
+
+    return $args;
+}
+
 sub new {
 	##
 	# Class constructor method for Perl OO interface.
@@ -111,9 +134,7 @@ sub new {
 	# providing a hybrid OO/tie interface.
 	##
 	my $class = shift;
-	my $args;
-	if (scalar(@_) > 1) { $args = {@_}; }
-	else { $args = { file => shift }; }
+	my $args = $class->_get_args( @_ );
 	
 	##
 	# Check if we want a tied hash or array.

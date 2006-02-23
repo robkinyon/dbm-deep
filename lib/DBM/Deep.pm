@@ -388,7 +388,10 @@ sub _add_bucket {
 	my $location = 0;
 	my $result = 2;
 
-    my $is_dbm_deep = eval { $value->isa( 'DBM::Deep' ) };
+	# added ref() check first to avoid eval and runtime exception for every
+	# scalar value being stored.  performance tweak.
+    my $is_dbm_deep = ref($value) && eval { $value->isa( 'DBM::Deep' ) };
+    
 	my $internal_ref = $is_dbm_deep && ($value->root eq $self->root);
 
     my $fh = $self->fh;
@@ -1385,6 +1388,8 @@ sub FETCH {
 	$self->unlock();
 	
     #XXX What is ref() checking here?
+    #YYY Filters only apply on scalar values, so the ref check is making
+    #YYY sure the fetched bucket is a scalar, not a child hash or array.
 	return ($result && !ref($result) && $self->root->{filter_fetch_value})
         ? $self->root->{filter_fetch_value}->($result)
         : $result;
@@ -1747,7 +1752,8 @@ filehandle.  Note: Beware of using the magick *DATA handle, as this actually
 contains your entire Perl script, as well as the data following the __DATA__
 marker.  This will not work, because DBM::Deep uses absolute seek()s into the
 file.  Instead, consider reading *DATA into an IO::Scalar handle, then passing
-in that.
+in that.  Also please note optimize() will NOT work when passing in only a
+handle.  Pass in a real filename in order to use optimize().
 
 =back
 
@@ -2694,9 +2700,10 @@ blib/lib/DBM/Deep/Hash.pm      95.2   80.0  100.0  100.0    n/a    4.4   92.3
 Total                          94.8   83.2   76.5   97.6   25.9  100.0   89.7
 ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
-=head1 AUTHOR
+=head1 AUTHORS
 
 Joseph Huckaby, L<jhuckaby@cpan.org>
+Rob Kinyon, L<rkinyon@cpan.org>
 
 Special thanks to Adam Sah and Rich Gaushell!  You know why :-)
 
@@ -2707,7 +2714,7 @@ Digest::SHA256(3), Crypt::Blowfish(3), Compress::Zlib(3)
 
 =head1 LICENSE
 
-Copyright (c) 2002-2005 Joseph Huckaby.  All Rights Reserved.
+Copyright (c) 2002-2006 Joseph Huckaby.  All Rights Reserved.
 This is free software, you may use it and distribute it under the
 same terms as Perl itself.
 

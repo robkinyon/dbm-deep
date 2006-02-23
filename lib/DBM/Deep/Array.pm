@@ -1,8 +1,9 @@
 package DBM::Deep::Array;
 
-$NEGATIVE_INDICES = 1;
-
 use strict;
+
+use vars qw( $NEGATIVE_INDICES );
+$NEGATIVE_INDICES = 1;
 
 use base 'DBM::Deep';
 

@@ -36,7 +36,7 @@ use Digest::MD5 ();
 use Scalar::Util ();
 
 use vars qw( $VERSION );
-$VERSION = q(0.96);
+$VERSION = q(0.97);
 
 ##
 # Set to 4 and 'N' for 32-bit offset tags (default).  Theoretical limit of 4 GB per file.
@@ -2672,17 +2672,17 @@ built-in hashes.
 
 =head1 CODE COVERAGE
 
-I use B<Devel::Cover> to test the code coverage of my tests, below is the B<Devel::Cover> report on this 
-module's test suite.
+I use B<Devel::Cover> to test the code coverage of my tests, below is the B<Devel::Cover>
+report on this module's test suite.
 
-  ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  File                           stmt   bran   cond    sub    pod   time  total
-  ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm           93.9   82.4   74.7   97.9   10.5   85.7   88.0
-  blib/lib/DBM/Deep/Array.pm     97.8   84.6   50.0  100.0    n/a    9.0   94.6
-  blib/lib/DBM/Deep/Hash.pm      93.9   87.5  100.0  100.0    n/a    5.3   93.4
-  Total                          94.4   82.9   75.8   98.5   10.5  100.0   89.0
-  ---------------------------- ------ ------ ------ ------ ------ ------ ------
+---------------------------- ------ ------ ------ ------ ------ ------ ------
+File                           stmt   bran   cond    sub    pod   time  total
+---------------------------- ------ ------ ------ ------ ------ ------ ------
+blib/lib/DBM/Deep.pm           93.7   82.5   71.9   96.5   25.9   82.8   87.9
+blib/lib/DBM/Deep/Array.pm     98.8   88.0   90.9  100.0    n/a   12.8   96.3
+blib/lib/DBM/Deep/Hash.pm      95.2   80.0  100.0  100.0    n/a    4.4   92.3
+Total                          94.8   83.2   76.5   97.6   25.9  100.0   89.7
+---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 AUTHOR
 

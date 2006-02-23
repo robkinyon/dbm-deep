@@ -439,7 +439,18 @@ sub _add_bucket {
 				##
 				my $actual_length;
                 my $r = Scalar::Util::reftype( $value ) || '';
-                if ( $r eq 'HASH' || $r eq 'ARRAY' ) { $actual_length = $INDEX_SIZE; }
+                if ( $r eq 'HASH' || $r eq 'ARRAY' ) {
+                	$actual_length = $INDEX_SIZE;
+                	
+                	# if autobless is enabled, must also take into consideration
+                	# the class name, as it is stored along with key/value.
+                	if ( $self->root->{autobless} ) {
+						my $value_class = Scalar::Util::blessed($value);
+						if ( defined $value_class && $value_class ne 'DBM::Deep' ) {
+							$actual_length += length($value_class);
+						}
+					} # autobless
+                }
 				else { $actual_length = length($value); }
 				
 				if ($actual_length <= $size) {

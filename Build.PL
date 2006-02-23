@@ -7,7 +7,7 @@ my $build = Module::Build->new(
     license => 'perl',
     requires => {
         'Digest::MD5'  => '1.00',
-        'Scalar::Util' => '1.18',
+        'Scalar::Util' => '1.14',
     },
     optional => {
     },

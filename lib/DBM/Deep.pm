@@ -1410,7 +1410,11 @@ sub DELETE {
 	##
 	# Delete bucket
 	##
-    my $value = $self->FETCH( $unpacked_key );
+    my $value = $self->_get_bucket_value( $tag, $md5 );
+	if ($value && !ref($value) && $self->root->{filter_fetch_value}) {
+        $value = $self->root->{filter_fetch_value}->($value);
+    }
+
 	my $result = $self->_delete_bucket( $tag, $md5 );
 	
 	##

@@ -38,12 +38,12 @@ throws_ok {
     };
 } qr/DBM::Deep: File type mismatch/, "\$SIG_TYPE doesn't match file's type";
 
-unlink "t/test.db";
-DBM::Deep->new( file => 't/test.db', type => DBM::Deep->TYPE_ARRAY );
+unlink "t/test2.db";
+DBM::Deep->new( file => 't/test2.db', type => DBM::Deep->TYPE_ARRAY );
 
 throws_ok {
     tie my %hash, 'DBM::Deep', {
-        file => 't/test.db',
+        file => 't/test2.db',
         type => DBM::Deep->TYPE_HASH,
     };
 } qr/DBM::Deep: File type mismatch/, "\$SIG_TYPE doesn't match file's type";

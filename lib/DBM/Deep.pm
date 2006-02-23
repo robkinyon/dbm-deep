@@ -199,7 +199,7 @@ sub TIEARRAY {
 
 sub _open {
 	##
-	# Open a FileHandle to the database, create if nonexistent.
+	# Open a fh to the database, create if nonexistent.
 	# Make sure file signature matches DeepDB spec.
 	##
     my $self = $_[0]->_get_self;
@@ -211,16 +211,6 @@ sub _open {
         # Of course, testing it is going to be ... interesting.
         my $flags = O_RDWR | O_CREAT | O_BINARY;
 
-        #XXX Can the mode be anything but r+, w+, or a+??
-        #XXX ie, it has to be in read-write mode
-        #XXX So, should we verify that the mode is legitimate?
-
-        #XXX Maybe the mode thingy should just go away. There's no good
-        #XXX reason for it ...
-        if ( $self->root->{mode} eq 'w+' ) {
-            $flags |= O_TRUNC;
-        }
-	
         my $fh;
         sysopen( $fh, $self->root->{file}, $flags )
             or $fh = undef;
@@ -305,10 +295,10 @@ sub _open {
 
 sub _close {
 	##
-	# Close database FileHandle
+	# Close database fh
 	##
     my $self = $_[0]->_get_self;
-    close $self->root->{fh};
+    close $self->root->{fh} if $self->root->{fh};
     $self->root->{fh} = undef;
 }
 
@@ -1101,7 +1091,7 @@ sub optimize {
 	chmod( $perms, $self->root->{file} . '.tmp' );
 	
     # q.v. perlport for more information on this variable
-    if ( $^O eq 'MSWin32' ) {
+    if ( $^O eq 'MSWin32' || $^O eq 'cygwin' ) {
 		##
 		# Potential race condition when optmizing on Win32 with locking.
 		# The Windows filesystem requires that the filehandle be closed 
@@ -1177,7 +1167,7 @@ sub root {
 
 sub fh {
 	##
-	# Get access to the raw FileHandle
+	# Get access to the raw fh
 	##
     #XXX It will be useful, though, when we split out HASH and ARRAY
     my $self = $_[0]->_get_self;
@@ -1548,7 +1538,6 @@ sub new {
         locking => undef,
         volatile => undef,
         debug => undef,
-        mode => 'r+',
         filter_store_key => undef,
         filter_store_value => undef,
         filter_fetch_key => undef,
@@ -1592,7 +1581,8 @@ DBM::Deep - A pure perl multi-level hash/array DBM
   # true multi-level support
   $db->{my_complex} = [
   	'hello', { perl => 'rules' }, 
-  	42, 99 ];
+  	42, 99,
+  ];
 
 =head1 DESCRIPTION
 
@@ -1606,7 +1596,7 @@ Mac OS X and Windows.
 
 =head1 INSTALLATION
 
-Hopefully you are using CPAN's excellent Perl module, which will download
+Hopefully you are using Perl's excellent CPAN module, which will download
 and install the module for you.  If not, get the tarball, and run these 
 commands:
 
@@ -1634,8 +1624,6 @@ file does not exist, it will automatically be created.  DB files are
 opened in "r+" (read/write) mode, and the type of object returned is a
 hash, unless otherwise specified (see L<OPTIONS> below).
 
-
-
 You can pass a number of options to the constructor to specify things like
 locking, autoflush, etc.  This is done by passing an inline hash:
 
@@ -1662,20 +1650,21 @@ specify the C<type> parameter:
 
 B<Note:> Specifing the C<type> parameter only takes effect when beginning
 a new DB file.  If you create a DBM::Deep object with an existing file, the
-C<type> will be loaded from the file header, and ignored if it is passed
-to the constructor.
+C<type> will be loaded from the file header, and an error will be thrown if
+the wrong type is passed in.
 
 =head2 TIE CONSTRUCTION
 
-Alternatively, you can create a DBM::Deep handle by using Perl's built-in
-tie() function.  This is not ideal, because you get only a basic, tied hash 
-(or array) which is not blessed, so you can't call any functions on it.
+Alternately, you can create a DBM::Deep handle by using Perl's built-in
+tie() function.  The object returned from tie() can be used to call methods,
+such as lock() and unlock(), but cannot be used to assign to the DBM::Deep
+file (as expected with most tie'd objects).
 
 	my %hash;
-	tie %hash, "DBM::Deep", "foo.db";
+	my $db = tie %hash, "DBM::Deep", "foo.db";
 	
 	my @array;
-	tie @array, "DBM::Deep", "bar.db";
+	my $db = tie @array, "DBM::Deep", "bar.db";
 
 As with the OO constructor, you can replace the DB filename parameter with
 a hash containing one or more options (see L<OPTIONS> just below for the
@@ -1700,13 +1689,6 @@ Filename of the DB file to link the handle to.  You can pass a full absolute
 filesystem path, partial path, or a plain filename if the file is in the 
 current working directory.  This is a required parameter.
 
-=item * mode
-
-File open mode (read-only, read-write, etc.) string passed to Perl's FileHandle
-module.  This is an optional parameter, and defaults to "r+" (read/write).
-B<Note:> If the default (r+) mode is selected, the file will also be auto-
-created if it doesn't exist.
-
 =item * type
 
 This parameter specifies what type of object to create, a hash or array.  Use
@@ -1724,7 +1706,7 @@ parameter, and defaults to 0 (disabled).  See L<LOCKING> below for more.
 
 =item * autoflush
 
-Specifies whether autoflush is to be enabled on the underlying FileHandle.  
+Specifies whether autoflush is to be enabled on the underlying filehandle.  
 This obviously slows down write operations, but is required if you may have 
 multiple processes accessing the same DB file (also consider enable I<locking> 
 or at least I<volatile>).  Pass any true value to enable.  This is an optional 
@@ -1773,12 +1755,13 @@ handle.  Pass in a real filename in order to use optimize().
 =head1 TIE INTERFACE
 
 With DBM::Deep you can access your databases using Perl's standard hash/array
-syntax.  Because all DBM::Deep objects are I<tied> to hashes or arrays, you can treat
-them as such.  DBM::Deep will intercept all reads/writes and direct them to the right
-place -- the DB file.  This has nothing to do with the L<TIE CONSTRUCTION> 
-section above.  This simply tells you how to use DBM::Deep using regular hashes 
-and arrays, rather than calling functions like C<get()> and C<put()> (although those 
-work too).  It is entirely up to you how to want to access your databases.
+syntax.  Because all DBM::Deep objects are I<tied> to hashes or arrays, you can
+treat them as such.  DBM::Deep will intercept all reads/writes and direct them
+to the right place -- the DB file.  This has nothing to do with the
+L<TIE CONSTRUCTION> section above.  This simply tells you how to use DBM::Deep
+using regular hashes and arrays, rather than calling functions like C<get()>
+and C<put()> (although those work too).  It is entirely up to you how to want
+to access your databases.
 
 =head2 HASHES
 
@@ -1852,7 +1835,7 @@ C<put()>, C<get()>, C<exists()>, C<delete()> and C<clear()>.
 
 =over
 
-=item * put()
+=item * put() / store()
 
 Stores a new hash key/value pair, or sets an array element value.  Takes two
 arguments, the hash key or array index, and the new value.  The value can be
@@ -1861,7 +1844,7 @@ a scalar, hash ref or array ref.  Returns true on success, false on failure.
 	$db->put("foo", "bar"); # for hashes
 	$db->put(1, "bar"); # for arrays
 
-=item * get()
+=item * get() / fetch()
 
 Fetches the value of a hash key or array element.  Takes one argument: the hash
 key or array index.  Returns a scalar, hash ref or array ref, depending on the 
@@ -2033,7 +2016,7 @@ parameter when constructing your DBM::Deep object (see L<SETUP> above).
 		locking => 1
 	);
 
-This causes DBM::Deep to C<flock()> the underlying FileHandle object with exclusive 
+This causes DBM::Deep to C<flock()> the underlying filehandle with exclusive 
 mode for writes, and shared mode for reads.  This is required if you have 
 multiple processes accessing the same database file, to avoid file corruption.  
 Please note that C<flock()> does NOT work for files over NFS.  See L<DB OVER 
@@ -2043,7 +2026,7 @@ NFS> below for more.
 
 You can explicitly lock a database, so it remains locked for multiple 
 transactions.  This is done by calling the C<lock()> method, and passing an 
-optional lock mode argument (defaults to exclusive mode).  This is particularly 
+optional lock mode argument (defaults to exclusive mode).  This is particularly
 useful for things like counters, where the current value needs to be fetched, 
 then incremented, then stored again.
 
@@ -2107,8 +2090,6 @@ keys are merged with the existing ones, replacing if they already exist.
 The C<import()> method can be called on any database level (not just the base 
 level), and works with both hash and array DB types.
 
-
-
 B<Note:> Make sure your existing structure has no circular references in it.
 These will cause an infinite loop when importing.
 
@@ -2136,8 +2117,6 @@ to it.  The C<export()> method can be called on any database level (not just
 the base level), and works with both hash and array DB types.  Be careful of 
 large databases -- you can store a lot more data in a DBM::Deep object than an 
 in-memory Perl structure.
-
-
 
 B<Note:> Make sure your database has no circular references in it.
 These will cause an infinite loop when exporting.
@@ -2287,6 +2266,7 @@ calling the C<error()> method.
 	my $db = DBM::Deep->new( "foo.db" ); # create hash
 	eval { $db->push("foo"); }; # ILLEGAL -- push is array-only call
 	
+    print $@;           # prints error message
 	print $db->error(); # prints error message
 
 You can then call C<clear_error()> to clear the current error state.
@@ -2294,8 +2274,9 @@ You can then call C<clear_error()> to clear the current error state.
 	$db->clear_error();
 
 If you set the C<debug> option to true when creating your DBM::Deep object,
-all errors are considered NON-FATAL, and dumped to STDERR.  This is only
-for debugging purposes.
+all errors are considered NON-FATAL, and dumped to STDERR.  This should only
+be used for debugging purposes and not production work. DBM::Deep expects errors
+to be thrown, not propagated back up the stack.
 
 =head1 LARGEFILE SUPPORT
 
@@ -2310,15 +2291,11 @@ This tells DBM::Deep to pack all file offsets with 8-byte (64-bit) quad words
 instead of 32-bit longs.  After setting these values your DB files have a 
 theoretical maximum size of 16 XB (exabytes).
 
-
-
 B<Note:> Changing these values will B<NOT> work for existing database files.
 Only change this for new files, and make sure it stays set consistently 
 throughout the file's life.  If you do set these values, you can no longer 
 access 32-bit DB files.  You can, however, call C<set_pack(4, 'N')> to change 
 back to 32-bit mode.
-
-
 
 B<Note:> I have not personally tested files > 2 GB -- all my systems have 
 only a 32-bit Perl.  However, I have received user reports that this does 
@@ -2326,14 +2303,14 @@ indeed work!
 
 =head1 LOW-LEVEL ACCESS
 
-If you require low-level access to the underlying FileHandle that DBM::Deep uses,
+If you require low-level access to the underlying filehandle that DBM::Deep uses,
 you can call the C<fh()> method, which returns the handle:
 
 	my $fh = $db->fh();
 
 This method can be called on the root level of the datbase, or any child
 hashes or arrays.  All levels share a I<root> structure, which contains things
-like the FileHandle, a reference counter, and all your options you specified
+like the filehandle, a reference counter, and all the options specified
 when you created the object.  You can get access to this root structure by 
 calling the C<root()> method.
 
@@ -2475,9 +2452,9 @@ be addressed in a later version of DBM::Deep.
 Beware of using DB files over NFS.  DBM::Deep uses flock(), which works well on local
 filesystems, but will NOT protect you from file corruption over NFS.  I've heard 
 about setting up your NFS server with a locking daemon, then using lockf() to 
-lock your files, but your milage may vary there as well.  From what I 
+lock your files, but your mileage may vary there as well.  From what I 
 understand, there is no real way to do it.  However, if you need access to the 
-underlying FileHandle in DBM::Deep for using some other kind of locking scheme like 
+underlying filehandle in DBM::Deep for using some other kind of locking scheme like 
 lockf(), see the L<LOW-LEVEL ACCESS> section above.
 
 =head2 COPYING OBJECTS
@@ -2488,12 +2465,15 @@ returns a new, blessed, tied hash or array to the same level in the DB.
 
 	my $copy = $db->clone();
 
+B<Note>: Since clone() here is cloning the object, not the database location, any
+modifications to either $db or $copy will be visible in both.
+
 =head2 LARGE ARRAYS
 
 Beware of using C<shift()>, C<unshift()> or C<splice()> with large arrays.
 These functions cause every element in the array to move, which can be murder
 on DBM::Deep, as every element has to be fetched from disk, then stored again in
-a different location.  This may be addressed in a later version.
+a different location.  This will be addressed in the forthcoming version 1.00.
 
 =head1 PERFORMANCE
 
@@ -2582,7 +2562,7 @@ included for reference.
 
 DBM::Deep files always start with a 32-bit signature to identify the file type.
 This is at offset 0.  The signature is "DPDB" in network byte order.  This is
-checked when the file is opened.
+checked for when the file is opened and an error will be thrown if it's not found.
 
 =head2 TAG
 
@@ -2599,15 +2579,11 @@ This is a standard tag header followed by 1024 bytes (in 32-bit mode) or 2048
 bytes (in 64-bit mode) of data.  The type is I<H> for hash or I<A> for array, 
 depending on how the DBM::Deep object was constructed.
 
-
-
 The index works by looking at a I<MD5 Hash> of the hash key (or array index 
 number).  The first 8-bit char of the MD5 signature is the offset into the 
 index, multipled by 4 in 32-bit mode, or 8 in 64-bit mode.  The value of the 
 index element is a file offset of the next tag for the key/element in question,
 which is usually a I<Bucket List> tag (see below).
-
-
 
 The next tag I<could> be another index, depending on how many keys/elements
 exist.  See L<RE-INDEXING> below for details.
@@ -2633,8 +2609,6 @@ just after the value is another size (32-bit unsigned long) and then the plain
 key itself.  Since the value is likely to be fetched more often than the plain 
 key, I figured it would be I<slightly> faster to store the value first.
 
-
-
 If the type is I<H> (hash) or I<A> (array), the value is another I<Master Index>
 record for the nested structure, where the process begins all over again.
 
@@ -2649,8 +2623,6 @@ I<Re-Indexing>.  Basically, a new index tag is created at the file EOF, and all
 inserted into the new index.  Several new Bucket Lists are created in the 
 process, as a new MD5 char from the key is being examined (it is unlikely that 
 the keys will all share the same next char of their MD5s).
-
-
 
 Because of the way the I<MD5> algorithm works, it is impossible to tell exactly
 when the Bucket Lists will turn into indexes, but the first round tends to 
@@ -2667,7 +2639,7 @@ this is 340 unodecillion, but don't quote me).
 
 =head2 STORING
 
-When a new key/element is stored, the key (or index number) is first ran through 
+When a new key/element is stored, the key (or index number) is first run through 
 I<Digest::MD5> to get a 128-bit signature (example, in hex: 
 b05783b0773d894396d475ced9d2f4f6).  Then, the I<Master Index> record is checked
 for the first char of the signature (in this case I<b>).  If it does not exist,
@@ -2687,8 +2659,6 @@ contains up to 16 full MD5 hashes.  Each is checked for equality to the key in
 question.  If we found a match, the I<Bucket> tag is loaded, where the value and 
 plain key are stored.
 
-
-
 Fetching the plain key occurs when calling the I<first_key()> and I<next_key()>
 methods.  In this process the indexes are walked systematically, and each key
 fetched in increasing MD5 order (which is why it appears random).   Once the
@@ -2701,8 +2671,8 @@ built-in hashes.
 
 =head1 CODE COVERAGE
 
-I use B<Devel::Cover> to test the code coverage of my tests, below is the B<Devel::Cover>
-report on this module's test suite.
+We use B<Devel::Cover> to test the code coverage of my tests, below is the
+B<Devel::Cover> report on this module's test suite.
 
 ---------------------------- ------ ------ ------ ------ ------ ------ ------
 File                           stmt   bran   cond    sub    pod   time  total

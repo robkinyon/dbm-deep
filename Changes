@@ -33,6 +33,7 @@ Revision history for DBM::Deep.
     - RT #14893 is fixed (tie() and new() use different parameter lists).
     - A bug with optimize and threading is fixed.
     - autobless has received some attention, resulting in a number of bugs fixed.
+    - Removed mode option as it just caused confusion.
 
 0.96  Oct 14 09:55:00 2005 Pacific
     - Fixed build (OS X hidden files killed it)

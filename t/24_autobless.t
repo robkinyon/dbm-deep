@@ -103,15 +103,14 @@ undef $db2;
 undef $db3;
 
 {
-    unlink 't/test.db';
+    unlink 't/test2.db';
     my $db = DBM::Deep->new(
-        file     => "t/test.db",
+        file     => "t/test2.db",
         autobless => 1,
     );
     if ($db->error()) {
         die "ERROR: " . $db->error();
     }
-
     my $obj = bless {
         a => 1,
         b => [ 1 .. 3 ],
@@ -122,7 +121,7 @@ undef $db3;
     undef $db;
 
     $db = DBM::Deep->new(
-        file     => "t/test.db",
+        file     => "t/test2.db",
         autobless => 1,
     );
     if ($db->error()) {
@@ -140,9 +139,9 @@ undef $db3;
 	# longer named class (FooFoo) and replacing key in db file, then validating
 	# content after that point in file to check for corruption.
 	##
-    unlink 't/test.db';
+    unlink 't/test3.db';
     my $db = DBM::Deep->new(
-        file     => "t/test.db",
+        file     => "t/test3.db",
         autobless => 1,
     );
     if ($db->error()) {

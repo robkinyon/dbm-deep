@@ -1387,8 +1387,6 @@ sub DELETE {
     my $self = $_[0]->_get_self;
 	my $key = $_[1];
 	
-	my $unpacked_key = $key;
-	if (($self->type eq TYPE_ARRAY) && ($key =~ /^\d+$/)) { $key = pack($LONG_PACK, $key); }
 	my $md5 = $DIGEST_FUNC->($key);
 
 	##
@@ -1421,9 +1419,6 @@ sub DELETE {
 	# If this object is an array and the key deleted was on the end of the stack,
 	# decrement the length variable.
 	##
-	if ($result && ($self->type eq TYPE_ARRAY) && ($unpacked_key == $self->FETCHSIZE() - 1)) {
-		$self->STORESIZE( $unpacked_key );
-	}
 	
 	$self->unlock();
 	

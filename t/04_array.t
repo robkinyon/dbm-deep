@@ -111,15 +111,9 @@ is( $db->length, 3, "... and we still have three after a DELETE on an out-of-ran
 $deleted = $db->delete(-2);
 is( $db->length, 3, "... and we still have three after deleting" );
 is( $db->[0], undef, "0th element still undef" );
-TODO: {
-    local $TODO = "delete on a negative array element should work";
-    is( $db->[1], undef, "1st element now undef" );
-}
+is( $db->[1], undef, "1st element now undef" );
 is( $db->[2], 'elem3', "2nd element still there after deleting" );
-TODO: {
-    local $TODO = "delete on a negative array element should return the deleted value";
-    is( $deleted, 'elem2', "Deleted value is correct" );
-}
+is( $deleted, 'elem2', "Deleted value is correct" );
 
 $db->[1] = 'elem2';
 

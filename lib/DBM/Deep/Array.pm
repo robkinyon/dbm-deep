@@ -28,21 +28,32 @@ sub FETCH {
     my $self = $_[0]->_get_self;
     my $key = $_[1];
 
+	$self->lock( $self->LOCK_SH );
+	
     if ( $key =~ /^-?\d+$/ ) {
         if ( $key < 0 ) {
             $key += $self->FETCHSIZE;
-            return unless $key >= 0;
+            unless ( $key >= 0 ) {
+                $self->unlock;
+                return;
+            }
         }
 
         $key = pack($DBM::Deep::LONG_PACK, $key);
     }
 
-    return $self->SUPER::FETCH( $key );
+    my $rv = $self->SUPER::FETCH( $key );
+
+    $self->unlock;
+
+    return $rv;
 }
 
 sub STORE {
     my $self = shift->_get_self;
     my ($key, $value) = @_;
+
+    $self->lock( $self->LOCK_EX );
 
     my $orig = $key;
     my $size = $self->FETCHSIZE;
@@ -66,6 +77,8 @@ sub STORE {
         $self->STORESIZE( $orig + 1 );
     }
 
+    $self->unlock;
+
     return $rv;
 }
 
@@ -73,24 +86,67 @@ sub EXISTS {
     my $self = $_[0]->_get_self;
     my $key = $_[1];
 
+	$self->lock( $self->LOCK_SH );
+
     if ( $key =~ /^-?\d+$/ ) {
         if ( $key < 0 ) {
             $key += $self->FETCHSIZE;
-            return unless $key >= 0;
+            unless ( $key >= 0 ) {
+                $self->unlock;
+                return;
+            }
         }
 
         $key = pack($DBM::Deep::LONG_PACK, $key);
     }
 
-    return $self->SUPER::EXISTS( $key );
+    my $rv = $self->SUPER::EXISTS( $key );
+
+    $self->unlock;
+
+    return $rv;
+}
+
+sub DELETE {
+    my $self = $_[0]->_get_self;
+    my $key = $_[1];
+
+    my $unpacked_key = $key;
+
+    $self->lock( $self->LOCK_EX );
+
+    my $size = $self->FETCHSIZE;
+    if ( $key =~ /^-?\d+$/ ) {
+        if ( $key < 0 ) {
+            $key += $size;
+            unless ( $key >= 0 ) {
+                $self->unlock;
+                return;
+            }
+        }
+
+        $key = pack($DBM::Deep::LONG_PACK, $key);
+    }
+
+    my $rv = $self->SUPER::DELETE( $key );
+
+	if ($rv && $unpacked_key == $size - 1) {
+		$self->STORESIZE( $unpacked_key );
+	}
+
+    $self->unlock;
+
+    return $rv;
 }
 
 sub FETCHSIZE {
 	##
 	# Return the length of the array
 	##
-    my $self = $_[0]->_get_self;
-	
+    my $self = shift->_get_self;
+
+    $self->lock( $self->LOCK_SH );
+
 	my $SAVE_FILTER = $self->root->{filter_fetch_value};
 	$self->root->{filter_fetch_value} = undef;
 	
@@ -98,6 +154,8 @@ sub FETCHSIZE {
 	
 	$self->root->{filter_fetch_value} = $SAVE_FILTER;
 	
+    $self->unlock;
+
 	if ($packed_size) {
         return int(unpack($DBM::Deep::LONG_PACK, $packed_size));
     }
@@ -112,6 +170,8 @@ sub STORESIZE {
     my $self = $_[0]->_get_self;
 	my $new_length = $_[1];
 	
+    $self->lock( $self->LOCK_EX );
+
 	my $SAVE_FILTER = $self->root->{filter_store_value};
 	$self->root->{filter_store_value} = undef;
 	
@@ -119,6 +179,8 @@ sub STORESIZE {
 	
 	$self->root->{filter_store_value} = $SAVE_FILTER;
 	
+    $self->unlock;
+
 	return $result;
 }
 
@@ -127,14 +189,21 @@ sub POP {
 	# Remove and return the last element on the array
 	##
     my $self = $_[0]->_get_self;
+
+    $self->lock( $self->LOCK_EX );
+
 	my $length = $self->FETCHSIZE();
 	
 	if ($length) {
 		my $content = $self->FETCH( $length - 1 );
 		$self->DELETE( $length - 1 );
+
+        $self->unlock;
+
 		return $content;
 	}
 	else {
+        $self->unlock;
 		return;
 	}
 }
@@ -144,12 +213,17 @@ sub PUSH {
 	# Add new element(s) to the end of the array
 	##
     my $self = shift->_get_self;
-	my $length = $self->FETCHSIZE();
 	
+    $self->lock( $self->LOCK_EX );
+
+	my $length = $self->FETCHSIZE();
+
 	while (my $content = shift @_) {
 		$self->STORE( $length, $content );
 		$length++;
 	}
+
+    $self->unlock;
 
     return $length;
 }
@@ -160,6 +234,9 @@ sub SHIFT {
 	# Shift over remaining elements to take up space.
 	##
     my $self = $_[0]->_get_self;
+
+    $self->lock( $self->LOCK_EX );
+
 	my $length = $self->FETCHSIZE();
 	
 	if ($length) {
@@ -172,10 +249,13 @@ sub SHIFT {
 			$self->STORE( $i, $self->FETCH($i + 1) );
 		}
 		$self->DELETE( $length - 1 );
+
+        $self->unlock;
 		
 		return $content;
 	}
 	else {
+        $self->unlock;
 		return;
 	}
 }
@@ -187,6 +267,9 @@ sub UNSHIFT {
 	##
     my $self = shift->_get_self;
 	my @new_elements = @_;
+
+    $self->lock( $self->LOCK_EX );
+
 	my $length = $self->FETCHSIZE();
 	my $new_size = scalar @new_elements;
 	
@@ -200,6 +283,8 @@ sub UNSHIFT {
 		$self->STORE( $i, $new_elements[$i] );
 	}
 
+    $self->unlock;
+
     return $length + $new_size;
 }
 
@@ -209,6 +294,9 @@ sub SPLICE {
 	# Returns deleted section, or last element deleted in scalar context.
 	##
     my $self = shift->_get_self;
+
+    $self->lock( $self->LOCK_EX );
+
 	my $length = $self->FETCHSIZE();
 	
 	##
@@ -260,13 +348,15 @@ sub SPLICE {
 		$self->STORE( $i, shift @new_elements );
 	}
 	
+    $self->unlock;
+
 	##
 	# Return deleted section, or last element in scalar context.
 	##
 	return wantarray ? @old_elements : $old_elements[-1];
 }
 
-#XXX We don't need to define it.
+#XXX We don't need to define it, yet.
 #XXX It will be useful, though, when we split out HASH and ARRAY
 #sub EXTEND {
 	##

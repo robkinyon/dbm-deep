@@ -1575,7 +1575,7 @@ DBM::Deep - A pure perl multi-level hash/array DBM
   $db->{key} = 'value'; # tie() style
   print $db->{key};
   
-  $db->put('key', 'value'); # OO style
+  $db->put('key' => 'value'); # OO style
   print $db->get('key');
   
   # true multi-level support

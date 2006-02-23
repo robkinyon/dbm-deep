@@ -320,10 +320,9 @@ sub SPLICE {
 	my @new_elements = @_;
 	my $new_size = scalar @new_elements;
 	
-	my @old_elements = ();
-	for (my $i = $offset; $i < $offset + $splice_length; $i++) {
-		push @old_elements, $self->FETCH( $i );
-	}
+    my @old_elements = map {
+        $self->FETCH( $_ )
+    } $offset .. ($offset + $splice_length - 1);
 	
 	##
 	# Adjust array length, and shift elements to accomodate new section.

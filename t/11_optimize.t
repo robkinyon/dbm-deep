@@ -66,74 +66,64 @@ is( $db->{a}{c}, 'value2', "key2's value is still there after optimize" );
 # problems with fork()ing, flock()ing, etc.  Win32 very bad.
 ##
 
-if ( $^O eq 'MSWin32' ) {
-	ok(1, "Skipping test on this platform");
-	ok(1, "Skipping test on this platform");
-	ok(1, "Skipping test on this platform");
-	ok(1, "Skipping test on this platform");
-	exit(1);
+SKIP: {
+    skip "Fork tests skipped on Win32", 4 if $^O eq 'MSWin32';
+
+    ##
+    # first things first, get us about 1000 keys so the optimize() will take 
+    # at least a few seconds on any machine, and re-open db with locking
+    ##
+    for (1..1000) { $db->STORE( $_, $_ ); }
+    undef $db;
+
+    ##
+    # now, fork a process for the optimize()
+    ##
+    my $pid = fork();
+
+    unless ( $pid ) {
+        # child fork
+        
+        # re-open db
+        $db = DBM::Deep->new(
+            file => "t/test.db",
+            autoflush => 1,
+            locking => 1
+        );
+        if ($db->error()) {
+            die "ERROR: " . $db->error();
+        }
+        
+        # optimize and exit
+        $db->optimize();
+
+        exit( 0 );
+    }
+
+    # parent fork
+    ok( defined($pid), "fork was successful" ); # make sure fork was successful
+    
+    # re-open db
+    $db = DBM::Deep->new(
+        file => "t/test.db",
+        autoflush => 1,
+        locking => 1
+    );
+    if ($db->error()) {
+        die "ERROR: " . $db->error();
+    }
+    
+    # sleep for 1 second to make sure optimize() is running in the other fork
+    sleep(1);
+    
+    # now, try to get a lock and store a key
+    $db->{parentfork} = "hello";
+    
+    # see if it was stored successfully
+    is( $db->{parentfork}, "hello", "stored key while optimize took place" );
+    # ok(1);
+    
+    # now check some existing values from before
+    is( $db->{key1}, 'value1', "key1's value is still there after optimize" );
+    is( $db->{a}{c}, 'value2', "key2's value is still there after optimize" );
 }
-
-##
-# first things first, get us about 1000 keys so the optimize() will take 
-# at least a few seconds on any machine, and re-open db with locking
-##
-for (1..1000) { $db->STORE( $_, $_ ); }
-undef $db;
-
-##
-# now, fork a process for the optimize()
-##
-my $pid = fork();
-ok( defined($pid), "fork was successful" ); # make sure fork was successful
-
-if ($pid) {
-	# parent fork
-	
-	# re-open db
-	$db = DBM::Deep->new(
-		file => "t/test.db",
-		autoflush => 1,
-		locking => 1
-	);
-	if ($db->error()) {
-		die "ERROR: " . $db->error();
-	}
-	
-	# sleep for 1 second to make sure optimize() is running in the other fork
-	sleep(1);
-	
-	# now, try to get a lock and store a key
-	$db->{parentfork} = "hello";
-	
-	# see if it was stored successfully
-	is( $db->{parentfork}, "hello", "stored key while optimize took place" );
-	# ok(1);
-	
-	# now check some existing values from before
-	is( $db->{key1}, 'value1', "key1's value is still there after optimize" );
-	is( $db->{a}{c}, 'value2', "key2's value is still there after optimize" );
-}
-else {
-	# child fork
-	
-	# re-open db
-	$db = DBM::Deep->new(
-		file => "t/test.db",
-		autoflush => 1,
-		locking => 1
-	);
-	if ($db->error()) {
-		die "ERROR: " . $db->error();
-	}
-	
-	# optimize and exit
-	$db->optimize();
-
-	ok(1, "Ignore this, we're in a fork");
-	ok(1, "Ignore this, we're in a fork");
-	ok(1, "Ignore this, we're in a fork");
-	exit(0);
-}
-
-1;

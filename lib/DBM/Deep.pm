@@ -1269,9 +1269,8 @@ sub STORE {
     my $self = $_[0]->_get_self;
 	my $key = $_[1];
 
-    #XXX What is ref() checking here?
-    #YYY User may be storing a hash, in which case we do not want it run 
-    #YYY through the filtering system
+    # User may be storing a hash, in which case we do not want it run 
+    # through the filtering system
 	my $value = ($self->root->{filter_store_value} && !ref($_[2]))
         ? $self->root->{filter_store_value}->($_[2])
         : $_[2];

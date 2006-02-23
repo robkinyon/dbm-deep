@@ -60,12 +60,13 @@ sub STORE {
     $self->lock( $self->LOCK_EX );
 
     my $orig = $key;
-    my $size = $self->FETCHSIZE;
 
+    my $size;
     my $numeric_idx;
-    if ( $key =~ /^-?\d+$/ ) {
+    if ( $key =~ /^\-?\d+$/ ) {
         $numeric_idx = 1;
         if ( $key < 0 ) {
+            $size = $self->FETCHSIZE;
             $key += $size;
             if ( $key < 0 ) {
                 die( "Modification of non-creatable array value attempted, subscript $orig" );
@@ -77,8 +78,11 @@ sub STORE {
 
     my $rv = $self->SUPER::STORE( $key, $value );
 
-    if ( $numeric_idx && $rv == 2 && $orig >= $size ) {
-        $self->STORESIZE( $orig + 1 );
+    if ( $numeric_idx && $rv == 2 ) {
+        $size = $self->FETCHSIZE unless defined $size;
+        if ( $orig >= $size ) {
+            $self->STORESIZE( $orig + 1 );
+        }
     }
 
     $self->unlock;
@@ -92,7 +96,7 @@ sub EXISTS {
 
 	$self->lock( $self->LOCK_SH );
 
-    if ( $key =~ /^-?\d+$/ ) {
+    if ( $key =~ /^\-?\d+$/ ) {
         if ( $key < 0 ) {
             $key += $self->FETCHSIZE;
             unless ( $key >= 0 ) {

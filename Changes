@@ -1,6 +1,6 @@
 Revision history for DBM::Deep.
 
-0.97  ??? ?? ??:??:?? 2006 Pacific
+0.97  Feb 24 10:00:00 2006 Pacific
     - Reorganization of distribution to a more standard layout
     - Migration to Module::Build with EU::MM backwards compatibility
     - Migration of all tests to use Test::More and Test::Exception

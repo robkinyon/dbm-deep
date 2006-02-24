@@ -172,6 +172,9 @@ sub _init {
         $self->{$param} = delete $args->{$param}
     }
     
+    # locking implicitly enables autoflush
+    if ($args->{locking}) { $args->{autoflush} = 1; }
+    
     $self->{root} = exists $args->{root}
         ? $args->{root}
         : DBM::Deep::_::Root->new( $args );
@@ -928,11 +931,16 @@ sub lock {
 		if (!$self->root->{locked}) {
 			flock($self->fh, $type);
 			
+			# refresh end counter in case file has changed size
+			my @stats = stat($self->root->{file});
+			$self->root->{end} = $stats[7];
+			
 			# double-check file inode, in case another process
 			# has optimize()d our file while we were waiting.
-			if ((stat($self->root->{file}))[1] != $self->root->{inode}) {
+			if ($stats[1] != $self->root->{inode}) {
 				$self->_open(); # re-open
 				flock($self->fh, $type); # re-lock
+				$self->root->{end} = (stat($self->fh))[7]; # re-end
 			}
 		}
 		$self->root->{locked}++;
@@ -1306,14 +1314,6 @@ sub STORE {
 	$self->lock( LOCK_EX );
 	
 	my $fh = $self->fh;
-
-	##
-	# If locking is enabled, set 'end' parameter again, in case another
-	# DB instance appended to our file while we were unlocked.
-	##
-	if ($self->root->{locking} || $self->root->{volatile}) {
-		$self->root->{end} = (stat($fh))[7];
-	}
 	
 	##
 	# Locate offset for bucket list using digest index system
@@ -1534,7 +1534,6 @@ sub new {
         end => 0,
         autoflush => undef,
         locking => undef,
-        volatile => undef,
         debug => undef,
         filter_store_key => undef,
         filter_store_value => undef,
@@ -1706,17 +1705,8 @@ parameter, and defaults to 0 (disabled).  See L<LOCKING> below for more.
 
 Specifies whether autoflush is to be enabled on the underlying filehandle.  
 This obviously slows down write operations, but is required if you may have 
-multiple processes accessing the same DB file (also consider enable I<locking> 
-or at least I<volatile>).  Pass any true value to enable.  This is an optional 
-parameter, and defaults to 0 (disabled).
-
-=item * volatile
-
-If I<volatile> mode is enabled, DBM::Deep will stat() the DB file before each
-STORE() operation.  This is required if an outside force may change the size of
-the file between transactions.  Locking also implicitly enables volatile.  This
-is useful if you want to use a different locking system or write your own.  Pass
-any true value to enable.  This is an optional parameter, and defaults to 0 
+multiple processes accessing the same DB file (also consider enable I<locking>).  
+Pass any true value to enable.  This is an optional parameter, and defaults to 0 
 (disabled).
 
 =item * autobless
@@ -2049,11 +2039,6 @@ same as the constants defined in Perl's C<Fcntl> module.
 	# something here
 	$db->unlock();
 
-If you want to implement your own file locking scheme, be sure to create your
-DBM::Deep objects setting the C<volatile> option to true.  This hints to DBM::Deep
-that the DB file may change between transactions.  See L<LOW-LEVEL ACCESS> 
-below for more.
-
 =head1 IMPORTING/EXPORTING
 
 You can import existing complex structures by calling the C<import()> method,
@@ -2315,7 +2300,7 @@ calling the C<root()> method.
 	my $root = $db->root();
 
 This is useful for changing options after the object has already been created,
-such as enabling/disabling locking, volatile or debug modes.  You can also
+such as enabling/disabling locking, or debug modes.  You can also
 store your own temporary user data in this structure (be wary of name 
 collision), which is then accessible from any child hash or array.
 
@@ -2638,7 +2623,7 @@ this is 340 unodecillion, but don't quote me).
 When a new key/element is stored, the key (or index number) is first run through 
 I<Digest::MD5> to get a 128-bit signature (example, in hex: 
 b05783b0773d894396d475ced9d2f4f6).  Then, the I<Master Index> record is checked
-for the first char of the signature (in this case I<b>).  If it does not exist,
+for the first char of the signature (in this case I<b0>).  If it does not exist,
 a new I<Bucket List> is created for our key (and the next 15 future keys that 
 happen to also have I<b> as their first MD5 char).  The entire MD5 is written 
 to the I<Bucket List> along with the offset of the new I<Bucket> record (EOF at
@@ -2667,21 +2652,27 @@ built-in hashes.
 
 =head1 CODE COVERAGE
 
-We use B<Devel::Cover> to test the code coverage of my tests, below is the
+We use B<Devel::Cover> to test the code coverage of our tests, below is the
 B<Devel::Cover> report on this module's test suite.
 
----------------------------- ------ ------ ------ ------ ------ ------ ------
-File                           stmt   bran   cond    sub    pod   time  total
----------------------------- ------ ------ ------ ------ ------ ------ ------
-blib/lib/DBM/Deep.pm           93.7   82.5   71.9   96.5   25.9   82.8   87.9
-blib/lib/DBM/Deep/Array.pm     98.8   88.0   90.9  100.0    n/a   12.8   96.3
-blib/lib/DBM/Deep/Hash.pm      95.2   80.0  100.0  100.0    n/a    4.4   92.3
-Total                          94.8   83.2   76.5   97.6   25.9  100.0   89.7
----------------------------- ------ ------ ------ ------ ------ ------ ------
+  ---------------------------- ------ ------ ------ ------ ------ ------ ------
+  File                           stmt   bran   cond    sub    pod   time  total
+  ---------------------------- ------ ------ ------ ------ ------ ------ ------
+  blib/lib/DBM/Deep.pm           93.9   82.5   70.0   96.5   33.3   84.3   88.1
+  blib/lib/DBM/Deep/Array.pm     98.8   88.9   87.5  100.0    n/a    9.0   96.4
+  blib/lib/DBM/Deep/Hash.pm      95.2   80.0  100.0  100.0    n/a    6.7   92.3
+  Total                          95.0   83.4   73.8   97.6   33.3  100.0   89.9
+  ---------------------------- ------ ------ ------ ------ ------ ------ ------
+
+=head1 MORE INFORMATION
+
+Check out the DBM::Deep Google Group at L<http://groups.google.com/group/DBM-Deep>
+or send email to L<DBM-Deep@googlegroups.com>.
 
 =head1 AUTHORS
 
 Joseph Huckaby, L<jhuckaby@cpan.org>
+
 Rob Kinyon, L<rkinyon@cpan.org>
 
 Special thanks to Adam Sah and Rich Gaushell!  You know why :-)

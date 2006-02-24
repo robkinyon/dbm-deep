@@ -34,6 +34,8 @@ Revision history for DBM::Deep.
     - A bug with optimize and threading is fixed.
     - autobless has received some attention, resulting in a number of bugs fixed.
     - Removed mode option as it just caused confusion.
+    - Removed volatile option as it is pretty useless (use locking instead)
+    - Locking now implicitly enables autoflush
 
 0.96  Oct 14 09:55:00 2005 Pacific
     - Fixed build (OS X hidden files killed it)

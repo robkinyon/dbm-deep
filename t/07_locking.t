@@ -13,7 +13,7 @@ use_ok( 'DBM::Deep' );
 unlink "t/test.db";
 my $db = DBM::Deep->new(
 	file => "t/test.db",
-	locking => 1
+	locking => 1,
 );
 if ($db->error()) {
 	die "ERROR: " . $db->error();

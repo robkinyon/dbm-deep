@@ -3,6 +3,7 @@
 ##
 use strict;
 use Test::More tests => 4;
+$|=1;
 
 use_ok( 'DBM::Deep' );
 

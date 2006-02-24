@@ -200,7 +200,7 @@ sub TIEARRAY {
 sub _open {
 	##
 	# Open a fh to the database, create if nonexistent.
-	# Make sure file signature matches DeepDB spec.
+	# Make sure file signature matches DBM::Deep spec.
 	##
     my $self = $_[0]->_get_self;
 
@@ -582,7 +582,7 @@ sub _add_bucket {
 		}
 		
 		##
-		# If content is a hash or array, create new child DeepDB object and
+		# If content is a hash or array, create new child DBM::Deep object and
 		# pass each key or element to it.
 		##
 		if ($r eq 'HASH') {
@@ -592,7 +592,6 @@ sub _add_bucket {
 				root => $self->root,
 			);
 			foreach my $key (keys %{$value}) {
-                #$branch->{$key} = $value->{$key};
                 $branch->STORE( $key, $value->{$key} );
 			}
 		}
@@ -604,7 +603,6 @@ sub _add_bucket {
 			);
 			my $index = 0;
 			foreach my $element (@{$value}) {
-                #$branch->[$index] = $element;
                 $branch->STORE( $index, $element );
 				$index++;
 			}
@@ -625,7 +623,7 @@ sub _get_bucket_value {
 	my $keys = $tag->{content};
 
     my $fh = $self->fh;
-	
+
 	##
 	# Iterate through buckets, looking for a key match
 	##
@@ -653,7 +651,7 @@ sub _get_bucket_value {
         read( $fh, $signature, SIG_SIZE);
         
         ##
-        # If value is a hash or array, return new DeepDB object with correct offset
+        # If value is a hash or array, return new DBM::Deep object with correct offset
         ##
         if (($signature eq TYPE_HASH) || ($signature eq TYPE_ARRAY)) {
             my $obj = DBM::Deep->new(
@@ -2410,8 +2408,6 @@ a long time for large files, and you need enough disk space to temporarily hold
 as the original, named with a ".tmp" extension, and is deleted when the 
 operation completes.  Oh, and if locking is enabled, the DB is automatically 
 locked for the entire duration of the copy.
-
-
 
 B<WARNING:> Only call optimize() on the top-level node of the database, and 
 make sure there are no child references lying around.  DBM::Deep keeps a reference 

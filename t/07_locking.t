@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 3;
+use Test::More tests => 4;
 
 use_ok( 'DBM::Deep' );
 
@@ -23,6 +23,9 @@ if ($db->error()) {
 ##
 $db->{key1} = "value1";
 is( $db->{key1}, "value1", "key1 is set" );
+
+$db->{key2} = [ 1 .. 3 ];
+is( $db->{key2}[1], 2 );
 
 ##
 # explicit lock

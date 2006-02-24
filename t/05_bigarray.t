@@ -27,7 +27,7 @@ for ( 0 .. $max_keys ) {
 my $count = -1;
 for ( 0 .. $max_keys ) {
     $count = $_;
-    unless( $db->get( $_ ) == $_ * 2 ) {
+    unless ( $db->get( $_ ) == $_ * 2 ) {
         last;
     };
 }

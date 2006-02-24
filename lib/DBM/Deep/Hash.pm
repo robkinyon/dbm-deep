@@ -5,7 +5,7 @@ use strict;
 use base 'DBM::Deep';
 
 sub _get_self {
-    eval { tied( %{$_[0]} ) } || $_[0]
+    eval { local $SIG{'__DIE__'}; tied( %{$_[0]} ) } || $_[0]
 }
 
 sub TIEHASH {

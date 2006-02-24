@@ -2,10 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More;
-
-my $max_keys = 4000;
-plan tests => 2;
+use Test::More tests => 2;
 
 use_ok( 'DBM::Deep' );
 
@@ -21,6 +18,8 @@ if ($db->error()) {
 ##
 # put/get many keys
 ##
+my $max_keys = 4000;
+
 for ( 0 .. $max_keys ) {
     $db->put( "hello $_" => "there " . $_ * 2 );
 }

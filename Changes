@@ -1,5 +1,9 @@
 Revision history for DBM::Deep.
 
+0.98  Feb ?? ??:??:?? 2006 Pacific
+    - Fixed arraytest slowness by localizing $SIG{__DIE__} to prevent Test::Builder's
+      $SIG{__DIE__} from being called. (q.v. http://perldoc.perl.org/functions/eval.html)
+
 0.97  Feb 24 10:00:00 2006 Pacific
     - Reorganization of distribution to a more standard layout
     - Migration to Module::Build with EU::MM backwards compatibility

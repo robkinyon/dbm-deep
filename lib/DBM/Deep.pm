@@ -2683,10 +2683,10 @@ B<Devel::Cover> report on this module's test suite.
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
   File                           stmt   bran   cond    sub    pod   time  total
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm           93.9   82.5   70.0   96.5   33.3   84.3   88.1
-  blib/lib/DBM/Deep/Array.pm     98.8   88.9   87.5  100.0    n/a    9.0   96.4
-  blib/lib/DBM/Deep/Hash.pm      95.2   80.0  100.0  100.0    n/a    6.7   92.3
-  Total                          95.0   83.4   73.8   97.6   33.3  100.0   89.9
+  blib/lib/DBM/Deep.pm           94.1   82.5   68.7   98.1  100.0   58.0   89.9
+  blib/lib/DBM/Deep/Array.pm     98.9   88.9   87.5  100.0    n/a   28.9   96.4
+  blib/lib/DBM/Deep/Hash.pm      95.3   80.0  100.0  100.0    n/a   13.2   92.4
+  Total                          95.1   83.4   72.8   98.8  100.0  100.0   91.3
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 MORE INFORMATION

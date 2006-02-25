@@ -210,6 +210,7 @@ sub _open {
 	if (defined($self->fh)) { $self->_close(); }
 	
     eval {
+        local $SIG{'__DIE__'};
         # Theoretically, adding O_BINARY should remove the need for the binmode
         # Of course, testing it is going to be ... interesting.
         my $flags = O_RDWR | O_CREAT | O_BINARY;
@@ -385,7 +386,7 @@ sub _add_bucket {
 
 	# added ref() check first to avoid eval and runtime exception for every
 	# scalar value being stored.  performance tweak.
-    my $is_dbm_deep = ref($value) && eval { $value->isa( 'DBM::Deep' ) };
+    my $is_dbm_deep = eval { local $SIG{'__DIE__'}; $value->isa( 'DBM::Deep' ) };
     
 	my $internal_ref = $is_dbm_deep && ($value->root eq $self->root);
 

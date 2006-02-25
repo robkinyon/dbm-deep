@@ -45,9 +45,9 @@ delete $db->{a}{b};
 ##
 # take byte count readings before, and after optimize
 ##
-my $before = (stat($db->fh()))[7];
+my $before = (stat($db->_fh()))[7];
 my $result = $db->optimize();
-my $after = (stat($db->fh()))[7];
+my $after = (stat($db->_fh()))[7];
 
 if ($db->error()) {
 	die "ERROR: " . $db->error();

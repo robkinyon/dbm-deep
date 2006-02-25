@@ -3,6 +3,12 @@ Revision history for DBM::Deep.
 0.98  Feb ?? ??:??:?? 2006 Pacific
     - Fixed arraytest slowness by localizing $SIG{__DIE__} to prevent Test::Builder's
       $SIG{__DIE__} from being called. (q.v. http://perldoc.perl.org/functions/eval.html)
+    - More methods have been made private:
+        - root() is now _root()
+        - base_offset() is now _base_offset()
+        - fh() is now _fh()
+        - type() is now _type()
+        - precalc_sizes() is now _precalc_sizes()
 
 0.97  Feb 24 10:00:00 2006 Pacific
     - Reorganization of distribution to a more standard layout

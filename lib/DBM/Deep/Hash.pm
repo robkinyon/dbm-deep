@@ -22,8 +22,8 @@ sub TIEHASH {
 
 sub FETCH {
     my $self = shift->_get_self;
-    my $key = ($self->root->{filter_store_key})
-        ? $self->root->{filter_store_key}->($_[0])
+    my $key = ($self->_root->{filter_store_key})
+        ? $self->_root->{filter_store_key}->($_[0])
         : $_[0];
 
     return $self->SUPER::FETCH( $key );
@@ -31,8 +31,8 @@ sub FETCH {
 
 sub STORE {
     my $self = shift->_get_self;
-	my $key = ($self->root->{filter_store_key})
-        ? $self->root->{filter_store_key}->($_[0])
+	my $key = ($self->_root->{filter_store_key})
+        ? $self->_root->{filter_store_key}->($_[0])
         : $_[0];
     my $value = $_[1];
 
@@ -41,8 +41,8 @@ sub STORE {
 
 sub EXISTS {
     my $self = shift->_get_self;
-	my $key = ($self->root->{filter_store_key})
-        ? $self->root->{filter_store_key}->($_[0])
+	my $key = ($self->_root->{filter_store_key})
+        ? $self->_root->{filter_store_key}->($_[0])
         : $_[0];
 
     return $self->SUPER::EXISTS( $key );
@@ -50,8 +50,8 @@ sub EXISTS {
 
 sub DELETE {
     my $self = shift->_get_self;
-	my $key = ($self->root->{filter_store_key})
-        ? $self->root->{filter_store_key}->($_[0])
+	my $key = ($self->_root->{filter_store_key})
+        ? $self->_root->{filter_store_key}->($_[0])
         : $_[0];
 
     return $self->SUPER::DELETE( $key );
@@ -66,7 +66,7 @@ sub FIRSTKEY {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { $self->_open(); }
+	if (!defined($self->_fh)) { $self->_open(); }
 	
 	##
 	# Request shared lock for reading
@@ -77,8 +77,8 @@ sub FIRSTKEY {
 	
 	$self->unlock();
 	
-	return ($result && $self->root->{filter_fetch_key})
-        ? $self->root->{filter_fetch_key}->($result)
+	return ($result && $self->_root->{filter_fetch_key})
+        ? $self->_root->{filter_fetch_key}->($result)
         : $result;
 }
 
@@ -88,8 +88,8 @@ sub NEXTKEY {
 	##
     my $self = $_[0]->_get_self;
 
-	my $prev_key = ($self->root->{filter_store_key})
-        ? $self->root->{filter_store_key}->($_[1])
+	my $prev_key = ($self->_root->{filter_store_key})
+        ? $self->_root->{filter_store_key}->($_[1])
         : $_[1];
 
 	my $prev_md5 = $DBM::Deep::DIGEST_FUNC->($prev_key);
@@ -97,7 +97,7 @@ sub NEXTKEY {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { $self->_open(); }
+	if (!defined($self->_fh)) { $self->_open(); }
 	
 	##
 	# Request shared lock for reading
@@ -108,8 +108,8 @@ sub NEXTKEY {
 	
 	$self->unlock();
 	
-	return ($result && $self->root->{filter_fetch_key})
-        ? $self->root->{filter_fetch_key}->($result)
+	return ($result && $self->_root->{filter_fetch_key})
+        ? $self->_root->{filter_fetch_key}->($result)
         : $result;
 }
 

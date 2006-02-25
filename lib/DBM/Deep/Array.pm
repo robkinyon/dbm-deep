@@ -155,12 +155,12 @@ sub FETCHSIZE {
 
     $self->lock( $self->LOCK_SH );
 
-	my $SAVE_FILTER = $self->root->{filter_fetch_value};
-	$self->root->{filter_fetch_value} = undef;
+	my $SAVE_FILTER = $self->_root->{filter_fetch_value};
+	$self->_root->{filter_fetch_value} = undef;
 	
 	my $packed_size = $self->FETCH('length');
 	
-	$self->root->{filter_fetch_value} = $SAVE_FILTER;
+	$self->_root->{filter_fetch_value} = $SAVE_FILTER;
 	
     $self->unlock;
 
@@ -180,12 +180,12 @@ sub STORESIZE {
 	
     $self->lock( $self->LOCK_EX );
 
-	my $SAVE_FILTER = $self->root->{filter_store_value};
-	$self->root->{filter_store_value} = undef;
+	my $SAVE_FILTER = $self->_root->{filter_store_value};
+	$self->_root->{filter_store_value} = undef;
 	
 	my $result = $self->STORE('length', pack($DBM::Deep::LONG_PACK, $new_length));
 	
-	$self->root->{filter_store_value} = $SAVE_FILTER;
+	$self->_root->{filter_store_value} = $SAVE_FILTER;
 	
     $self->unlock;
 

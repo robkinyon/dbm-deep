@@ -16,7 +16,7 @@ if ($db->error()) {
 }
 $db->{key1} = "value1";
 $db->{key2} = "value2";
-my $before = (stat($db->fh()))[7];
+my $before = (stat($db->_fh()))[7];
 undef $db;
 
 ##
@@ -34,7 +34,7 @@ if ($db->error()) {
 }
 $db->{key1} = "value1";
 $db->{key2} = "value2";
-my $after = (stat($db->fh()))[7];
+my $after = (stat($db->_fh()))[7];
 undef $db;
 
 ok( $after < $before );

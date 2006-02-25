@@ -82,7 +82,7 @@ my ($INDEX_SIZE, $BUCKET_SIZE, $BUCKET_LIST_SIZE);
 
 set_digest();
 #set_pack();
-#precalc_sizes();
+#_precalc_sizes();
 
 ##
 # Setup file and tag signatures.  These should never change.
@@ -100,9 +100,9 @@ sub SIG_SIZE   () {  1  }
 ##
 # Setup constants for users to pass to new()
 ##
-sub TYPE_HASH   () { return SIG_HASH; }
-sub TYPE_ARRAY  () { return SIG_ARRAY; }
-sub TYPE_SCALAR () { return SIG_SCALAR; }
+sub TYPE_HASH   () { SIG_HASH   }
+sub TYPE_ARRAY  () { SIG_ARRAY  }
+sub TYPE_SCALAR () { SIG_SCALAR }
 
 sub _get_args {
     my $proto = shift;
@@ -114,8 +114,8 @@ sub _get_args {
         }
         $args = {@_};
     }
-	elsif ( my $type = Scalar::Util::reftype($_[0]) ) {
-        if ( $type ne 'HASH' ) {
+	elsif ( ref $_[0] ) {
+        unless ( eval { local $SIG{'__DIE__'}; %{$_[0]} || 1 } ) {
             $proto->_throw_error( "Not a hashref in args to " . (caller(1))[2] );
         }
         $args = $_[0];
@@ -179,7 +179,7 @@ sub _init {
         ? $args->{root}
         : DBM::Deep::_::Root->new( $args );
 
-    if (!defined($self->fh)) { $self->_open(); }
+    if (!defined($self->_fh)) { $self->_open(); }
 
     return $self;
 }
@@ -207,7 +207,7 @@ sub _open {
 	##
     my $self = $_[0]->_get_self;
 
-	if (defined($self->fh)) { $self->_close(); }
+	if (defined($self->_fh)) { $self->_close(); }
 	
     eval {
         local $SIG{'__DIE__'};
@@ -216,21 +216,21 @@ sub _open {
         my $flags = O_RDWR | O_CREAT | O_BINARY;
 
         my $fh;
-        sysopen( $fh, $self->root->{file}, $flags )
+        sysopen( $fh, $self->_root->{file}, $flags )
             or $fh = undef;
-        $self->root->{fh} = $fh;
+        $self->_root->{fh} = $fh;
     }; if ($@ ) { $self->_throw_error( "Received error: $@\n" ); }
-	if (! defined($self->fh)) {
-		return $self->_throw_error("Cannot sysopen file: " . $self->root->{file} . ": $!");
+	if (! defined($self->_fh)) {
+		return $self->_throw_error("Cannot sysopen file: " . $self->_root->{file} . ": $!");
 	}
 
-    my $fh = $self->fh;
+    my $fh = $self->_fh;
 
     #XXX Can we remove this by using the right sysopen() flags?
     # Maybe ... q.v. above
     binmode $fh; # for win32
 
-    if ($self->root->{autoflush}) {
+    if ($self->_root->{autoflush}) {
         my $old = select $fh;
         $|=1;
         select $old;
@@ -248,7 +248,7 @@ sub _open {
     if (!$bytes_read) {
         seek($fh, 0, SEEK_SET);
         print($fh SIG_FILE);
-        $self->_create_tag($self->base_offset, $self->type, chr(0) x $INDEX_SIZE);
+        $self->_create_tag($self->_base_offset, $self->_type, chr(0) x $INDEX_SIZE);
 
         my $plain_key = "[base]";
         print($fh pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
@@ -261,8 +261,8 @@ sub _open {
         select $old_fh;
 
         my @stats = stat($fh);
-        $self->root->{inode} = $stats[1];
-        $self->root->{end} = $stats[7];
+        $self->_root->{inode} = $stats[1];
+        $self->_root->{end} = $stats[7];
 
         return 1;
     }
@@ -276,13 +276,13 @@ sub _open {
     }
 
 	my @stats = stat($fh);
-	$self->root->{inode} = $stats[1];
-    $self->root->{end} = $stats[7];
+	$self->_root->{inode} = $stats[1];
+    $self->_root->{end} = $stats[7];
         
     ##
     # Get our type from master index signature
     ##
-    my $tag = $self->_load_tag($self->base_offset);
+    my $tag = $self->_load_tag($self->_base_offset);
 
 #XXX We probably also want to store the hash algorithm name and not assume anything
 #XXX The cool thing would be to allow a different hashing algorithm at every level
@@ -302,8 +302,8 @@ sub _close {
 	# Close database fh
 	##
     my $self = $_[0]->_get_self;
-    close $self->root->{fh} if $self->root->{fh};
-    $self->root->{fh} = undef;
+    close $self->_root->{fh} if $self->_root->{fh};
+    $self->_root->{fh} = undef;
 }
 
 sub _create_tag {
@@ -313,13 +313,13 @@ sub _create_tag {
 	my ($self, $offset, $sig, $content) = @_;
 	my $size = length($content);
 	
-    my $fh = $self->fh;
+    my $fh = $self->_fh;
 
 	seek($fh, $offset, SEEK_SET);
 	print($fh $sig . pack($DATA_LENGTH_PACK, $size) . $content );
 	
-	if ($offset == $self->root->{end}) {
-		$self->root->{end} += SIG_SIZE + $DATA_LENGTH_SIZE + $size;
+	if ($offset == $self->_root->{end}) {
+		$self->_root->{end} += SIG_SIZE + $DATA_LENGTH_SIZE + $size;
 	}
 	
 	return {
@@ -337,7 +337,7 @@ sub _load_tag {
 	my $self = shift;
 	my $offset = shift;
 	
-    my $fh = $self->fh;
+    my $fh = $self->_fh;
 
 	seek($fh, $offset, SEEK_SET);
 	if (eof $fh) { return undef; }
@@ -388,9 +388,9 @@ sub _add_bucket {
 	# scalar value being stored.  performance tweak.
     my $is_dbm_deep = eval { local $SIG{'__DIE__'}; $value->isa( 'DBM::Deep' ) };
     
-	my $internal_ref = $is_dbm_deep && ($value->root eq $self->root);
+	my $internal_ref = $is_dbm_deep && ($value->_root eq $self->_root);
 
-    my $fh = $self->fh;
+    my $fh = $self->_fh;
 
 	##
 	# Iterate through buckets, seeing if this is a new entry or a replace.
@@ -405,8 +405,8 @@ sub _add_bucket {
 			$result = 2;
 			
             $location = $internal_ref
-                ? $value->base_offset
-                : $self->root->{end};
+                ? $value->_base_offset
+                : $self->_root->{end};
 			
 			seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), SEEK_SET);
 			print($fh $md5 . pack($LONG_PACK, $location) );
@@ -419,7 +419,7 @@ sub _add_bucket {
 			$result = 1;
 			
 			if ($internal_ref) {
-				$location = $value->base_offset;
+				$location = $value->_base_offset;
 				seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), SEEK_SET);
 				print($fh $md5 . pack($LONG_PACK, $location) );
 			}
@@ -440,7 +440,7 @@ sub _add_bucket {
                 	
                 	# if autobless is enabled, must also take into consideration
                 	# the class name, as it is stored along with key/value.
-                	if ( $self->root->{autobless} ) {
+                	if ( $self->_root->{autobless} ) {
 						my $value_class = Scalar::Util::blessed($value);
 						if ( defined $value_class && $value_class ne 'DBM::Deep' ) {
 							$actual_length += length($value_class);
@@ -453,7 +453,7 @@ sub _add_bucket {
 					$location = $subloc;
 				}
 				else {
-					$location = $self->root->{end};
+					$location = $self->_root->{end};
 					seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $HASH_SIZE, SEEK_SET);
 					print($fh pack($LONG_PACK, $location) );
 				}
@@ -475,9 +475,9 @@ sub _add_bucket {
 	##
 	if (!$location) {
 		seek($fh, $tag->{ref_loc}, SEEK_SET);
-		print($fh pack($LONG_PACK, $self->root->{end}) );
+		print($fh pack($LONG_PACK, $self->_root->{end}) );
 		
-		my $index_tag = $self->_create_tag($self->root->{end}, SIG_INDEX, chr(0) x $INDEX_SIZE);
+		my $index_tag = $self->_create_tag($self->_root->{end}, SIG_INDEX, chr(0) x $INDEX_SIZE);
 		my @offsets = ();
 		
 		$keys .= $md5 . pack($LONG_PACK, 0);
@@ -498,25 +498,25 @@ sub _add_bucket {
 						my $subloc = unpack($LONG_PACK, substr($subkeys, ($k * $BUCKET_SIZE) + $HASH_SIZE, $LONG_SIZE));
 						if (!$subloc) {
 							seek($fh, $offset + ($k * $BUCKET_SIZE), SEEK_SET);
-							print($fh $key . pack($LONG_PACK, $old_subloc || $self->root->{end}) );
+							print($fh $key . pack($LONG_PACK, $old_subloc || $self->_root->{end}) );
 							last;
 						}
 					} # k loop
 				}
 				else {
-					$offsets[$num] = $self->root->{end};
+					$offsets[$num] = $self->_root->{end};
 					seek($fh, $index_tag->{offset} + ($num * $LONG_SIZE), SEEK_SET);
-					print($fh pack($LONG_PACK, $self->root->{end}) );
+					print($fh pack($LONG_PACK, $self->_root->{end}) );
 					
-					my $blist_tag = $self->_create_tag($self->root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
+					my $blist_tag = $self->_create_tag($self->_root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
 					
 					seek($fh, $blist_tag->{offset}, SEEK_SET);
-					print($fh $key . pack($LONG_PACK, $old_subloc || $self->root->{end}) );
+					print($fh $key . pack($LONG_PACK, $old_subloc || $self->_root->{end}) );
 				}
 			} # key is real
 		} # i loop
 		
-		$location ||= $self->root->{end};
+		$location ||= $self->_root->{end};
 	} # re-index bucket list
 	
 	##
@@ -559,7 +559,7 @@ sub _add_bucket {
 		##
 		# If value is blessed, preserve class name
 		##
-		if ( $self->root->{autobless} ) {
+		if ( $self->_root->{autobless} ) {
             my $value_class = Scalar::Util::blessed($value);
             if ( defined $value_class && $value_class ne 'DBM::Deep' ) {
                 ##
@@ -579,10 +579,10 @@ sub _add_bucket {
 		##
 		# If this is a new content area, advance EOF counter
 		##
-		if ($location == $self->root->{end}) {
-			$self->root->{end} += SIG_SIZE;
-			$self->root->{end} += $DATA_LENGTH_SIZE + $content_length;
-			$self->root->{end} += $DATA_LENGTH_SIZE + length($plain_key);
+		if ($location == $self->_root->{end}) {
+			$self->_root->{end} += SIG_SIZE;
+			$self->_root->{end} += $DATA_LENGTH_SIZE + $content_length;
+			$self->_root->{end} += $DATA_LENGTH_SIZE + length($plain_key);
 		}
 		
 		##
@@ -593,7 +593,7 @@ sub _add_bucket {
 			my $branch = DBM::Deep->new(
 				type => TYPE_HASH,
 				base_offset => $location,
-				root => $self->root,
+				root => $self->_root,
 			);
 			foreach my $key (keys %{$value}) {
                 $branch->STORE( $key, $value->{$key} );
@@ -603,7 +603,7 @@ sub _add_bucket {
 			my $branch = DBM::Deep->new(
 				type => TYPE_ARRAY,
 				base_offset => $location,
-				root => $self->root,
+				root => $self->_root,
 			);
 			my $index = 0;
 			foreach my $element (@{$value}) {
@@ -626,7 +626,7 @@ sub _get_bucket_value {
 	my ($tag, $md5) = @_;
 	my $keys = $tag->{content};
 
-    my $fh = $self->fh;
+    my $fh = $self->_fh;
 
 	##
 	# Iterate through buckets, looking for a key match
@@ -661,10 +661,10 @@ sub _get_bucket_value {
             my $obj = DBM::Deep->new(
                 type => $signature,
                 base_offset => $subloc,
-                root => $self->root
+                root => $self->_root
             );
             
-            if ($self->root->{autobless}) {
+            if ($self->_root->{autobless}) {
                 ##
                 # Skip over value and plain key to see if object needs
                 # to be re-blessed
@@ -719,7 +719,7 @@ sub _delete_bucket {
 	my ($tag, $md5) = @_;
 	my $keys = $tag->{content};
 
-    my $fh = $self->fh;
+    my $fh = $self->_fh;
 	
 	##
 	# Iterate through buckets, looking for a key match
@@ -800,7 +800,7 @@ sub _find_bucket_list {
 	# Locate offset for bucket list using digest index system
 	##
 	my $ch = 0;
-	my $tag = $self->_load_tag($self->base_offset);
+	my $tag = $self->_load_tag($self->_base_offset);
 	if (!$tag) { return; }
 	
 	while ($tag->{signature} ne SIG_BLIST) {
@@ -821,7 +821,7 @@ sub _traverse_index {
 	
 	my $tag = $self->_load_tag( $offset );
 
-    my $fh = $self->fh;
+    my $fh = $self->_fh;
 	
 	if ($tag->{signature} ne SIG_BLIST) {
 		my $content = $tag->{content};
@@ -913,7 +913,7 @@ sub _get_next_key {
 		$self->{return_next} = 1;
 	}
 	
-	return $self->_traverse_index( $self->base_offset, 0 );
+	return $self->_traverse_index( $self->_base_offset, 0 );
 }
 
 sub lock {
@@ -926,25 +926,25 @@ sub lock {
 	my $type = $_[1];
     $type = LOCK_EX unless defined $type;
 	
-	if (!defined($self->fh)) { return; }
+	if (!defined($self->_fh)) { return; }
 
-	if ($self->root->{locking}) {
-		if (!$self->root->{locked}) {
-			flock($self->fh, $type);
+	if ($self->_root->{locking}) {
+		if (!$self->_root->{locked}) {
+			flock($self->_fh, $type);
 			
 			# refresh end counter in case file has changed size
-			my @stats = stat($self->root->{file});
-			$self->root->{end} = $stats[7];
+			my @stats = stat($self->_root->{file});
+			$self->_root->{end} = $stats[7];
 			
 			# double-check file inode, in case another process
 			# has optimize()d our file while we were waiting.
-			if ($stats[1] != $self->root->{inode}) {
+			if ($stats[1] != $self->_root->{inode}) {
 				$self->_open(); # re-open
-				flock($self->fh, $type); # re-lock
-				$self->root->{end} = (stat($self->fh))[7]; # re-end
+				flock($self->_fh, $type); # re-lock
+				$self->_root->{end} = (stat($self->_fh))[7]; # re-end
 			}
 		}
-		$self->root->{locked}++;
+		$self->_root->{locked}++;
 
         return 1;
 	}
@@ -959,11 +959,11 @@ sub unlock {
 	##
     my $self = $_[0]->_get_self;
 
-	if (!defined($self->fh)) { return; }
+	if (!defined($self->_fh)) { return; }
 	
-	if ($self->root->{locking} && $self->root->{locked} > 0) {
-		$self->root->{locked}--;
-		if (!$self->root->{locked}) { flock($self->fh, LOCK_UN); }
+	if ($self->_root->{locking} && $self->_root->{locked} > 0) {
+		$self->_root->{locked}--;
+		if (!$self->_root->{locked}) { flock($self->_fh, LOCK_UN); }
 
         return 1;
 	}
@@ -980,14 +980,14 @@ sub _copy_node {
     my $self = $_[0]->_get_self;
 	my $db_temp = $_[1];
 
-	if ($self->type eq TYPE_HASH) {
+	if ($self->_type eq TYPE_HASH) {
 		my $key = $self->first_key();
 		while ($key) {
 			my $value = $self->get($key);
 #XXX This doesn't work with autobless
 			if (!ref($value)) { $db_temp->{$key} = $value; }
 			else {
-				my $type = $value->type;
+				my $type = $value->_type;
 				if ($type eq TYPE_HASH) { $db_temp->{$key} = {}; }
 				else { $db_temp->{$key} = []; }
 				$value->_copy_node( $db_temp->{$key} );
@@ -1002,7 +1002,7 @@ sub _copy_node {
 			if (!ref($value)) { $db_temp->[$index] = $value; }
             #XXX NO tests for this code
 			else {
-				my $type = $value->type;
+				my $type = $value->_type;
 				if ($type eq TYPE_HASH) { $db_temp->[$index] = {}; }
 				else { $db_temp->[$index] = []; }
 				$value->_copy_node( $db_temp->[$index] );
@@ -1018,8 +1018,8 @@ sub export {
     my $self = $_[0]->_get_self;
 	
 	my $temp;
-	if ($self->type eq TYPE_HASH) { $temp = {}; }
-	elsif ($self->type eq TYPE_ARRAY) { $temp = []; }
+	if ($self->_type eq TYPE_HASH) { $temp = {}; }
+	elsif ($self->_type eq TYPE_ARRAY) { $temp = []; }
 	
 	$self->lock();
 	$self->_copy_node( $temp );
@@ -1045,15 +1045,15 @@ sub import {
 		##
 		shift @_;
 		
-		if ($self->type eq TYPE_HASH) { $struct = {@_}; }
-		elsif ($self->type eq TYPE_ARRAY) { $struct = [@_]; }
+		if ($self->_type eq TYPE_HASH) { $struct = {@_}; }
+		elsif ($self->_type eq TYPE_ARRAY) { $struct = [@_]; }
 	}
 	
     my $r = Scalar::Util::reftype($struct) || '';
-	if ($r eq "HASH" && $self->type eq TYPE_HASH) {
+	if ($r eq "HASH" && $self->_type eq TYPE_HASH) {
 		foreach my $key (keys %$struct) { $self->put($key, $struct->{$key}); }
 	}
-	elsif ($r eq "ARRAY" && $self->type eq TYPE_ARRAY) {
+	elsif ($r eq "ARRAY" && $self->_type eq TYPE_ARRAY) {
 		$self->push( @$struct );
 	}
 	else {
@@ -1071,13 +1071,13 @@ sub optimize {
     my $self = $_[0]->_get_self;
 
 #XXX Need to create a new test for this
-#	if ($self->root->{links} > 1) {
+#	if ($self->_root->{links} > 1) {
 #		return $self->_throw_error("Cannot optimize: reference count is greater than 1");
 #	}
 	
 	my $db_temp = DBM::Deep->new(
-		file => $self->root->{file} . '.tmp',
-		type => $self->type
+		file => $self->_root->{file} . '.tmp',
+		type => $self->_type
 	);
 	if (!$db_temp) {
 		return $self->_throw_error("Cannot optimize: failed to open temp file: $!");
@@ -1090,12 +1090,12 @@ sub optimize {
 	##
 	# Attempt to copy user, group and permissions over to new file
 	##
-	my @stats = stat($self->fh);
+	my @stats = stat($self->_fh);
 	my $perms = $stats[2] & 07777;
 	my $uid = $stats[4];
 	my $gid = $stats[5];
-	chown( $uid, $gid, $self->root->{file} . '.tmp' );
-	chmod( $perms, $self->root->{file} . '.tmp' );
+	chown( $uid, $gid, $self->_root->{file} . '.tmp' );
+	chmod( $perms, $self->_root->{file} . '.tmp' );
 	
     # q.v. perlport for more information on this variable
     if ( $^O eq 'MSWin32' || $^O eq 'cygwin' ) {
@@ -1109,8 +1109,8 @@ sub optimize {
 		$self->_close();
 	}
 	
-	if (!rename $self->root->{file} . '.tmp', $self->root->{file}) {
-		unlink $self->root->{file} . '.tmp';
+	if (!rename $self->_root->{file} . '.tmp', $self->_root->{file}) {
+		unlink $self->_root->{file} . '.tmp';
 		$self->unlock();
 		return $self->_throw_error("Optimize failed: Cannot copy temp file over original: $!");
 	}
@@ -1129,9 +1129,9 @@ sub clone {
     my $self = $_[0]->_get_self;
 	
 	return DBM::Deep->new(
-		type => $self->type,
-		base_offset => $self->base_offset,
-		root => $self->root
+		type => $self->_type,
+		base_offset => $self->_base_offset,
+		root => $self->_root
 	);
 }
 
@@ -1152,7 +1152,7 @@ sub clone {
         my $func = $_[2] ? $_[2] : undef;
 	
         if ( $is_legal_filter{$type} ) {
-            $self->root->{"filter_$type"} = $func;
+            $self->_root->{"filter_$type"} = $func;
             return 1;
         }
 
@@ -1164,7 +1164,7 @@ sub clone {
 # Accessor methods
 ##
 
-sub root {
+sub _root {
 	##
 	# Get access to the root structure
 	##
@@ -1172,16 +1172,16 @@ sub root {
 	return $self->{root};
 }
 
-sub fh {
+sub _fh {
 	##
 	# Get access to the raw fh
 	##
     #XXX It will be useful, though, when we split out HASH and ARRAY
     my $self = $_[0]->_get_self;
-	return $self->root->{fh};
+	return $self->_root->{fh};
 }
 
-sub type {
+sub _type {
 	##
 	# Get type of current node (TYPE_HASH or TYPE_ARRAY)
 	##
@@ -1189,7 +1189,7 @@ sub type {
 	return $self->{type};
 }
 
-sub base_offset {
+sub _base_offset {
 	##
 	# Get base_offset of current node (TYPE_HASH or TYPE_ARRAY)
 	##
@@ -1215,13 +1215,13 @@ sub _throw_error {
 	##
 	# Store error string in self
 	##
-    my $self = $_[0]->_get_self;
 	my $error_text = $_[1];
 	
-    if ( Scalar::Util::blessed $self ) {
-        $self->root->{error} = $error_text;
+    if ( Scalar::Util::blessed $_[0] ) {
+        my $self = $_[0]->_get_self;
+        $self->_root->{error} = $error_text;
 	
-        unless ($self->root->{debug}) {
+        unless ($self->_root->{debug}) {
             die "DBM::Deep: $error_text\n";
         }
 
@@ -1239,10 +1239,10 @@ sub clear_error {
 	##
     my $self = $_[0]->_get_self;
 	
-	undef $self->root->{error};
+	undef $self->_root->{error};
 }
 
-sub precalc_sizes {
+sub _precalc_sizes {
 	##
 	# Precalculate index, bucket and bucket list sizes
 	##
@@ -1267,7 +1267,7 @@ sub set_pack {
     $DATA_LENGTH_SIZE = $data_s ? $data_s : 4;
     $DATA_LENGTH_PACK = $data_p ? $data_p : 'N';
 
-	precalc_sizes();
+	_precalc_sizes();
 }
 
 sub set_digest {
@@ -1279,7 +1279,7 @@ sub set_digest {
     $DIGEST_FUNC = $digest_func ? $digest_func : \&Digest::MD5::md5;
     $HASH_SIZE = $hash_size ? $hash_size : 16;
 
-	precalc_sizes();
+	_precalc_sizes();
 }
 
 ##
@@ -1295,8 +1295,8 @@ sub STORE {
 
     # User may be storing a hash, in which case we do not want it run 
     # through the filtering system
-	my $value = ($self->root->{filter_store_value} && !ref($_[2]))
-        ? $self->root->{filter_store_value}->($_[2])
+	my $value = ($self->_root->{filter_store_value} && !ref($_[2]))
+        ? $self->_root->{filter_store_value}->($_[2])
         : $_[2];
 	
 	my $md5 = $DIGEST_FUNC->($key);
@@ -1304,7 +1304,7 @@ sub STORE {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh) && !$self->_open()) {
+	if (!defined($self->_fh) && !$self->_open()) {
 		return;
 	}
 	##
@@ -1314,14 +1314,14 @@ sub STORE {
 	##
 	$self->lock( LOCK_EX );
 	
-	my $fh = $self->fh;
+	my $fh = $self->_fh;
 	
 	##
 	# Locate offset for bucket list using digest index system
 	##
-	my $tag = $self->_load_tag($self->base_offset);
+	my $tag = $self->_load_tag($self->_base_offset);
 	if (!$tag) {
-		$tag = $self->_create_tag($self->base_offset, SIG_INDEX, chr(0) x $INDEX_SIZE);
+		$tag = $self->_create_tag($self->_base_offset, SIG_INDEX, chr(0) x $INDEX_SIZE);
 	}
 	
 	my $ch = 0;
@@ -1331,9 +1331,9 @@ sub STORE {
 		if (!$new_tag) {
 			my $ref_loc = $tag->{offset} + ($num * $LONG_SIZE);
 			seek($fh, $ref_loc, SEEK_SET);
-			print($fh pack($LONG_PACK, $self->root->{end}) );
+			print($fh pack($LONG_PACK, $self->_root->{end}) );
 			
-			$tag = $self->_create_tag($self->root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
+			$tag = $self->_create_tag($self->_root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
 			$tag->{ref_loc} = $ref_loc;
 			$tag->{ch} = $ch;
 			last;
@@ -1367,7 +1367,7 @@ sub FETCH {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { $self->_open(); }
+	if (!defined($self->_fh)) { $self->_open(); }
 	
 	my $md5 = $DIGEST_FUNC->($key);
 
@@ -1392,8 +1392,8 @@ sub FETCH {
     #XXX What is ref() checking here?
     #YYY Filters only apply on scalar values, so the ref check is making
     #YYY sure the fetched bucket is a scalar, not a child hash or array.
-	return ($result && !ref($result) && $self->root->{filter_fetch_value})
-        ? $self->root->{filter_fetch_value}->($result)
+	return ($result && !ref($result) && $self->_root->{filter_fetch_value})
+        ? $self->_root->{filter_fetch_value}->($result)
         : $result;
 }
 
@@ -1409,7 +1409,7 @@ sub DELETE {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { $self->_open(); }
+	if (!defined($self->_fh)) { $self->_open(); }
 	
 	##
 	# Request exclusive lock for writing
@@ -1426,8 +1426,8 @@ sub DELETE {
 	# Delete bucket
 	##
     my $value = $self->_get_bucket_value( $tag, $md5 );
-	if ($value && !ref($value) && $self->root->{filter_fetch_value}) {
-        $value = $self->root->{filter_fetch_value}->($value);
+	if ($value && !ref($value) && $self->_root->{filter_fetch_value}) {
+        $value = $self->_root->{filter_fetch_value}->($value);
     }
 
 	my $result = $self->_delete_bucket( $tag, $md5 );
@@ -1454,7 +1454,7 @@ sub EXISTS {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { $self->_open(); }
+	if (!defined($self->_fh)) { $self->_open(); }
 	
 	##
 	# Request shared lock for reading
@@ -1490,22 +1490,22 @@ sub CLEAR {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->fh)) { $self->_open(); }
+	if (!defined($self->_fh)) { $self->_open(); }
 	
 	##
 	# Request exclusive lock for writing
 	##
 	$self->lock( LOCK_EX );
 	
-    my $fh = $self->fh;
+    my $fh = $self->_fh;
 
-	seek($fh, $self->base_offset, SEEK_SET);
+	seek($fh, $self->_base_offset, SEEK_SET);
 	if (eof $fh) {
 		$self->unlock();
 		return;
 	}
 	
-	$self->_create_tag($self->base_offset, $self->type, chr(0) x $INDEX_SIZE);
+	$self->_create_tag($self->_base_offset, $self->_type, chr(0) x $INDEX_SIZE);
 	
 	$self->unlock();
 	
@@ -1824,6 +1824,10 @@ C<put()>, C<get()>, C<exists()>, C<delete()> and C<clear()>.
 
 =over
 
+=item * new() / clone()
+
+These are the constructor and copy-functions.
+
 =item * put() / store()
 
 Stores a new hash key/value pair, or sets an array element value.  Takes two
@@ -1872,6 +1876,26 @@ details and workarounds.
 
 	$db->clear(); # hashes or arrays
 
+=item * lock() / unlock()
+
+q.v. Locking.
+
+=item * optimize()
+
+Recover lost disk space.
+
+=item * import() / export()
+
+Data going in and out.
+
+=item * set_digest() / set_pack() / set_filter()
+
+q.v. adjusting the interal parameters.
+
+=item * error() / clear_error()
+
+Error handling methods (may be deprecated).
+.
 =back
 
 =head2 HASHES
@@ -2288,9 +2312,9 @@ indeed work!
 =head1 LOW-LEVEL ACCESS
 
 If you require low-level access to the underlying filehandle that DBM::Deep uses,
-you can call the C<fh()> method, which returns the handle:
+you can call the C<_fh()> method, which returns the handle:
 
-	my $fh = $db->fh();
+	my $fh = $db->_fh();
 
 This method can be called on the root level of the datbase, or any child
 hashes or arrays.  All levels share a I<root> structure, which contains things
@@ -2298,7 +2322,7 @@ like the filehandle, a reference counter, and all the options specified
 when you created the object.  You can get access to this root structure by 
 calling the C<root()> method.
 
-	my $root = $db->root();
+	my $root = $db->_root();
 
 This is useful for changing options after the object has already been created,
 such as enabling/disabling locking, or debug modes.  You can also

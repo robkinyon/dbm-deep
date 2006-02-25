@@ -2668,7 +2668,7 @@ plain key are stored.
 Fetching the plain key occurs when calling the I<first_key()> and I<next_key()>
 methods.  In this process the indexes are walked systematically, and each key
 fetched in increasing MD5 order (which is why it appears random).   Once the
-I<Bucket> is found, the value is skipped the plain key returned instead.  
+I<Bucket> is found, the value is skipped and the plain key returned instead.  
 B<Note:> Do not count on keys being fetched as if the MD5 hashes were 
 alphabetically sorted.  This only happens on an index-level -- as soon as the 
 I<Bucket Lists> are hit, the keys will come out in the order they went in -- 

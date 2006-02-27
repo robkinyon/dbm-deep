@@ -992,7 +992,7 @@ sub _copy_value {
         else {
             ${$spot} = { %{$value} };
         }
-        $$spot = bless $$spot, $c
+        ${$spot} = bless ${$spot}, $c
             if defined $c;
     }
 

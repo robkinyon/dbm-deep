@@ -246,11 +246,11 @@ sub _open {
     ##
     if (!$bytes_read) {
         seek($fh, 0 + $self->_root->{file_offset}, SEEK_SET);
-        print($fh SIG_FILE);
+        print( $fh SIG_FILE);
         $self->_create_tag($self->_base_offset, $self->_type, chr(0) x $INDEX_SIZE);
 
         my $plain_key = "[base]";
-        print($fh pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
+        print( $fh pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
 
         # Flush the filehandle
         my $old_fh = select $fh;
@@ -313,7 +313,7 @@ sub _create_tag {
     my $fh = $self->_fh;
 
 	seek($fh, $offset + $self->_root->{file_offset}, SEEK_SET);
-	print($fh $sig . pack($DATA_LENGTH_PACK, $size) . $content );
+	print( $fh $sig . pack($DATA_LENGTH_PACK, $size) . $content );
 	
 	if ($offset == $self->_root->{end}) {
 		$self->_root->{end} += SIG_SIZE + $DATA_LENGTH_SIZE + $size;
@@ -378,11 +378,10 @@ sub _add_bucket {
 	my $location = 0;
 	my $result = 2;
 
-	# added ref() check first to avoid eval and runtime exception for every
-	# scalar value being stored.  performance tweak.
+    my $root = $self->_root;
+
     my $is_dbm_deep = eval { local $SIG{'__DIE__'}; $value->isa( 'DBM::Deep' ) };
-    
-	my $internal_ref = $is_dbm_deep && ($value->_root eq $self->_root);
+	my $internal_ref = $is_dbm_deep && ($value->_root eq $root);
 
     my $fh = $self->_fh;
 
@@ -400,10 +399,10 @@ sub _add_bucket {
 			
             $location = $internal_ref
                 ? $value->_base_offset
-                : $self->_root->{end};
+                : $root->{end};
 			
-			seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $self->_root->{file_offset}, SEEK_SET);
-			print($fh $md5 . pack($LONG_PACK, $location) );
+			seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $root->{file_offset}, SEEK_SET);
+			print( $fh $md5 . pack($LONG_PACK, $location) );
 			last;
 		}
 		elsif ($md5 eq $key) {
@@ -414,11 +413,11 @@ sub _add_bucket {
 			
 			if ($internal_ref) {
 				$location = $value->_base_offset;
-				seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $self->_root->{file_offset}, SEEK_SET);
-				print($fh $md5 . pack($LONG_PACK, $location) );
+				seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $root->{file_offset}, SEEK_SET);
+				print( $fh $md5 . pack($LONG_PACK, $location) );
 			}
 			else {
-				seek($fh, $subloc + SIG_SIZE + $self->_root->{file_offset}, SEEK_SET);
+				seek($fh, $subloc + SIG_SIZE + $root->{file_offset}, SEEK_SET);
 				my $size;
 				read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
 				
@@ -434,7 +433,7 @@ sub _add_bucket {
                 	
                 	# if autobless is enabled, must also take into consideration
                 	# the class name, as it is stored along with key/value.
-                	if ( $self->_root->{autobless} ) {
+                	if ( $root->{autobless} ) {
 						my $value_class = Scalar::Util::blessed($value);
 						if ( defined $value_class && $value_class ne 'DBM::Deep' ) {
 							$actual_length += length($value_class);
@@ -447,9 +446,9 @@ sub _add_bucket {
 					$location = $subloc;
 				}
 				else {
-					$location = $self->_root->{end};
-					seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $HASH_SIZE + $self->_root->{file_offset}, SEEK_SET);
-					print($fh pack($LONG_PACK, $location) );
+					$location = $root->{end};
+					seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $HASH_SIZE + $root->{file_offset}, SEEK_SET);
+					print( $fh pack($LONG_PACK, $location) );
 				}
 			}
 			last;
@@ -468,10 +467,10 @@ sub _add_bucket {
 	# If bucket didn't fit into list, split into a new index level
 	##
 	if (!$location) {
-		seek($fh, $tag->{ref_loc} + $self->_root->{file_offset}, SEEK_SET);
-		print($fh pack($LONG_PACK, $self->_root->{end}) );
+		seek($fh, $tag->{ref_loc} + $root->{file_offset}, SEEK_SET);
+		print( $fh pack($LONG_PACK, $root->{end}) );
 		
-		my $index_tag = $self->_create_tag($self->_root->{end}, SIG_INDEX, chr(0) x $INDEX_SIZE);
+		my $index_tag = $self->_create_tag($root->{end}, SIG_INDEX, chr(0) x $INDEX_SIZE);
 		my @offsets = ();
 		
 		$keys .= $md5 . pack($LONG_PACK, 0);
@@ -484,33 +483,33 @@ sub _add_bucket {
 				
 				if ($offsets[$num]) {
 					my $offset = $offsets[$num] + SIG_SIZE + $DATA_LENGTH_SIZE;
-					seek($fh, $offset + $self->_root->{file_offset}, SEEK_SET);
+					seek($fh, $offset + $root->{file_offset}, SEEK_SET);
 					my $subkeys;
 					read( $fh, $subkeys, $BUCKET_LIST_SIZE);
 					
 					for (my $k=0; $k<$MAX_BUCKETS; $k++) {
 						my $subloc = unpack($LONG_PACK, substr($subkeys, ($k * $BUCKET_SIZE) + $HASH_SIZE, $LONG_SIZE));
 						if (!$subloc) {
-							seek($fh, $offset + ($k * $BUCKET_SIZE) + $self->_root->{file_offset}, SEEK_SET);
-							print($fh $key . pack($LONG_PACK, $old_subloc || $self->_root->{end}) );
+							seek($fh, $offset + ($k * $BUCKET_SIZE) + $root->{file_offset}, SEEK_SET);
+							print( $fh $key . pack($LONG_PACK, $old_subloc || $root->{end}) );
 							last;
 						}
 					} # k loop
 				}
 				else {
-					$offsets[$num] = $self->_root->{end};
-					seek($fh, $index_tag->{offset} + ($num * $LONG_SIZE) + $self->_root->{file_offset}, SEEK_SET);
-					print($fh pack($LONG_PACK, $self->_root->{end}) );
+					$offsets[$num] = $root->{end};
+					seek($fh, $index_tag->{offset} + ($num * $LONG_SIZE) + $root->{file_offset}, SEEK_SET);
+					print( $fh pack($LONG_PACK, $root->{end}) );
 					
-					my $blist_tag = $self->_create_tag($self->_root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
+					my $blist_tag = $self->_create_tag($root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
 					
-					seek($fh, $blist_tag->{offset} + $self->_root->{file_offset}, SEEK_SET);
-					print($fh $key . pack($LONG_PACK, $old_subloc || $self->_root->{end}) );
+					seek($fh, $blist_tag->{offset} + $root->{file_offset}, SEEK_SET);
+					print( $fh $key . pack($LONG_PACK, $old_subloc || $root->{end}) );
 				}
 			} # key is real
 		} # i loop
 		
-		$location ||= $self->_root->{end};
+		$location ||= $root->{end};
 	} # re-index bucket list
 	
 	##
@@ -518,54 +517,54 @@ sub _add_bucket {
 	##
 	if ($location) {
 		my $content_length;
-		seek($fh, $location + $self->_root->{file_offset}, SEEK_SET);
+		seek($fh, $location + $root->{file_offset}, SEEK_SET);
 		
 		##
 		# Write signature based on content type, set content length and write actual value.
 		##
         my $r = Scalar::Util::reftype($value) || '';
 		if ($r eq 'HASH') {
-			print($fh TYPE_HASH );
-			print($fh pack($DATA_LENGTH_PACK, $INDEX_SIZE) . chr(0) x $INDEX_SIZE );
+			print( $fh TYPE_HASH );
+			print( $fh pack($DATA_LENGTH_PACK, $INDEX_SIZE) . chr(0) x $INDEX_SIZE );
 			$content_length = $INDEX_SIZE;
 		}
 		elsif ($r eq 'ARRAY') {
-			print($fh TYPE_ARRAY );
-			print($fh pack($DATA_LENGTH_PACK, $INDEX_SIZE) . chr(0) x $INDEX_SIZE );
+			print( $fh TYPE_ARRAY );
+			print( $fh pack($DATA_LENGTH_PACK, $INDEX_SIZE) . chr(0) x $INDEX_SIZE );
 			$content_length = $INDEX_SIZE;
 		}
 		elsif (!defined($value)) {
-			print($fh SIG_NULL );
-			print($fh pack($DATA_LENGTH_PACK, 0) );
+			print( $fh SIG_NULL );
+			print( $fh pack($DATA_LENGTH_PACK, 0) );
 			$content_length = 0;
 		}
 		else {
-			print($fh SIG_DATA );
-			print($fh pack($DATA_LENGTH_PACK, length($value)) . $value );
+			print( $fh SIG_DATA );
+			print( $fh pack($DATA_LENGTH_PACK, length($value)) . $value );
 			$content_length = length($value);
 		}
 		
 		##
 		# Plain key is stored AFTER value, as keys are typically fetched less often.
 		##
-		print($fh pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
+		print( $fh pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
 		
 		##
 		# If value is blessed, preserve class name
 		##
-		if ( $self->_root->{autobless} ) {
+		if ( $root->{autobless} ) {
             my $value_class = Scalar::Util::blessed($value);
             if ( defined $value_class && $value_class ne 'DBM::Deep' ) {
                 ##
                 # Blessed ref -- will restore later
                 ##
-                print($fh chr(1) );
-                print($fh pack($DATA_LENGTH_PACK, length($value_class)) . $value_class );
+                print( $fh chr(1) );
+                print( $fh pack($DATA_LENGTH_PACK, length($value_class)) . $value_class );
                 $content_length += 1;
                 $content_length += $DATA_LENGTH_SIZE + length($value_class);
             }
             else {
-                print($fh chr(0) );
+                print( $fh chr(0) );
                 $content_length += 1;
             }
         }
@@ -573,10 +572,10 @@ sub _add_bucket {
 		##
 		# If this is a new content area, advance EOF counter
 		##
-		if ($location == $self->_root->{end}) {
-			$self->_root->{end} += SIG_SIZE;
-			$self->_root->{end} += $DATA_LENGTH_SIZE + $content_length;
-			$self->_root->{end} += $DATA_LENGTH_SIZE + length($plain_key);
+		if ($location == $root->{end}) {
+			$root->{end} += SIG_SIZE;
+			$root->{end} += $DATA_LENGTH_SIZE + $content_length;
+			$root->{end} += $DATA_LENGTH_SIZE + length($plain_key);
 		}
 		
 		##
@@ -587,7 +586,7 @@ sub _add_bucket {
 			my $branch = DBM::Deep->new(
 				type => TYPE_HASH,
 				base_offset => $location,
-				root => $self->_root,
+				root => $root,
 			);
 			foreach my $key (keys %{$value}) {
                 $branch->STORE( $key, $value->{$key} );
@@ -597,7 +596,7 @@ sub _add_bucket {
 			my $branch = DBM::Deep->new(
 				type => TYPE_ARRAY,
 				base_offset => $location,
-				root => $self->_root,
+				root => $root,
 			);
 			my $index = 0;
 			foreach my $element (@{$value}) {
@@ -738,8 +737,8 @@ sub _delete_bucket {
         # Matched key -- delete bucket and return
         ##
         seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $self->_root->{file_offset}, SEEK_SET);
-        print($fh substr($keys, ($i+1) * $BUCKET_SIZE ) );
-        print($fh chr(0) x $BUCKET_SIZE );
+        print( $fh substr($keys, ($i+1) * $BUCKET_SIZE ) );
+        print( $fh chr(0) x $BUCKET_SIZE );
         
         return 1;
 	} # i loop
@@ -1336,20 +1335,24 @@ sub STORE {
 	my $ch = 0;
 	while ($tag->{signature} ne SIG_BLIST) {
 		my $num = ord(substr($md5, $ch, 1));
+
+        my $ref_loc = $tag->{offset} + ($num * $LONG_SIZE);
 		my $new_tag = $self->_index_lookup($tag, $num);
+
 		if (!$new_tag) {
-			my $ref_loc = $tag->{offset} + ($num * $LONG_SIZE);
 			seek($fh, $ref_loc + $self->_root->{file_offset}, SEEK_SET);
-			print($fh pack($LONG_PACK, $self->_root->{end}) );
+			print( $fh pack($LONG_PACK, $self->_root->{end}) );
 			
 			$tag = $self->_create_tag($self->_root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
+
 			$tag->{ref_loc} = $ref_loc;
 			$tag->{ch} = $ch;
+
 			last;
 		}
 		else {
-			my $ref_loc = $tag->{offset} + ($num * $LONG_SIZE);
 			$tag = $new_tag;
+
 			$tag->{ref_loc} = $ref_loc;
 			$tag->{ch} = $ch;
 		}

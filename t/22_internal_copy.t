@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 12;
+use Test::More tests => 13;
 
 use_ok( 'DBM::Deep' );
 
@@ -47,3 +47,29 @@ is( scalar(keys %{$db->{hash1}}), 1, "... and only 1 key in the original" );
 
 $db->{copy} = $db->{hash2};
 is( $db->{copy}{subkey3}, 'subvalue3', "After the second copy, we're still good" );
+
+my $max_keys = 1000;
+
+unlink 't/test2.db';
+{
+    my $db = DBM::Deep->new( 't/test2.db' );
+
+    $db->{foo} = [ 1 .. 3 ];
+    for ( 0 .. $max_keys ) {
+        $db->{'foo' . $_} = $db->{foo};
+    }
+}
+
+{
+    my $db = DBM::Deep->new( 't/test2.db' );
+
+    my $base_offset = $db->{foo}->_base_offset;
+    my $count = -1;
+    for ( 0 .. $max_keys ) {
+        $count = $_;
+        unless ( $base_offset == $db->{'foo'.$_}->_base_offset ) {
+            last;
+        }
+    }
+    is( $count, $max_keys, "We read $count keys" );
+}

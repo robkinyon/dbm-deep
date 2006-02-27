@@ -254,9 +254,7 @@ sub _open {
 
         # Flush the filehandle
         my $old_fh = select $fh;
-        my $old_af = $|;
-        $| = 1;
-        $| = $old_af;
+        my $old_af = $|; $| = 1; $| = $old_af;
         select $old_fh;
 
         my @stats = stat($fh);
@@ -341,12 +339,9 @@ sub _load_tag {
 	seek($fh, $offset + $self->_root->{file_offset}, SEEK_SET);
 	if (eof $fh) { return undef; }
 	
-	my $sig;
-	read( $fh, $sig, SIG_SIZE);
-	
-	my $size;
-	read( $fh, $size, $DATA_LENGTH_SIZE);
-	$size = unpack($DATA_LENGTH_PACK, $size);
+    my $b;
+    read( $fh, $b, SIG_SIZE + $DATA_LENGTH_SIZE );
+    my ($sig, $size) = unpack( "A $DATA_LENGTH_PACK", $b );
 	
 	my $buffer;
 	read( $fh, $buffer, $size);

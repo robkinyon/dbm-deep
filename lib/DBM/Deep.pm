@@ -389,7 +389,6 @@ sub _add_bucket {
 	# Iterate through buckets, seeing if this is a new entry or a replace.
 	##
 	for (my $i=0; $i<$MAX_BUCKETS; $i++) {
-		my $key = substr($keys, $i * $BUCKET_SIZE, $HASH_SIZE);
 		my $subloc = unpack($LONG_PACK, substr($keys, ($i * $BUCKET_SIZE) + $HASH_SIZE, $LONG_SIZE));
 		if (!$subloc) {
 			##
@@ -405,7 +404,9 @@ sub _add_bucket {
 			print( $fh $md5 . pack($LONG_PACK, $location) );
 			last;
 		}
-		elsif ($md5 eq $key) {
+
+		my $key = substr($keys, $i * $BUCKET_SIZE, $HASH_SIZE);
+		if ($md5 eq $key) {
 			##
 			# Found existing bucket with same key.  Replace with new value.
 			##
@@ -415,45 +416,46 @@ sub _add_bucket {
 				$location = $value->_base_offset;
 				seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $root->{file_offset}, SEEK_SET);
 				print( $fh $md5 . pack($LONG_PACK, $location) );
+                return $result;
 			}
-			else {
-				seek($fh, $subloc + SIG_SIZE + $root->{file_offset}, SEEK_SET);
-				my $size;
-				read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-				
-				##
-				# If value is a hash, array, or raw value with equal or less size, we can
-				# reuse the same content area of the database.  Otherwise, we have to create
-				# a new content area at the EOF.
-				##
-				my $actual_length;
-                my $r = Scalar::Util::reftype( $value ) || '';
-                if ( $r eq 'HASH' || $r eq 'ARRAY' ) {
-                	$actual_length = $INDEX_SIZE;
-                	
-                	# if autobless is enabled, must also take into consideration
-                	# the class name, as it is stored along with key/value.
-                	if ( $root->{autobless} ) {
-						my $value_class = Scalar::Util::blessed($value);
-						if ( defined $value_class && $value_class ne 'DBM::Deep' ) {
-							$actual_length += length($value_class);
-						}
-					} # autobless
+
+            seek($fh, $subloc + SIG_SIZE + $root->{file_offset}, SEEK_SET);
+            my $size;
+            read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
+            
+            ##
+            # If value is a hash, array, or raw value with equal or less size, we can
+            # reuse the same content area of the database.  Otherwise, we have to create
+            # a new content area at the EOF.
+            ##
+            my $actual_length;
+            my $r = Scalar::Util::reftype( $value ) || '';
+            if ( $r eq 'HASH' || $r eq 'ARRAY' ) {
+                $actual_length = $INDEX_SIZE;
+                
+                # if autobless is enabled, must also take into consideration
+                # the class name, as it is stored along with key/value.
+                if ( $root->{autobless} ) {
+                    my $value_class = Scalar::Util::blessed($value);
+                    if ( defined $value_class && !$value->isa('DBM::Deep') ) {
+                        $actual_length += length($value_class);
+                    }
                 }
-				else { $actual_length = length($value); }
-				
-				if ($actual_length <= $size) {
-					$location = $subloc;
-				}
-				else {
-					$location = $root->{end};
-					seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $HASH_SIZE + $root->{file_offset}, SEEK_SET);
-					print( $fh pack($LONG_PACK, $location) );
-				}
-			}
+            }
+            else { $actual_length = length($value); }
+            
+            if ($actual_length <= $size) {
+                $location = $subloc;
+            }
+            else {
+                $location = $root->{end};
+                seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $HASH_SIZE + $root->{file_offset}, SEEK_SET);
+                print( $fh pack($LONG_PACK, $location) );
+            }
+
 			last;
 		}
-	} # i loop
+	}
 	
 	##
 	# If this is an internal reference, return now.
@@ -1210,7 +1212,6 @@ sub error {
 	# Get last error string, or undef if no error
 	##
 	return $_[0]
-        #? ( _get_self($_[0])->{root}->{error} or undef )
         ? ( $_[0]->_get_self->{root}->{error} or undef )
         : $@;
 }
@@ -1765,15 +1766,7 @@ Setting I<debug> mode will make all errors non-fatal, dump them out to
 STDERR, and continue on.  This is for debugging purposes only, and probably
 not what you want.  This is an optional parameter, and defaults to 0 (disabled).
 
-=item * fh
-
-Instead of passing a file path, you can instead pass a handle to an pre-opened
-filehandle.  Note: Beware of using the magick *DATA handle, as this actually 
-contains your entire Perl script, as well as the data following the __DATA__
-marker.  This will not work, because DBM::Deep uses absolute seek()s into the
-file.  Instead, consider reading *DATA into an IO::Scalar handle, then passing
-in that.  Also please note optimize() will NOT work when passing in only a
-handle.  Pass in a real filename in order to use optimize().
+B<NOTE>: This parameter is considered deprecated and should not be used anymore.
 
 =back
 
@@ -1930,7 +1923,7 @@ q.v. adjusting the interal parameters.
 
 =item * error() / clear_error()
 
-Error handling methods (may be deprecated).
+Error handling methods. These are deprecated and will be removed in 1.00.
 .
 =back
 
@@ -2321,6 +2314,9 @@ If you set the C<debug> option to true when creating your DBM::Deep object,
 all errors are considered NON-FATAL, and dumped to STDERR.  This should only
 be used for debugging purposes and not production work. DBM::Deep expects errors
 to be thrown, not propagated back up the stack.
+
+B<NOTE>: error() and clear_error() are considered deprecated and I<will> be removed
+in 1.00. Please don't use them. Instead, wrap all your functions with in eval-blocks.
 
 =head1 LARGEFILE SUPPORT
 

@@ -236,8 +236,7 @@ sub _open {
         select $old;
     }
     
-    # Set the 
-    seek($fh, 0, SEEK_SET);
+    seek($fh, 0 + $self->_root->{file_offset}, SEEK_SET);
 
     my $signature;
     my $bytes_read = read( $fh, $signature, length(SIG_FILE));
@@ -246,7 +245,7 @@ sub _open {
     # File is empty -- write signature and master index
     ##
     if (!$bytes_read) {
-        seek($fh, 0, SEEK_SET);
+        seek($fh, 0 + $self->_root->{file_offset}, SEEK_SET);
         print($fh SIG_FILE);
         $self->_create_tag($self->_base_offset, $self->_type, chr(0) x $INDEX_SIZE);
 
@@ -315,7 +314,7 @@ sub _create_tag {
 	
     my $fh = $self->_fh;
 
-	seek($fh, $offset, SEEK_SET);
+	seek($fh, $offset + $self->_root->{file_offset}, SEEK_SET);
 	print($fh $sig . pack($DATA_LENGTH_PACK, $size) . $content );
 	
 	if ($offset == $self->_root->{end}) {
@@ -339,7 +338,7 @@ sub _load_tag {
 	
     my $fh = $self->_fh;
 
-	seek($fh, $offset, SEEK_SET);
+	seek($fh, $offset + $self->_root->{file_offset}, SEEK_SET);
 	if (eof $fh) { return undef; }
 	
 	my $sig;
@@ -408,7 +407,7 @@ sub _add_bucket {
                 ? $value->_base_offset
                 : $self->_root->{end};
 			
-			seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), SEEK_SET);
+			seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $self->_root->{file_offset}, SEEK_SET);
 			print($fh $md5 . pack($LONG_PACK, $location) );
 			last;
 		}
@@ -420,11 +419,11 @@ sub _add_bucket {
 			
 			if ($internal_ref) {
 				$location = $value->_base_offset;
-				seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), SEEK_SET);
+				seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $self->_root->{file_offset}, SEEK_SET);
 				print($fh $md5 . pack($LONG_PACK, $location) );
 			}
 			else {
-				seek($fh, $subloc + SIG_SIZE, SEEK_SET);
+				seek($fh, $subloc + SIG_SIZE + $self->_root->{file_offset}, SEEK_SET);
 				my $size;
 				read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
 				
@@ -454,7 +453,7 @@ sub _add_bucket {
 				}
 				else {
 					$location = $self->_root->{end};
-					seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $HASH_SIZE, SEEK_SET);
+					seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $HASH_SIZE + $self->_root->{file_offset}, SEEK_SET);
 					print($fh pack($LONG_PACK, $location) );
 				}
 			}
@@ -474,7 +473,7 @@ sub _add_bucket {
 	# If bucket didn't fit into list, split into a new index level
 	##
 	if (!$location) {
-		seek($fh, $tag->{ref_loc}, SEEK_SET);
+		seek($fh, $tag->{ref_loc} + $self->_root->{file_offset}, SEEK_SET);
 		print($fh pack($LONG_PACK, $self->_root->{end}) );
 		
 		my $index_tag = $self->_create_tag($self->_root->{end}, SIG_INDEX, chr(0) x $INDEX_SIZE);
@@ -490,14 +489,14 @@ sub _add_bucket {
 				
 				if ($offsets[$num]) {
 					my $offset = $offsets[$num] + SIG_SIZE + $DATA_LENGTH_SIZE;
-					seek($fh, $offset, SEEK_SET);
+					seek($fh, $offset + $self->_root->{file_offset}, SEEK_SET);
 					my $subkeys;
 					read( $fh, $subkeys, $BUCKET_LIST_SIZE);
 					
 					for (my $k=0; $k<$MAX_BUCKETS; $k++) {
 						my $subloc = unpack($LONG_PACK, substr($subkeys, ($k * $BUCKET_SIZE) + $HASH_SIZE, $LONG_SIZE));
 						if (!$subloc) {
-							seek($fh, $offset + ($k * $BUCKET_SIZE), SEEK_SET);
+							seek($fh, $offset + ($k * $BUCKET_SIZE) + $self->_root->{file_offset}, SEEK_SET);
 							print($fh $key . pack($LONG_PACK, $old_subloc || $self->_root->{end}) );
 							last;
 						}
@@ -505,12 +504,12 @@ sub _add_bucket {
 				}
 				else {
 					$offsets[$num] = $self->_root->{end};
-					seek($fh, $index_tag->{offset} + ($num * $LONG_SIZE), SEEK_SET);
+					seek($fh, $index_tag->{offset} + ($num * $LONG_SIZE) + $self->_root->{file_offset}, SEEK_SET);
 					print($fh pack($LONG_PACK, $self->_root->{end}) );
 					
 					my $blist_tag = $self->_create_tag($self->_root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
 					
-					seek($fh, $blist_tag->{offset}, SEEK_SET);
+					seek($fh, $blist_tag->{offset} + $self->_root->{file_offset}, SEEK_SET);
 					print($fh $key . pack($LONG_PACK, $old_subloc || $self->_root->{end}) );
 				}
 			} # key is real
@@ -524,7 +523,7 @@ sub _add_bucket {
 	##
 	if ($location) {
 		my $content_length;
-		seek($fh, $location, SEEK_SET);
+		seek($fh, $location + $self->_root->{file_offset}, SEEK_SET);
 		
 		##
 		# Write signature based on content type, set content length and write actual value.
@@ -651,7 +650,7 @@ sub _get_bucket_value {
         # Found match -- seek to offset and read signature
         ##
         my $signature;
-        seek($fh, $subloc, SEEK_SET);
+        seek($fh, $subloc + $self->_root->{file_offset}, SEEK_SET);
         read( $fh, $signature, SIG_SIZE);
         
         ##
@@ -743,7 +742,7 @@ sub _delete_bucket {
         ##
         # Matched key -- delete bucket and return
         ##
-        seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE), SEEK_SET);
+        seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $self->_root->{file_offset}, SEEK_SET);
         print($fh substr($keys, ($i+1) * $BUCKET_SIZE ) );
         print($fh chr(0) x $BUCKET_SIZE );
         
@@ -869,7 +868,7 @@ sub _traverse_index {
 				##
 				# Seek to bucket location and skip over signature
 				##
-				seek($fh, $subloc + SIG_SIZE, SEEK_SET);
+				seek($fh, $subloc + SIG_SIZE + $self->_root->{file_offset}, SEEK_SET);
 				
 				##
 				# Skip over value to get to plain key
@@ -1345,7 +1344,7 @@ sub STORE {
 		my $new_tag = $self->_index_lookup($tag, $num);
 		if (!$new_tag) {
 			my $ref_loc = $tag->{offset} + ($num * $LONG_SIZE);
-			seek($fh, $ref_loc, SEEK_SET);
+			seek($fh, $ref_loc + $self->_root->{file_offset}, SEEK_SET);
 			print($fh pack($LONG_PACK, $self->_root->{end}) );
 			
 			$tag = $self->_create_tag($self->_root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
@@ -1514,7 +1513,7 @@ sub CLEAR {
 	
     my $fh = $self->_fh;
 
-	seek($fh, $self->_base_offset, SEEK_SET);
+	seek($fh, $self->_base_offset + $self->_root->{file_offset}, SEEK_SET);
 	if (eof $fh) {
 		$self->unlock();
 		return;
@@ -1547,6 +1546,7 @@ sub new {
     my $self = bless {
         file => undef,
         fh => undef,
+        file_offset => 0,
         end => 0,
         autoflush => undef,
         locking => undef,
@@ -1559,6 +1559,10 @@ sub new {
         locked => 0,
         %$args,
     }, $class;
+
+    if ( $self->{fh} && !$self->{file_offset} ) {
+        $self->{file_offset} = tell( $self->{fh} );
+    }
 
     return $self;
 }
@@ -1700,7 +1704,26 @@ DBM::Deep objects.  These apply to both the OO- and tie- based approaches.
 
 Filename of the DB file to link the handle to.  You can pass a full absolute
 filesystem path, partial path, or a plain filename if the file is in the 
-current working directory.  This is a required parameter.
+current working directory.  This is a required parameter (though q.v. fh).
+
+=item * fh
+
+If you want, you can pass in the fh instead of the file. This is most useful for doing
+something like:
+
+  my $db = DBM::Deep->new( { fh => \*DATA } );
+
+You are responsible for making sure that the fh has been opened appropriately for your
+needs. If you open it read-only and attempt to write, an exception will be thrown. If you
+open it write-only or append-only, an exception will be thrown immediately as DBM::Deep
+needs to read from the fh.
+
+=item * file_offset
+
+This is the offset within the file that the DBM::Deep db starts. Most of the time, you will
+not need to set this. However, it's there if you want it.
+
+If you pass in fh and do not set this, it will be set appropriately.
 
 =item * type
 
@@ -2698,10 +2721,10 @@ B<Devel::Cover> report on this module's test suite.
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
   File                           stmt   bran   cond    sub    pod   time  total
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm           94.1   82.5   68.7   98.1  100.0   58.0   89.9
-  blib/lib/DBM/Deep/Array.pm     98.9   88.9   87.5  100.0    n/a   28.9   96.4
-  blib/lib/DBM/Deep/Hash.pm      95.3   80.0  100.0  100.0    n/a   13.2   92.4
-  Total                          95.1   83.4   72.8   98.8  100.0  100.0   91.3
+  blib/lib/DBM/Deep.pm           95.0   83.2   68.7   98.2  100.0   57.8   90.7
+  blib/lib/DBM/Deep/Array.pm     98.9   88.9   87.5  100.0    n/a   27.4   96.4
+  blib/lib/DBM/Deep/Hash.pm      95.3   80.0  100.0  100.0    n/a   14.8   92.4
+  Total                          95.8   83.9   72.8   98.8  100.0  100.0   91.8
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 MORE INFORMATION

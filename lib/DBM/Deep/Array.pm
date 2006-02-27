@@ -310,7 +310,8 @@ sub SPLICE {
 	##
 	# Calculate offset and length of splice
 	##
-	my $offset = shift || 0;
+	my $offset = shift;
+    $offset = 0 unless defined $offset;
 	if ($offset < 0) { $offset += $length; }
 	
 	my $splice_length;

@@ -971,27 +971,47 @@ sub unlock {
     return;
 }
 
-#XXX These uses of ref() need verified
+sub _copy_value {
+    my $self = shift->_get_self;
+    my ($spot, $value) = @_;
+
+    if ( !ref $value ) {
+        ${$spot} = $value;
+    }
+    elsif ( eval { local $SIG{__DIE__}; $value->isa( 'DBM::Deep' ) } ) {
+        my $type = $value->_type;
+        ${$spot} = $type eq TYPE_HASH ? {} : [];
+        $value->_copy_node( ${$spot} );
+    }
+    else {
+        my $r = Scalar::Util::reftype( $value );
+        my $c = Scalar::Util::blessed( $value );
+        if ( $r eq 'ARRAY' ) {
+            ${$spot} = [ @{$value} ];
+        }
+        else {
+            ${$spot} = { %{$value} };
+        }
+        $$spot = bless $$spot, $c
+            if defined $c;
+    }
+
+    return 1;
+}
+
 sub _copy_node {
 	##
 	# Copy single level of keys or elements to new DB handle.
 	# Recurse for nested structures
 	##
-    my $self = $_[0]->_get_self;
-	my $db_temp = $_[1];
+    my $self = shift->_get_self;
+	my ($db_temp) = @_;
 
 	if ($self->_type eq TYPE_HASH) {
 		my $key = $self->first_key();
 		while ($key) {
 			my $value = $self->get($key);
-#XXX This doesn't work with autobless
-			if (!ref($value)) { $db_temp->{$key} = $value; }
-			else {
-				my $type = $value->_type;
-				if ($type eq TYPE_HASH) { $db_temp->{$key} = {}; }
-				else { $db_temp->{$key} = []; }
-				$value->_copy_node( $db_temp->{$key} );
-			}
+            $self->_copy_value( \$db_temp->{$key}, $value );
 			$key = $self->next_key($key);
 		}
 	}
@@ -999,16 +1019,11 @@ sub _copy_node {
 		my $length = $self->length();
 		for (my $index = 0; $index < $length; $index++) {
 			my $value = $self->get($index);
-			if (!ref($value)) { $db_temp->[$index] = $value; }
-            #XXX NO tests for this code
-			else {
-				my $type = $value->_type;
-				if ($type eq TYPE_HASH) { $db_temp->[$index] = {}; }
-				else { $db_temp->[$index] = []; }
-				$value->_copy_node( $db_temp->[$index] );
-			}
+            $self->_copy_value( \$db_temp->[$index], $value );
 		}
 	}
+
+    return 1;
 }
 
 sub export {

@@ -7,7 +7,7 @@ use strict;
     sub foo { 'foo' };
 }
 
-use Test::More tests => 29;
+use Test::More tests => 39;
 
 use_ok( 'DBM::Deep' );
 
@@ -70,10 +70,23 @@ $db2 = DBM::Deep->new(
 );
 is( $db2->{blessed}{c}, 'new' );
 
-TODO: {
-    todo_skip "_copy_node() doesn't work with autobless", 1;
+{
     my $structure = $db2->export();
-    ok( 1 );
+    
+    my $obj2 = $structure->{blessed};
+    isa_ok( $obj2, 'Foo' );
+    can_ok( $obj2, 'export', 'foo' );
+    ok( !$obj2->can( 'STORE' ), "... but it cannot 'STORE'" );
+
+    is( $obj2->{a}, 1 );
+    is( $obj2->{b}[0], 1 );
+    is( $obj2->{b}[1], 2 );
+    is( $obj2->{b}[2], 3 );
+
+    is( $structure->{unblessed}{a}, 1 );
+    is( $structure->{unblessed}{b}[0], 1 );
+    is( $structure->{unblessed}{b}[1], 2 );
+    is( $structure->{unblessed}{b}[2], 3 );
 }
 
 my $db3 = DBM::Deep->new(

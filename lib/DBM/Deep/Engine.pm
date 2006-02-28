@@ -424,5 +424,97 @@ sub add_bucket {
     return $obj->_throw_error("Fatal error: indexing failed -- possibly due to corruption in file");
 }
 
+sub get_bucket_value {
+	##
+	# Fetch single value given tag and MD5 digested key.
+	##
+	my $self = shift;
+	my ($obj, $tag, $md5) = @_;
+	my $keys = $tag->{content};
+
+    my $fh = $obj->_fh;
+
+	##
+	# Iterate through buckets, looking for a key match
+	##
+    BUCKET:
+	for (my $i=0; $i<$DBM::Deep::MAX_BUCKETS; $i++) {
+		my $key = substr($keys, $i * $DBM::Deep::BUCKET_SIZE, $DBM::Deep::HASH_SIZE);
+		my $subloc = unpack($DBM::Deep::LONG_PACK, substr($keys, ($i * $DBM::Deep::BUCKET_SIZE) + $DBM::Deep::HASH_SIZE, $DBM::Deep::LONG_SIZE));
+
+		if (!$subloc) {
+			##
+			# Hit end of list, no match
+			##
+			return;
+		}
+
+        if ( $md5 ne $key ) {
+            next BUCKET;
+        }
+
+        ##
+        # Found match -- seek to offset and read signature
+        ##
+        my $signature;
+        seek($fh, $subloc + $obj->_root->{file_offset}, SEEK_SET);
+        read( $fh, $signature, DBM::Deep->SIG_SIZE);
+        
+        ##
+        # If value is a hash or array, return new DBM::Deep object with correct offset
+        ##
+        if (($signature eq DBM::Deep->TYPE_HASH) || ($signature eq DBM::Deep->TYPE_ARRAY)) {
+            my $obj = DBM::Deep->new(
+                type => $signature,
+                base_offset => $subloc,
+                root => $obj->_root,
+            );
+            
+            if ($obj->_root->{autobless}) {
+                ##
+                # Skip over value and plain key to see if object needs
+                # to be re-blessed
+                ##
+                seek($fh, $DBM::Deep::DATA_LENGTH_SIZE + $DBM::Deep::INDEX_SIZE, SEEK_CUR);
+                
+                my $size;
+                read( $fh, $size, $DBM::Deep::DATA_LENGTH_SIZE); $size = unpack($DBM::Deep::DATA_LENGTH_PACK, $size);
+                if ($size) { seek($fh, $size, SEEK_CUR); }
+                
+                my $bless_bit;
+                read( $fh, $bless_bit, 1);
+                if (ord($bless_bit)) {
+                    ##
+                    # Yes, object needs to be re-blessed
+                    ##
+                    my $class_name;
+                    read( $fh, $size, $DBM::Deep::DATA_LENGTH_SIZE); $size = unpack($DBM::Deep::DATA_LENGTH_PACK, $size);
+                    if ($size) { read( $fh, $class_name, $size); }
+                    if ($class_name) { $obj = bless( $obj, $class_name ); }
+                }
+            }
+            
+            return $obj;
+        }
+        
+        ##
+        # Otherwise return actual value
+        ##
+        elsif ($signature eq DBM::Deep->SIG_DATA) {
+            my $size;
+            my $value = '';
+            read( $fh, $size, $DBM::Deep::DATA_LENGTH_SIZE); $size = unpack($DBM::Deep::DATA_LENGTH_PACK, $size);
+            if ($size) { read( $fh, $value, $size); }
+            return $value;
+        }
+        
+        ##
+        # Key exists, but content is null
+        ##
+        else { return; }
+	} # i loop
+
+	return;
+}
 1;
 __END__

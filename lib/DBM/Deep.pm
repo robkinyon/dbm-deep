@@ -203,99 +203,6 @@ sub TIEARRAY {
 #sub DESTROY {
 #}
 
-sub _get_bucket_value {
-	##
-	# Fetch single value given tag and MD5 digested key.
-	##
-	my $self = shift;
-	my ($tag, $md5) = @_;
-	my $keys = $tag->{content};
-
-    my $fh = $self->_fh;
-
-	##
-	# Iterate through buckets, looking for a key match
-	##
-    BUCKET:
-	for (my $i=0; $i<$MAX_BUCKETS; $i++) {
-		my $key = substr($keys, $i * $BUCKET_SIZE, $HASH_SIZE);
-		my $subloc = unpack($LONG_PACK, substr($keys, ($i * $BUCKET_SIZE) + $HASH_SIZE, $LONG_SIZE));
-
-		if (!$subloc) {
-			##
-			# Hit end of list, no match
-			##
-			return;
-		}
-
-        if ( $md5 ne $key ) {
-            next BUCKET;
-        }
-
-        ##
-        # Found match -- seek to offset and read signature
-        ##
-        my $signature;
-        seek($fh, $subloc + $self->_root->{file_offset}, SEEK_SET);
-        read( $fh, $signature, SIG_SIZE);
-        
-        ##
-        # If value is a hash or array, return new DBM::Deep object with correct offset
-        ##
-        if (($signature eq TYPE_HASH) || ($signature eq TYPE_ARRAY)) {
-            my $obj = DBM::Deep->new(
-                type => $signature,
-                base_offset => $subloc,
-                root => $self->_root
-            );
-            
-            if ($self->_root->{autobless}) {
-                ##
-                # Skip over value and plain key to see if object needs
-                # to be re-blessed
-                ##
-                seek($fh, $DATA_LENGTH_SIZE + $INDEX_SIZE, SEEK_CUR);
-                
-                my $size;
-                read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-                if ($size) { seek($fh, $size, SEEK_CUR); }
-                
-                my $bless_bit;
-                read( $fh, $bless_bit, 1);
-                if (ord($bless_bit)) {
-                    ##
-                    # Yes, object needs to be re-blessed
-                    ##
-                    my $class_name;
-                    read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-                    if ($size) { read( $fh, $class_name, $size); }
-                    if ($class_name) { $obj = bless( $obj, $class_name ); }
-                }
-            }
-            
-            return $obj;
-        }
-        
-        ##
-        # Otherwise return actual value
-        ##
-        elsif ($signature eq SIG_DATA) {
-            my $size;
-            my $value = '';
-            read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-            if ($size) { read( $fh, $value, $size); }
-            return $value;
-        }
-        
-        ##
-        # Key exists, but content is null
-        ##
-        else { return; }
-	} # i loop
-
-	return;
-}
-
 sub _delete_bucket {
 	##
 	# Delete single key/value pair given tag and MD5 digested key.
@@ -953,7 +860,7 @@ sub FETCH {
 	##
 	# Get value from bucket list
 	##
-	my $result = $self->_get_bucket_value( $tag, $md5 );
+	my $result = $self->{engine}->get_bucket_value( $self, $tag, $md5 );
 	
 	$self->unlock();
 	
@@ -988,7 +895,7 @@ sub DELETE {
 	##
 	# Delete bucket
 	##
-    my $value = $self->_get_bucket_value( $tag, $md5 );
+    my $value = $self->{engine}->get_bucket_value($self,  $tag, $md5 );
 	if ($value && !ref($value) && $self->_root->{filter_fetch_value}) {
         $value = $self->_root->{filter_fetch_value}->($value);
     }

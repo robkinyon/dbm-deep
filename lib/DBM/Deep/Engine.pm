@@ -52,7 +52,7 @@ sub open {
     if (!$bytes_read) {
         seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
         print( $fh DBM::Deep->SIG_FILE);
-        $obj->_create_tag($obj->_base_offset, $obj->_type, chr(0) x $DBM::Deep::INDEX_SIZE);
+        $self->create_tag($obj, $obj->_base_offset, $obj->_type, chr(0) x $DBM::Deep::INDEX_SIZE);
 
         my $plain_key = "[base]";
         print( $fh pack($DBM::Deep::DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
@@ -84,7 +84,7 @@ sub open {
     ##
     # Get our type from master index signature
     ##
-    my $tag = $obj->_load_tag($obj->_base_offset);
+    my $tag = $self->load_tag($obj, $obj->_base_offset);
 
 #XXX We probably also want to store the hash algorithm name and not assume anything
 #XXX The cool thing would be to allow a different hashing algorithm at every level
@@ -109,6 +109,71 @@ sub close {
     $obj->_root->{fh} = undef;
 
     return 1;
+}
+
+sub create_tag {
+	##
+	# Given offset, signature and content, create tag and write to disk
+	##
+    my $self = shift;
+	my ($obj, $offset, $sig, $content) = @_;
+	my $size = length($content);
+	
+    my $fh = $obj->_fh;
+
+	seek($fh, $offset + $obj->_root->{file_offset}, SEEK_SET);
+	print( $fh $sig . pack($DBM::Deep::DATA_LENGTH_PACK, $size) . $content );
+	
+	if ($offset == $obj->_root->{end}) {
+		$obj->_root->{end} += DBM::Deep->SIG_SIZE + $DBM::Deep::DATA_LENGTH_SIZE + $size;
+	}
+	
+	return {
+		signature => $sig,
+		size => $size,
+		offset => $offset + DBM::Deep->SIG_SIZE + $DBM::Deep::DATA_LENGTH_SIZE,
+		content => $content
+	};
+}
+
+sub load_tag {
+	##
+	# Given offset, load single tag and return signature, size and data
+	##
+    my $self = shift;
+	my ($obj, $offset) = @_;
+	
+    my $fh = $obj->_fh;
+
+	seek($fh, $offset + $obj->_root->{file_offset}, SEEK_SET);
+	if (eof $fh) { return undef; }
+	
+    my $b;
+    read( $fh, $b, DBM::Deep->SIG_SIZE + $DBM::Deep::DATA_LENGTH_SIZE );
+    my ($sig, $size) = unpack( "A $DBM::Deep::DATA_LENGTH_PACK", $b );
+	
+	my $buffer;
+	read( $fh, $buffer, $size);
+	
+	return {
+		signature => $sig,
+		size => $size,
+		offset => $offset + DBM::Deep->SIG_SIZE + $DBM::Deep::DATA_LENGTH_SIZE,
+		content => $buffer
+	};
+}
+
+sub index_lookup {
+	##
+	# Given index tag, lookup single entry in index and return .
+	##
+    my $self = shift;
+	my ($obj, $tag, $index) = @_;
+
+	my $location = unpack($DBM::Deep::LONG_PACK, substr($tag->{content}, $index * $DBM::Deep::LONG_SIZE, $DBM::Deep::LONG_SIZE) );
+	if (!$location) { return; }
+	
+	return $self->load_tag( $obj, $location );
 }
 
 1;

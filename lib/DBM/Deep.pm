@@ -203,70 +203,6 @@ sub TIEARRAY {
 #sub DESTROY {
 #}
 
-sub _create_tag {
-	##
-	# Given offset, signature and content, create tag and write to disk
-	##
-	my ($self, $offset, $sig, $content) = @_;
-	my $size = length($content);
-	
-    my $fh = $self->_fh;
-
-	seek($fh, $offset + $self->_root->{file_offset}, SEEK_SET);
-	print( $fh $sig . pack($DATA_LENGTH_PACK, $size) . $content );
-	
-	if ($offset == $self->_root->{end}) {
-		$self->_root->{end} += SIG_SIZE + $DATA_LENGTH_SIZE + $size;
-	}
-	
-	return {
-		signature => $sig,
-		size => $size,
-		offset => $offset + SIG_SIZE + $DATA_LENGTH_SIZE,
-		content => $content
-	};
-}
-
-sub _load_tag {
-	##
-	# Given offset, load single tag and return signature, size and data
-	##
-	my $self = shift;
-	my $offset = shift;
-	
-    my $fh = $self->_fh;
-
-	seek($fh, $offset + $self->_root->{file_offset}, SEEK_SET);
-	if (eof $fh) { return undef; }
-	
-    my $b;
-    read( $fh, $b, SIG_SIZE + $DATA_LENGTH_SIZE );
-    my ($sig, $size) = unpack( "A $DATA_LENGTH_PACK", $b );
-	
-	my $buffer;
-	read( $fh, $buffer, $size);
-	
-	return {
-		signature => $sig,
-		size => $size,
-		offset => $offset + SIG_SIZE + $DATA_LENGTH_SIZE,
-		content => $buffer
-	};
-}
-
-sub _index_lookup {
-	##
-	# Given index tag, lookup single entry in index and return .
-	##
-	my $self = shift;
-	my ($tag, $index) = @_;
-
-	my $location = unpack($LONG_PACK, substr($tag->{content}, $index * $LONG_SIZE, $LONG_SIZE) );
-	if (!$location) { return; }
-	
-	return $self->_load_tag( $location );
-}
-
 sub _add_bucket {
 	##
 	# Adds one key/value pair to bucket list, given offset, MD5 digest of key,
@@ -372,7 +308,7 @@ sub _add_bucket {
 		seek($fh, $tag->{ref_loc} + $root->{file_offset}, SEEK_SET);
 		print( $fh pack($LONG_PACK, $root->{end}) );
 		
-		my $index_tag = $self->_create_tag($root->{end}, SIG_INDEX, chr(0) x $INDEX_SIZE);
+		my $index_tag = $self->{engine}->create_tag($self, $root->{end}, SIG_INDEX, chr(0) x $INDEX_SIZE);
 		my @offsets = ();
 		
 		$keys .= $md5 . pack($LONG_PACK, 0);
@@ -403,7 +339,7 @@ sub _add_bucket {
 					seek($fh, $index_tag->{offset} + ($num * $LONG_SIZE) + $root->{file_offset}, SEEK_SET);
 					print( $fh pack($LONG_PACK, $root->{end}) );
 					
-					my $blist_tag = $self->_create_tag($root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
+					my $blist_tag = $self->{engine}->create_tag($self, $root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
 					
 					seek($fh, $blist_tag->{offset} + $root->{file_offset}, SEEK_SET);
 					print( $fh $key . pack($LONG_PACK, $old_subloc || $root->{end}) );
@@ -695,11 +631,11 @@ sub _find_bucket_list {
 	# Locate offset for bucket list using digest index system
 	##
 	my $ch = 0;
-	my $tag = $self->_load_tag($self->_base_offset);
+	my $tag = $self->{engine}->load_tag($self, $self->_base_offset);
 	if (!$tag) { return; }
 	
 	while ($tag->{signature} ne SIG_BLIST) {
-		$tag = $self->_index_lookup($tag, ord(substr($md5, $ch, 1)));
+		$tag = $self->{engine}->index_lookup($self, $tag, ord(substr($md5, $ch, 1)));
 		if (!$tag) { return; }
 		$ch++;
 	}
@@ -714,7 +650,7 @@ sub _traverse_index {
     my ($self, $offset, $ch, $force_return_next) = @_;
     $force_return_next = undef unless $force_return_next;
 	
-	my $tag = $self->_load_tag( $offset );
+	my $tag = $self->{engine}->load_tag($self,  $offset );
 
     my $fh = $self->_fh;
 	
@@ -1198,9 +1134,9 @@ sub STORE {
 	##
 	# Locate offset for bucket list using digest index system
 	##
-	my $tag = $self->_load_tag($self->_base_offset);
+	my $tag = $self->{engine}->load_tag($self, $self->_base_offset);
 	if (!$tag) {
-		$tag = $self->_create_tag($self->_base_offset, SIG_INDEX, chr(0) x $INDEX_SIZE);
+		$tag = $self->{engine}->create_tag($self, $self->_base_offset, SIG_INDEX, chr(0) x $INDEX_SIZE);
 	}
 	
 	my $ch = 0;
@@ -1208,13 +1144,13 @@ sub STORE {
 		my $num = ord(substr($md5, $ch, 1));
 
         my $ref_loc = $tag->{offset} + ($num * $LONG_SIZE);
-		my $new_tag = $self->_index_lookup($tag, $num);
+		my $new_tag = $self->{engine}->index_lookup($self, $tag, $num);
 
 		if (!$new_tag) {
 			seek($fh, $ref_loc + $self->_root->{file_offset}, SEEK_SET);
 			print( $fh pack($LONG_PACK, $self->_root->{end}) );
 			
-			$tag = $self->_create_tag($self->_root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
+			$tag = $self->{engine}->create_tag($self, $self->_root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
 
 			$tag->{ref_loc} = $ref_loc;
 			$tag->{ch} = $ch;
@@ -1368,7 +1304,7 @@ sub CLEAR {
 		return;
 	}
 	
-	$self->_create_tag($self->_base_offset, $self->_type, chr(0) x $INDEX_SIZE);
+	$self->{engine}->create_tag($self, $self->_base_offset, $self->_type, chr(0) x $INDEX_SIZE);
 	
 	$self->unlock();
 	

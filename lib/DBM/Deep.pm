@@ -203,42 +203,6 @@ sub TIEARRAY {
 #sub DESTROY {
 #}
 
-sub _bucket_exists {
-	##
-	# Check existence of single key given tag and MD5 digested key.
-	##
-	my $self = shift;
-	my ($tag, $md5) = @_;
-	my $keys = $tag->{content};
-	
-	##
-	# Iterate through buckets, looking for a key match
-	##
-    BUCKET:
-	for (my $i=0; $i<$MAX_BUCKETS; $i++) {
-		my $key = substr($keys, $i * $BUCKET_SIZE, $HASH_SIZE);
-		my $subloc = unpack($LONG_PACK, substr($keys, ($i * $BUCKET_SIZE) + $HASH_SIZE, $LONG_SIZE));
-
-		if (!$subloc) {
-			##
-			# Hit end of list, no match
-			##
-			return;
-		}
-
-        if ( $md5 ne $key ) {
-            next BUCKET;
-        }
-
-        ##
-        # Matched key -- return true
-        ##
-        return 1;
-	} # i loop
-
-	return;
-}
-
 sub _find_bucket_list {
 	##
 	# Locate offset for bucket list, given digested key
@@ -897,7 +861,7 @@ sub EXISTS {
 	##
 	# Check if bucket exists and return 1 or ''
 	##
-	my $result = $self->_bucket_exists( $tag, $md5 ) || '';
+	my $result = $self->{engine}->bucket_exists( $self, $tag, $md5 ) || '';
 	
 	$self->unlock();
 	

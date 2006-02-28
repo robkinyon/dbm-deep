@@ -559,5 +559,41 @@ sub delete_bucket {
 	return;
 }
 
+sub bucket_exists {
+	##
+	# Check existence of single key given tag and MD5 digested key.
+	##
+	my $self = shift;
+	my ($obj, $tag, $md5) = @_;
+	my $keys = $tag->{content};
+	
+	##
+	# Iterate through buckets, looking for a key match
+	##
+    BUCKET:
+	for (my $i=0; $i<$DBM::Deep::MAX_BUCKETS; $i++) {
+		my $key = substr($keys, $i * $DBM::Deep::BUCKET_SIZE, $DBM::Deep::HASH_SIZE);
+		my $subloc = unpack($DBM::Deep::LONG_PACK, substr($keys, ($i * $DBM::Deep::BUCKET_SIZE) + $DBM::Deep::HASH_SIZE, $DBM::Deep::LONG_SIZE));
+
+		if (!$subloc) {
+			##
+			# Hit end of list, no match
+			##
+			return;
+		}
+
+        if ( $md5 ne $key ) {
+            next BUCKET;
+        }
+
+        ##
+        # Matched key -- return true
+        ##
+        return 1;
+	} # i loop
+
+	return;
+}
+
 1;
 __END__

@@ -1296,10 +1296,10 @@ sub _is_writable {
     (O_WRONLY | O_RDWR) & fcntl( $fh, F_GETFL, my $slush = 0);
 }
 
-sub _is_readable {
-    my $fh = shift;
-    (O_RDONLY | O_RDWR) & fcntl( $fh, F_GETFL, my $slush = 0);
-}
+#sub _is_readable {
+#    my $fh = shift;
+#    (O_RDONLY | O_RDWR) & fcntl( $fh, F_GETFL, my $slush = 0);
+#}
 
 ##
 # tie() methods (hashes and arrays)
@@ -2526,6 +2526,13 @@ These functions cause every element in the array to move, which can be murder
 on DBM::Deep, as every element has to be fetched from disk, then stored again in
 a different location.  This will be addressed in the forthcoming version 1.00.
 
+=head2 WRITEONLY FILES
+
+If you pass in a filehandle to new(), you may have opened it in either a readonly or
+writeonly mode. STORE will verify that the filehandle is writable. However, there
+doesn't seem to be a good way to determine if a filehandle is readable. And, if the
+filehandle isn't readable, it's not clear what will happen. So, don't do that.
+
 =head1 PERFORMANCE
 
 This section discusses DBM::Deep's speed and memory usage.
@@ -2728,10 +2735,10 @@ B<Devel::Cover> report on this module's test suite.
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
   File                           stmt   bran   cond    sub    pod   time  total
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm           95.0   83.2   68.7   98.2  100.0   57.8   90.7
-  blib/lib/DBM/Deep/Array.pm     98.9   88.9   87.5  100.0    n/a   27.4   96.4
-  blib/lib/DBM/Deep/Hash.pm      95.3   80.0  100.0  100.0    n/a   14.8   92.4
-  Total                          95.8   83.9   72.8   98.8  100.0  100.0   91.8
+  blib/lib/DBM/Deep.pm           95.2   83.8   70.0   98.2  100.0   58.0   91.0
+  blib/lib/DBM/Deep/Array.pm    100.0   91.1  100.0  100.0    n/a   26.7   98.0
+  blib/lib/DBM/Deep/Hash.pm      95.3   80.0  100.0  100.0    n/a   15.3   92.4
+  Total                          96.2   84.8   74.4   98.8  100.0  100.0   92.4
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 MORE INFORMATION

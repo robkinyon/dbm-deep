@@ -7,6 +7,7 @@ META.yml
 lib/DBM/Deep.pm
 lib/DBM/Deep/Array.pm
 lib/DBM/Deep/Hash.pm
+lib/DBM/Deep/Engine.pm
 t/01_basic.t
 t/02_hash.t
 t/03_bighash.t

@@ -203,48 +203,6 @@ sub TIEARRAY {
 #sub DESTROY {
 #}
 
-sub _delete_bucket {
-	##
-	# Delete single key/value pair given tag and MD5 digested key.
-	##
-	my $self = shift;
-	my ($tag, $md5) = @_;
-	my $keys = $tag->{content};
-
-    my $fh = $self->_fh;
-	
-	##
-	# Iterate through buckets, looking for a key match
-	##
-    BUCKET:
-	for (my $i=0; $i<$MAX_BUCKETS; $i++) {
-		my $key = substr($keys, $i * $BUCKET_SIZE, $HASH_SIZE);
-		my $subloc = unpack($LONG_PACK, substr($keys, ($i * $BUCKET_SIZE) + $HASH_SIZE, $LONG_SIZE));
-
-		if (!$subloc) {
-			##
-			# Hit end of list, no match
-			##
-			return;
-		}
-
-        if ( $md5 ne $key ) {
-            next BUCKET;
-        }
-
-        ##
-        # Matched key -- delete bucket and return
-        ##
-        seek($fh, $tag->{offset} + ($i * $BUCKET_SIZE) + $self->_root->{file_offset}, SEEK_SET);
-        print( $fh substr($keys, ($i+1) * $BUCKET_SIZE ) );
-        print( $fh chr(0) x $BUCKET_SIZE );
-        
-        return 1;
-	} # i loop
-
-	return;
-}
-
 sub _bucket_exists {
 	##
 	# Check existence of single key given tag and MD5 digested key.
@@ -900,7 +858,7 @@ sub DELETE {
         $value = $self->_root->{filter_fetch_value}->($value);
     }
 
-	my $result = $self->_delete_bucket( $tag, $md5 );
+	my $result = $self->{engine}->delete_bucket( $self, $tag, $md5 );
 	
 	##
 	# If this object is an array and the key deleted was on the end of the stack,

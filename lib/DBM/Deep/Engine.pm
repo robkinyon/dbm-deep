@@ -516,5 +516,48 @@ sub get_bucket_value {
 
 	return;
 }
+
+sub delete_bucket {
+	##
+	# Delete single key/value pair given tag and MD5 digested key.
+	##
+	my $self = shift;
+	my ($obj, $tag, $md5) = @_;
+	my $keys = $tag->{content};
+
+    my $fh = $obj->_fh;
+	
+	##
+	# Iterate through buckets, looking for a key match
+	##
+    BUCKET:
+	for (my $i=0; $i<$DBM::Deep::MAX_BUCKETS; $i++) {
+		my $key = substr($keys, $i * $DBM::Deep::BUCKET_SIZE, $DBM::Deep::HASH_SIZE);
+		my $subloc = unpack($DBM::Deep::LONG_PACK, substr($keys, ($i * $DBM::Deep::BUCKET_SIZE) + $DBM::Deep::HASH_SIZE, $DBM::Deep::LONG_SIZE));
+
+		if (!$subloc) {
+			##
+			# Hit end of list, no match
+			##
+			return;
+		}
+
+        if ( $md5 ne $key ) {
+            next BUCKET;
+        }
+
+        ##
+        # Matched key -- delete bucket and return
+        ##
+        seek($fh, $tag->{offset} + ($i * $DBM::Deep::BUCKET_SIZE) + $obj->_root->{file_offset}, SEEK_SET);
+        print( $fh substr($keys, ($i+1) * $DBM::Deep::BUCKET_SIZE ) );
+        print( $fh chr(0) x $DBM::Deep::BUCKET_SIZE );
+        
+        return 1;
+	} # i loop
+
+	return;
+}
+
 1;
 __END__

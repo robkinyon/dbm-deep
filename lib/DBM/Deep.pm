@@ -1287,13 +1287,6 @@ sub STORE {
 	
 	my $md5 = $DIGEST_FUNC->($key);
 	
-	##
-	# Make sure file is open
-	##
-#	if (!defined($self->_fh) && !$self->_open()) {
-#		return;
-#	}
-
     unless ( _is_writable( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
@@ -1357,11 +1350,6 @@ sub FETCH {
     my $self = shift->_get_self;
     my $key = shift;
 
-	##
-	# Make sure file is open
-	##
-#	if (!defined($self->_fh)) { $self->_open(); }
-	
 	my $md5 = $DIGEST_FUNC->($key);
 
 	##
@@ -1399,11 +1387,6 @@ sub DELETE {
 	
 	my $md5 = $DIGEST_FUNC->($key);
 
-	##
-	# Make sure file is open
-	##
-#	if (!defined($self->_fh)) { $self->_open(); }
-	
 	##
 	# Request exclusive lock for writing
 	##
@@ -1445,11 +1428,6 @@ sub EXISTS {
 	my $md5 = $DIGEST_FUNC->($key);
 
 	##
-	# Make sure file is open
-	##
-#	if (!defined($self->_fh)) { $self->_open(); }
-	
-	##
 	# Request shared lock for reading
 	##
 	$self->lock( LOCK_SH );
@@ -1480,11 +1458,6 @@ sub CLEAR {
 	##
     my $self = $_[0]->_get_self;
 
-	##
-	# Make sure file is open
-	##
-#	if (!defined($self->_fh)) { $self->_open(); }
-	
 	##
 	# Request exclusive lock for writing
 	##

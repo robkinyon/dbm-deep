@@ -64,11 +64,6 @@ sub FIRSTKEY {
     my $self = $_[0]->_get_self;
 
 	##
-	# Make sure file is open
-	##
-#	if (!defined($self->_fh)) { $self->_open(); }
-	
-	##
 	# Request shared lock for reading
 	##
 	$self->lock( $self->LOCK_SH );
@@ -94,11 +89,6 @@ sub NEXTKEY {
 
 	my $prev_md5 = $DBM::Deep::DIGEST_FUNC->($prev_key);
 
-	##
-	# Make sure file is open
-	##
-#	if (!defined($self->_fh)) { $self->_open(); }
-	
 	##
 	# Request shared lock for reading
 	##

@@ -24,7 +24,7 @@ package DBM::Deep;
 #	print "This module " . $db->{my_complex}->[1]->{perl} . "!\n";
 #
 # Copyright:
-#	(c) 2002-2005 Joseph Huckaby.  All Rights Reserved.
+#	(c) 2002-2006 Joseph Huckaby.  All Rights Reserved.
 #	This program is free software; you can redistribute it and/or 
 #	modify it under the same terms as Perl itself.
 ##
@@ -1291,6 +1291,16 @@ sub set_digest {
 	_precalc_sizes();
 }
 
+sub _is_writable {
+    my $fh = shift;
+    (O_WRONLY | O_RDWR) & fcntl( $fh, F_GETFL, my $slush = 0);
+}
+
+sub _is_readable {
+    my $fh = shift;
+    (O_RDONLY | O_RDWR) & fcntl( $fh, F_GETFL, my $slush = 0);
+}
+
 ##
 # tie() methods (hashes and arrays)
 ##
@@ -1316,7 +1326,10 @@ sub STORE {
 	if (!defined($self->_fh) && !$self->_open()) {
 		return;
 	}
-	##
+
+    unless ( _is_writable( $self->_fh ) ) {
+        $self->_throw_error( 'Cannot write to a readonly filehandle' );
+    }
 	
 	##
 	# Request exclusive lock for writing

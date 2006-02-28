@@ -203,15 +203,6 @@ sub TIEARRAY {
 #sub DESTROY {
 #}
 
-sub _close {
-	##
-	# Close database fh
-	##
-    my $self = $_[0]->_get_self;
-    close $self->_root->{fh} if $self->_root->{fh};
-    $self->_root->{fh} = undef;
-}
-
 sub _create_tag {
 	##
 	# Given offset, signature and content, create tag and write to disk
@@ -843,7 +834,7 @@ sub lock {
 			# double-check file inode, in case another process
 			# has optimize()d our file while we were waiting.
 			if ($stats[1] != $self->_root->{inode}) {
-				$self->{engine}->open($self); # re-open
+				$self->{engine}->open( $self ); # re-open
 				flock($self->_fh, $type); # re-lock
 				$self->_root->{end} = (stat($self->_fh))[7]; # re-end
 			}
@@ -1025,7 +1016,7 @@ sub optimize {
 		# with a soft copy.
 		##
 		$self->unlock();
-		$self->_close();
+		$self->{engine}->close( $self );
 	}
 	
 	if (!rename $self->_root->{file} . '.tmp', $self->_root->{file}) {
@@ -1035,8 +1026,8 @@ sub optimize {
 	}
 	
 	$self->unlock();
-	$self->_close();
-	$self->{engine}->open($self);
+	$self->{engine}->close( $self );
+	$self->{engine}->open( $self );
 	
 	return 1;
 }

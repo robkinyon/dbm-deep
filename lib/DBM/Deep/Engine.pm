@@ -9,10 +9,10 @@ sub open {
 	# Open a fh to the database, create if nonexistent.
 	# Make sure file signature matches DBM::Deep spec.
 	##
-    shift;
     my $self = shift;
+    my $obj = shift;
 
-	if (defined($self->_fh)) { $self->_close(); }
+	if (defined($obj->_fh)) { $self->close( $obj ); }
 	
     eval {
         local $SIG{'__DIE__'};
@@ -21,27 +21,27 @@ sub open {
         my $flags = O_RDWR | O_CREAT | O_BINARY;
 
         my $fh;
-        sysopen( $fh, $self->_root->{file}, $flags )
+        sysopen( $fh, $obj->_root->{file}, $flags )
             or $fh = undef;
-        $self->_root->{fh} = $fh;
-    }; if ($@ ) { $self->_throw_error( "Received error: $@\n" ); }
-	if (! defined($self->_fh)) {
-		return $self->_throw_error("Cannot sysopen file: " . $self->_root->{file} . ": $!");
+        $obj->_root->{fh} = $fh;
+    }; if ($@ ) { $obj->_throw_error( "Received error: $@\n" ); }
+	if (! defined($obj->_fh)) {
+		return $obj->_throw_error("Cannot sysopen file: " . $obj->_root->{file} . ": $!");
 	}
 
-    my $fh = $self->_fh;
+    my $fh = $obj->_fh;
 
     #XXX Can we remove this by using the right sysopen() flags?
     # Maybe ... q.v. above
     binmode $fh; # for win32
 
-    if ($self->_root->{autoflush}) {
+    if ($obj->_root->{autoflush}) {
         my $old = select $fh;
         $|=1;
         select $old;
     }
     
-    seek($fh, 0 + $self->_root->{file_offset}, SEEK_SET);
+    seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
 
     my $signature;
     my $bytes_read = read( $fh, $signature, length(DBM::Deep->SIG_FILE));
@@ -50,9 +50,9 @@ sub open {
     # File is empty -- write signature and master index
     ##
     if (!$bytes_read) {
-        seek($fh, 0 + $self->_root->{file_offset}, SEEK_SET);
+        seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
         print( $fh DBM::Deep->SIG_FILE);
-        $self->_create_tag($self->_base_offset, $self->_type, chr(0) x $DBM::Deep::INDEX_SIZE);
+        $obj->_create_tag($obj->_base_offset, $obj->_type, chr(0) x $DBM::Deep::INDEX_SIZE);
 
         my $plain_key = "[base]";
         print( $fh pack($DBM::Deep::DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
@@ -63,8 +63,8 @@ sub open {
         select $old_fh;
 
         my @stats = stat($fh);
-        $self->_root->{inode} = $stats[1];
-        $self->_root->{end} = $stats[7];
+        $obj->_root->{inode} = $stats[1];
+        $obj->_root->{end} = $stats[7];
 
         return 1;
     }
@@ -73,29 +73,41 @@ sub open {
     # Check signature was valid
     ##
     unless ($signature eq DBM::Deep->SIG_FILE) {
-        $self->_close();
-        return $self->_throw_error("Signature not found -- file is not a Deep DB");
+        $self->close( $obj );
+        return $obj->_throw_error("Signature not found -- file is not a Deep DB");
     }
 
 	my @stats = stat($fh);
-	$self->_root->{inode} = $stats[1];
-    $self->_root->{end} = $stats[7];
+	$obj->_root->{inode} = $stats[1];
+    $obj->_root->{end} = $stats[7];
         
     ##
     # Get our type from master index signature
     ##
-    my $tag = $self->_load_tag($self->_base_offset);
+    my $tag = $obj->_load_tag($obj->_base_offset);
 
 #XXX We probably also want to store the hash algorithm name and not assume anything
 #XXX The cool thing would be to allow a different hashing algorithm at every level
 
     if (!$tag) {
-    	return $self->_throw_error("Corrupted file, no master index record");
+    	return $obj->_throw_error("Corrupted file, no master index record");
     }
-    if ($self->{type} ne $tag->{signature}) {
-    	return $self->_throw_error("File type mismatch");
+    if ($obj->{type} ne $tag->{signature}) {
+    	return $obj->_throw_error("File type mismatch");
     }
     
+    return 1;
+}
+
+sub close {
+    my $self = shift;
+    my $obj = shift;
+
+    if ( my $fh = $obj->_root->{fh} ) {
+        close $fh;
+    }
+    $obj->_root->{fh} = undef;
+
     return 1;
 }
 

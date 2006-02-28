@@ -87,7 +87,7 @@ sub NEXTKEY {
         ? $self->_root->{filter_store_key}->($_[1])
         : $_[1];
 
-	my $prev_md5 = $DBM::Deep::DIGEST_FUNC->($prev_key);
+	my $prev_md5 = $DBM::Deep::Engine::DIGEST_FUNC->($prev_key);
 
 	##
 	# Request shared lock for reading

@@ -40,51 +40,6 @@ use DBM::Deep::Engine;
 use vars qw( $VERSION );
 $VERSION = q(0.99_01);
 
-##
-# Set to 4 and 'N' for 32-bit offset tags (default).  Theoretical limit of 4 GB per file.
-#	(Perl must be compiled with largefile support for files > 2 GB)
-#
-# Set to 8 and 'Q' for 64-bit offsets.  Theoretical limit of 16 XB per file.
-#	(Perl must be compiled with largefile and 64-bit long support)
-##
-#my $LONG_SIZE = 4;
-#my $LONG_PACK = 'N';
-
-##
-# Set to 4 and 'N' for 32-bit data length prefixes.  Limit of 4 GB for each key/value.
-# Upgrading this is possible (see above) but probably not necessary.  If you need
-# more than 4 GB for a single key or value, this module is really not for you :-)
-##
-#my $DATA_LENGTH_SIZE = 4;
-#my $DATA_LENGTH_PACK = 'N';
-our ($LONG_SIZE, $LONG_PACK, $DATA_LENGTH_SIZE, $DATA_LENGTH_PACK);
-
-##
-# Maximum number of buckets per list before another level of indexing is done.
-# Increase this value for slightly greater speed, but larger database files.
-# DO NOT decrease this value below 16, due to risk of recursive reindex overrun.
-##
-our $MAX_BUCKETS = 16;
-
-##
-# Better not adjust anything below here, unless you're me :-)
-##
-
-##
-# Setup digest function for keys
-##
-our ($DIGEST_FUNC, $HASH_SIZE);
-#my $DIGEST_FUNC = \&Digest::MD5::md5;
-
-##
-# Precalculate index and bucket sizes based on values above.
-##
-#my $HASH_SIZE = 16;
-our ($INDEX_SIZE, $BUCKET_SIZE, $BUCKET_LIST_SIZE);
-
-set_digest();
-#set_pack();
-#_precalc_sizes();
 
 ##
 # Setup file and tag signatures.  These should never change.
@@ -507,46 +462,6 @@ sub _throw_error {
     die "DBM::Deep: $_[1]\n";
 }
 
-sub _precalc_sizes {
-	##
-	# Precalculate index, bucket and bucket list sizes
-	##
-
-    #XXX I don't like this ...
-    set_pack() unless defined $LONG_SIZE;
-
-	$INDEX_SIZE = 256 * $LONG_SIZE;
-	$BUCKET_SIZE = $HASH_SIZE + $LONG_SIZE;
-	$BUCKET_LIST_SIZE = $MAX_BUCKETS * $BUCKET_SIZE;
-}
-
-sub set_pack {
-	##
-	# Set pack/unpack modes (see file header for more)
-	##
-    my ($long_s, $long_p, $data_s, $data_p) = @_;
-
-    $LONG_SIZE = $long_s ? $long_s : 4;
-    $LONG_PACK = $long_p ? $long_p : 'N';
-
-    $DATA_LENGTH_SIZE = $data_s ? $data_s : 4;
-    $DATA_LENGTH_PACK = $data_p ? $data_p : 'N';
-
-	_precalc_sizes();
-}
-
-sub set_digest {
-	##
-	# Set key digest function (default is MD5)
-	##
-    my ($digest_func, $hash_size) = @_;
-
-    $DIGEST_FUNC = $digest_func ? $digest_func : \&Digest::MD5::md5;
-    $HASH_SIZE = $hash_size ? $hash_size : 16;
-
-	_precalc_sizes();
-}
-
 sub _is_writable {
     my $fh = shift;
     (O_WRONLY | O_RDWR) & fcntl( $fh, F_GETFL, my $slush = 0);
@@ -574,7 +489,7 @@ sub STORE {
         ? $self->_root->{filter_store_value}->($_[2])
         : $_[2];
 	
-	my $md5 = $DIGEST_FUNC->($key);
+	my $md5 = $DBM::Deep::Engine::DIGEST_FUNC->($key);
 	
     unless ( _is_writable( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
@@ -592,21 +507,21 @@ sub STORE {
 	##
 	my $tag = $self->{engine}->load_tag($self, $self->_base_offset);
 	if (!$tag) {
-		$tag = $self->{engine}->create_tag($self, $self->_base_offset, SIG_INDEX, chr(0) x $INDEX_SIZE);
+		$tag = $self->{engine}->create_tag($self, $self->_base_offset, SIG_INDEX, chr(0) x $DBM::Deep::Engine::INDEX_SIZE);
 	}
 	
 	my $ch = 0;
 	while ($tag->{signature} ne SIG_BLIST) {
 		my $num = ord(substr($md5, $ch, 1));
 
-        my $ref_loc = $tag->{offset} + ($num * $LONG_SIZE);
+        my $ref_loc = $tag->{offset} + ($num * $DBM::Deep::Engine::LONG_SIZE);
 		my $new_tag = $self->{engine}->index_lookup($self, $tag, $num);
 
 		if (!$new_tag) {
 			seek($fh, $ref_loc + $self->_root->{file_offset}, SEEK_SET);
-			print( $fh pack($LONG_PACK, $self->_root->{end}) );
+			print( $fh pack($DBM::Deep::Engine::LONG_PACK, $self->_root->{end}) );
 			
-			$tag = $self->{engine}->create_tag($self, $self->_root->{end}, SIG_BLIST, chr(0) x $BUCKET_LIST_SIZE);
+			$tag = $self->{engine}->create_tag($self, $self->_root->{end}, SIG_BLIST, chr(0) x $DBM::Deep::Engine::BUCKET_LIST_SIZE);
 
 			$tag->{ref_loc} = $ref_loc;
 			$tag->{ch} = $ch;
@@ -639,7 +554,7 @@ sub FETCH {
     my $self = shift->_get_self;
     my $key = shift;
 
-	my $md5 = $DIGEST_FUNC->($key);
+	my $md5 = $DBM::Deep::Engine::DIGEST_FUNC->($key);
 
 	##
 	# Request shared lock for reading
@@ -674,7 +589,7 @@ sub DELETE {
     my $self = $_[0]->_get_self;
 	my $key = $_[1];
 	
-	my $md5 = $DIGEST_FUNC->($key);
+	my $md5 = $DBM::Deep::Engine::DIGEST_FUNC->($key);
 
 	##
 	# Request exclusive lock for writing
@@ -714,7 +629,7 @@ sub EXISTS {
     my $self = $_[0]->_get_self;
 	my $key = $_[1];
 	
-	my $md5 = $DIGEST_FUNC->($key);
+	my $md5 = $DBM::Deep::Engine::DIGEST_FUNC->($key);
 
 	##
 	# Request shared lock for reading
@@ -760,7 +675,7 @@ sub CLEAR {
 		return;
 	}
 	
-	$self->{engine}->create_tag($self, $self->_base_offset, $self->_type, chr(0) x $INDEX_SIZE);
+	$self->{engine}->create_tag($self, $self->_base_offset, $self->_type, chr(0) x $DBM::Deep::Engine::INDEX_SIZE);
 	
 	$self->unlock();
 	

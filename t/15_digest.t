@@ -20,7 +20,7 @@ my $db = new DBM::Deep(
 ##
 # Set digest handler
 ##
-DBM::Deep::set_digest( \&my_digest, 8 );
+DBM::Deep::Engine::set_digest( \&my_digest, 8 );
 
 ##
 # put/get key

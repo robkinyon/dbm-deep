@@ -19,7 +19,7 @@ undef $db;
 ##
 # set pack to 2-byte (16-bit) words
 ##
-DBM::Deep::set_pack(2, 'S');
+DBM::Deep::Engine::set_pack(2, 'S');
 
 unlink "t/test.db";
 $db = DBM::Deep->new(

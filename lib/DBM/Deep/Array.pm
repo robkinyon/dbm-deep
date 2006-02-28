@@ -43,7 +43,7 @@ sub FETCH {
             }
         }
 
-        $key = pack($DBM::Deep::LONG_PACK, $key);
+        $key = pack($DBM::Deep::Engine::LONG_PACK, $key);
     }
 
     my $rv = $self->SUPER::FETCH( $key );
@@ -73,7 +73,7 @@ sub STORE {
             }
         }
 
-        $key = pack($DBM::Deep::LONG_PACK, $key);
+        $key = pack($DBM::Deep::Engine::LONG_PACK, $key);
     }
 
     my $rv = $self->SUPER::STORE( $key, $value );
@@ -105,7 +105,7 @@ sub EXISTS {
             }
         }
 
-        $key = pack($DBM::Deep::LONG_PACK, $key);
+        $key = pack($DBM::Deep::Engine::LONG_PACK, $key);
     }
 
     my $rv = $self->SUPER::EXISTS( $key );
@@ -133,7 +133,7 @@ sub DELETE {
             }
         }
 
-        $key = pack($DBM::Deep::LONG_PACK, $key);
+        $key = pack($DBM::Deep::Engine::LONG_PACK, $key);
     }
 
     my $rv = $self->SUPER::DELETE( $key );
@@ -165,7 +165,7 @@ sub FETCHSIZE {
     $self->unlock;
 
 	if ($packed_size) {
-        return int(unpack($DBM::Deep::LONG_PACK, $packed_size));
+        return int(unpack($DBM::Deep::Engine::LONG_PACK, $packed_size));
     }
 
 	return 0;
@@ -183,7 +183,7 @@ sub STORESIZE {
 	my $SAVE_FILTER = $self->_root->{filter_store_value};
 	$self->_root->{filter_store_value} = undef;
 	
-	my $result = $self->STORE('length', pack($DBM::Deep::LONG_PACK, $new_length));
+	my $result = $self->STORE('length', pack($DBM::Deep::Engine::LONG_PACK, $new_length));
 	
 	$self->_root->{filter_store_value} = $SAVE_FILTER;
 	

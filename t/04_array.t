@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 99;
+use Test::More tests => 107;
 use Test::Exception;
 
 use_ok( 'DBM::Deep' );
@@ -188,6 +188,20 @@ is($db->length(), 3);
 is($db->[0], "elem first");
 is($db->[1], "middle ABC");
 is($db->[2], "elem last");
+
+@returned = $db->splice( 1 );
+is($db->length(), 1);
+is($db->[0], "elem first");
+is($returned[0], "middle ABC");
+is($returned[1], "elem last");
+
+$db->push( @returned );
+
+@returned = $db->splice( 1, -1 );
+is($db->length(), 2);
+is($db->[0], "elem first");
+is($db->[1], "elem last");
+is($returned[0], "middle ABC");
 
 # These tests verify that the hash methods cannot be called on arraytypes.
 # They will be removed once the ARRAY and HASH types are refactored into their own classes.

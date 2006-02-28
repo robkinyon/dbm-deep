@@ -68,7 +68,7 @@ sub FIRSTKEY {
 	##
 	$self->lock( $self->LOCK_SH );
 	
-	my $result = $self->_get_next_key();
+	my $result = $self->{engine}->get_next_key($self);
 	
 	$self->unlock();
 	
@@ -94,7 +94,7 @@ sub NEXTKEY {
 	##
 	$self->lock( $self->LOCK_SH );
 	
-	my $result = $self->_get_next_key( $prev_md5 );
+	my $result = $self->{engine}->get_next_key( $self, $prev_md5 );
 	
 	$self->unlock();
 	

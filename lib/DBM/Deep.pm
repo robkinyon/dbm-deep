@@ -203,133 +203,6 @@ sub TIEARRAY {
 #sub DESTROY {
 #}
 
-sub _find_bucket_list {
-	##
-	# Locate offset for bucket list, given digested key
-	##
-	my $self = shift;
-	my $md5 = shift;
-	
-	##
-	# Locate offset for bucket list using digest index system
-	##
-	my $ch = 0;
-	my $tag = $self->{engine}->load_tag($self, $self->_base_offset);
-	if (!$tag) { return; }
-	
-	while ($tag->{signature} ne SIG_BLIST) {
-		$tag = $self->{engine}->index_lookup($self, $tag, ord(substr($md5, $ch, 1)));
-		if (!$tag) { return; }
-		$ch++;
-	}
-	
-	return $tag;
-}
-
-sub _traverse_index {
-	##
-	# Scan index and recursively step into deeper levels, looking for next key.
-	##
-    my ($self, $offset, $ch, $force_return_next) = @_;
-    $force_return_next = undef unless $force_return_next;
-	
-	my $tag = $self->{engine}->load_tag($self,  $offset );
-
-    my $fh = $self->_fh;
-	
-	if ($tag->{signature} ne SIG_BLIST) {
-		my $content = $tag->{content};
-		my $start;
-		if ($self->{return_next}) { $start = 0; }
-		else { $start = ord(substr($self->{prev_md5}, $ch, 1)); }
-		
-		for (my $index = $start; $index < 256; $index++) {
-			my $subloc = unpack($LONG_PACK, substr($content, $index * $LONG_SIZE, $LONG_SIZE) );
-			if ($subloc) {
-				my $result = $self->_traverse_index( $subloc, $ch + 1, $force_return_next );
-				if (defined($result)) { return $result; }
-			}
-		} # index loop
-		
-		$self->{return_next} = 1;
-	} # tag is an index
-	
-	elsif ($tag->{signature} eq SIG_BLIST) {
-		my $keys = $tag->{content};
-		if ($force_return_next) { $self->{return_next} = 1; }
-		
-		##
-		# Iterate through buckets, looking for a key match
-		##
-		for (my $i=0; $i<$MAX_BUCKETS; $i++) {
-			my $key = substr($keys, $i * $BUCKET_SIZE, $HASH_SIZE);
-			my $subloc = unpack($LONG_PACK, substr($keys, ($i * $BUCKET_SIZE) + $HASH_SIZE, $LONG_SIZE));
-	
-			if (!$subloc) {
-				##
-				# End of bucket list -- return to outer loop
-				##
-				$self->{return_next} = 1;
-				last;
-			}
-			elsif ($key eq $self->{prev_md5}) {
-				##
-				# Located previous key -- return next one found
-				##
-				$self->{return_next} = 1;
-				next;
-			}
-			elsif ($self->{return_next}) {
-				##
-				# Seek to bucket location and skip over signature
-				##
-				seek($fh, $subloc + SIG_SIZE + $self->_root->{file_offset}, SEEK_SET);
-				
-				##
-				# Skip over value to get to plain key
-				##
-				my $size;
-				read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-				if ($size) { seek($fh, $size, SEEK_CUR); }
-				
-				##
-				# Read in plain key and return as scalar
-				##
-				my $plain_key;
-				read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);
-				if ($size) { read( $fh, $plain_key, $size); }
-				
-				return $plain_key;
-			}
-		} # bucket loop
-		
-		$self->{return_next} = 1;
-	} # tag is a bucket list
-	
-	return;
-}
-
-sub _get_next_key {
-	##
-	# Locate next key, given digested previous one
-	##
-    my $self = $_[0]->_get_self;
-	
-	$self->{prev_md5} = $_[1] ? $_[1] : undef;
-	$self->{return_next} = 0;
-	
-	##
-	# If the previous key was not specifed, start at the top and
-	# return the first one found.
-	##
-	if (!$self->{prev_md5}) {
-		$self->{prev_md5} = chr(0) x $HASH_SIZE;
-		$self->{return_next} = 1;
-	}
-	
-	return $self->_traverse_index( $self->_base_offset, 0 );
-}
-
 sub lock {
 	##
 	# If db locking is set, flock() the db file.  If called multiple
@@ -773,7 +646,7 @@ sub FETCH {
 	##
 	$self->lock( LOCK_SH );
 	
-	my $tag = $self->_find_bucket_list( $md5 );
+	my $tag = $self->{engine}->find_bucket_list( $self, $md5 );
 	if (!$tag) {
 		$self->unlock();
 		return;
@@ -808,7 +681,7 @@ sub DELETE {
 	##
 	$self->lock( LOCK_EX );
 	
-	my $tag = $self->_find_bucket_list( $md5 );
+	my $tag = $self->{engine}->find_bucket_list( $self, $md5 );
 	if (!$tag) {
 		$self->unlock();
 		return;
@@ -848,7 +721,7 @@ sub EXISTS {
 	##
 	$self->lock( LOCK_SH );
 	
-	my $tag = $self->_find_bucket_list( $md5 );
+	my $tag = $self->{engine}->find_bucket_list( $self, $md5 );
 	
 	##
 	# For some reason, the built-in exists() function returns '' for false

@@ -595,5 +595,134 @@ sub bucket_exists {
 	return;
 }
 
+sub find_bucket_list {
+	##
+	# Locate offset for bucket list, given digested key
+	##
+	my $self = shift;
+	my ($obj, $md5) = @_;
+	
+	##
+	# Locate offset for bucket list using digest index system
+	##
+	my $ch = 0;
+	my $tag = $self->load_tag($obj, $obj->_base_offset);
+	if (!$tag) { return; }
+	
+	while ($tag->{signature} ne DBM::Deep->SIG_BLIST) {
+		$tag = $self->index_lookup($obj, $tag, ord(substr($md5, $ch, 1)));
+		if (!$tag) { return; }
+		$ch++;
+	}
+	
+	return $tag;
+}
+
+sub traverse_index {
+	##
+	# Scan index and recursively step into deeper levels, looking for next key.
+	##
+    my $self = shift;
+    my ($obj, $offset, $ch, $force_return_next) = @_;
+    $force_return_next = undef unless $force_return_next;
+	
+	my $tag = $self->load_tag($obj, $offset );
+
+    my $fh = $obj->_fh;
+	
+	if ($tag->{signature} ne DBM::Deep->SIG_BLIST) {
+		my $content = $tag->{content};
+		my $start;
+		if ($obj->{return_next}) { $start = 0; }
+		else { $start = ord(substr($obj->{prev_md5}, $ch, 1)); }
+		
+		for (my $index = $start; $index < 256; $index++) {
+			my $subloc = unpack($DBM::Deep::LONG_PACK, substr($content, $index * $DBM::Deep::LONG_SIZE, $DBM::Deep::LONG_SIZE) );
+			if ($subloc) {
+				my $result = $self->traverse_index( $obj, $subloc, $ch + 1, $force_return_next );
+				if (defined($result)) { return $result; }
+			}
+		} # index loop
+		
+		$obj->{return_next} = 1;
+	} # tag is an index
+	
+	elsif ($tag->{signature} eq DBM::Deep->SIG_BLIST) {
+		my $keys = $tag->{content};
+		if ($force_return_next) { $obj->{return_next} = 1; }
+		
+		##
+		# Iterate through buckets, looking for a key match
+		##
+		for (my $i=0; $i<$DBM::Deep::MAX_BUCKETS; $i++) {
+			my $key = substr($keys, $i * $DBM::Deep::BUCKET_SIZE, $DBM::Deep::HASH_SIZE);
+			my $subloc = unpack($DBM::Deep::LONG_PACK, substr($keys, ($i * $DBM::Deep::BUCKET_SIZE) + $DBM::Deep::HASH_SIZE, $DBM::Deep::LONG_SIZE));
+	
+			if (!$subloc) {
+				##
+				# End of bucket list -- return to outer loop
+				##
+				$obj->{return_next} = 1;
+				last;
+			}
+			elsif ($key eq $obj->{prev_md5}) {
+				##
+				# Located previous key -- return next one found
+				##
+				$obj->{return_next} = 1;
+				next;
+			}
+			elsif ($obj->{return_next}) {
+				##
+				# Seek to bucket location and skip over signature
+				##
+				seek($fh, $subloc + DBM::Deep->SIG_SIZE + $obj->_root->{file_offset}, SEEK_SET);
+				
+				##
+				# Skip over value to get to plain key
+				##
+				my $size;
+				read( $fh, $size, $DBM::Deep::DATA_LENGTH_SIZE); $size = unpack($DBM::Deep::DATA_LENGTH_PACK, $size);
+				if ($size) { seek($fh, $size, SEEK_CUR); }
+				
+				##
+				# Read in plain key and return as scalar
+				##
+				my $plain_key;
+				read( $fh, $size, $DBM::Deep::DATA_LENGTH_SIZE); $size = unpack($DBM::Deep::DATA_LENGTH_PACK, $size);
+				if ($size) { read( $fh, $plain_key, $size); }
+				
+				return $plain_key;
+			}
+		} # bucket loop
+		
+		$obj->{return_next} = 1;
+	} # tag is a bucket list
+	
+	return;
+}
+
+sub get_next_key {
+	##
+	# Locate next key, given digested previous one
+	##
+    my $self = shift;
+    my ($obj) = @_;
+	
+	$obj->{prev_md5} = $_[1] ? $_[1] : undef;
+	$obj->{return_next} = 0;
+	
+	##
+	# If the previous key was not specifed, start at the top and
+	# return the first one found.
+	##
+	if (!$obj->{prev_md5}) {
+		$obj->{prev_md5} = chr(0) x $DBM::Deep::HASH_SIZE;
+		$obj->{return_next} = 1;
+	}
+	
+	return $self->traverse_index( $obj, $obj->_base_offset, 0 );
+}
+
 1;
 __END__

@@ -11,9 +11,6 @@ my $db = DBM::Deep->new(
 	file => "t/test.db",
 	autoflush => 1,
 );
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 
 ##
 # create some unused space
@@ -48,10 +45,6 @@ delete $db->{a}{b};
 my $before = (stat($db->_fh()))[7];
 my $result = $db->optimize();
 my $after = (stat($db->_fh()))[7];
-
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 
 ok( $result, "optimize succeeded" );
 ok( $after < $before, "file size has shrunk" ); # make sure file shrunk
@@ -90,9 +83,6 @@ SKIP: {
             autoflush => 1,
             locking => 1
         );
-        if ($db->error()) {
-            die "ERROR: " . $db->error();
-        }
         
         # optimize and exit
         $db->optimize();
@@ -109,9 +99,6 @@ SKIP: {
         autoflush => 1,
         locking => 1
     );
-    if ($db->error()) {
-        die "ERROR: " . $db->error();
-    }
     
     # sleep for 1 second to make sure optimize() is running in the other fork
     sleep(1);

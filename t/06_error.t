@@ -9,9 +9,6 @@ use Test::Exception;
 use_ok( 'DBM::Deep' );
 
 ##
-# make sure you can clear the error state
-##
-##
 # test a corrupted file
 ##
 open FH, '>t/test.db';

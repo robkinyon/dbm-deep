@@ -9,9 +9,6 @@ use_ok( 'DBM::Deep' );
 
 unlink "t/test.db";
 my $db = DBM::Deep->new( "t/test.db" );
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 
 ##
 # put/get key
@@ -95,9 +92,6 @@ is( $db->get("key1"), "value222222222222222222222222", "We set a value before cl
 ##
 undef $db;
 $db = DBM::Deep->new( "t/test.db" );
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 is( $db->get("key1"), "value222222222222222222222222", "The value we set is still there after closure" );
 
 ##

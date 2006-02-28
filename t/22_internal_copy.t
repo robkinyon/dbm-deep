@@ -8,9 +8,6 @@ use_ok( 'DBM::Deep' );
 
 unlink "t/test.db";
 my $db = DBM::Deep->new( "t/test.db" );
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 
 ##
 # Create structure in $db

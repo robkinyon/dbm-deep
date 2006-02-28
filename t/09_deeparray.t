@@ -16,9 +16,6 @@ my $db = DBM::Deep->new(
 	file => "t/test.db",
 	type => DBM::Deep->TYPE_ARRAY,
 );
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 
 $db->[0] = [];
 my $temp_db = $db->[0];

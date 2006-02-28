@@ -17,9 +17,6 @@ unlink 't/test.db';
         file     => "t/test.db",
         autobless => 1,
     );
-    if ($db->error()) {
-        die "ERROR: " . $db->error();
-    }
 
     my $obj = bless {
         a => 1,
@@ -47,9 +44,6 @@ unlink 't/test.db';
         file     => 't/test.db',
         autobless => 1,
     );
-    if ($db->error()) {
-        die "ERROR: " . $db->error();
-    }
 
     my $obj = $db->{blessed};
     isa_ok( $obj, 'Foo' );
@@ -115,9 +109,6 @@ unlink 't/test.db';
     my $db = DBM::Deep->new(
         file     => 't/test.db',
     );
-    if ($db->error()) {
-        die "ERROR: " . $db->error();
-    }
 
     my $obj = $db->{blessed};
     isa_ok( $obj, 'DBM::Deep' );
@@ -149,9 +140,6 @@ unlink 't/test.db';
         file     => "t/test2.db",
         autobless => 1,
     );
-    if ($db->error()) {
-        die "ERROR: " . $db->error();
-    }
     my $obj = bless {
         a => 1,
         b => [ 1 .. 3 ],
@@ -165,9 +153,6 @@ unlink 't/test.db';
         file     => "t/test2.db",
         autobless => 1,
     );
-    if ($db->error()) {
-        die "ERROR: " . $db->error();
-    }
 
     my $blessed = $db->{blessed};
     isa_ok( $blessed, 'Foo' );
@@ -185,9 +170,6 @@ unlink 't/test.db';
         file     => "t/test3.db",
         autobless => 1,
     );
-    if ($db->error()) {
-        die "ERROR: " . $db->error();
-    }
 
     my $obj = bless {}, 'Foo';
 

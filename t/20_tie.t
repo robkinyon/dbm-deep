@@ -15,12 +15,7 @@ use_ok( 'DBM::Deep' );
     my %hash;
     my $db = tie %hash, 'DBM::Deep', 't/test.db';
 
-    if ($db->error()) {
-        print "ERROR: " . $db->error();
-        ok(0);
-        exit(0);
-    }
-    else { ok(1, "Tied an hash with an array for params" ); }
+    ok(1, "Tied an hash with an array for params" );
 }
 
 {
@@ -30,12 +25,7 @@ use_ok( 'DBM::Deep' );
         file => 't/test.db',
     };
 
-    if ($db->error()) {
-        print "ERROR: " . $db->error();
-        ok(0);
-        exit(0);
-    }
-    else { ok(1, "Tied a hash with a hashref for params" ); }
+    ok(1, "Tied a hash with a hashref for params" );
 }
 
 {
@@ -43,12 +33,7 @@ use_ok( 'DBM::Deep' );
     my @array;
     my $db = tie @array, 'DBM::Deep', 't/test.db';
 
-    if ($db->error()) {
-        print "ERROR: " . $db->error();
-        ok(0);
-        exit(0);
-    }
-    else { ok(1, "Tied an array with an array for params" ); }
+    ok(1, "Tied an array with an array for params" );
 
     is( $db->{type}, DBM::Deep->TYPE_ARRAY, "TIE_ARRAY sets the correct type" );
 }
@@ -60,12 +45,7 @@ use_ok( 'DBM::Deep' );
         file => 't/test.db',
     };
 
-    if ($db->error()) {
-        print "ERROR: " . $db->error();
-        ok(0);
-        exit(0);
-    }
-    else { ok(1, "Tied an array with a hashref for params" ); }
+    ok(1, "Tied an array with a hashref for params" );
 
     is( $db->{type}, DBM::Deep->TYPE_ARRAY, "TIE_ARRAY sets the correct type" );
 }

@@ -11,9 +11,6 @@ my $db = DBM::Deep->new(
 	file => "t/test.db",
 	autoflush => 1
 );
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 $db->{key1} = "value1";
 $db->{key2} = "value2";
 my $before = (stat($db->_fh()))[7];
@@ -29,9 +26,6 @@ $db = DBM::Deep->new(
 	file => "t/test.db",
 	autoflush => 1
 );
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 $db->{key1} = "value1";
 $db->{key2} = "value2";
 my $after = (stat($db->_fh()))[7];

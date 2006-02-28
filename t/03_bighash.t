@@ -11,9 +11,6 @@ my $db = DBM::Deep->new(
 	file => "t/test.db",
 	type => DBM::Deep->TYPE_HASH
 );
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 
 ##
 # put/get many keys

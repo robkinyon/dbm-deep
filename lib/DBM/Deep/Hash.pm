@@ -66,7 +66,7 @@ sub FIRSTKEY {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->_fh)) { $self->_open(); }
+#	if (!defined($self->_fh)) { $self->_open(); }
 	
 	##
 	# Request shared lock for reading
@@ -97,7 +97,7 @@ sub NEXTKEY {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->_fh)) { $self->_open(); }
+#	if (!defined($self->_fh)) { $self->_open(); }
 	
 	##
 	# Request shared lock for reading

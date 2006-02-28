@@ -16,9 +16,6 @@ unlink "t/test.db";
 my $db = new DBM::Deep(
 	file => "t/test.db"
 );
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 
 ##
 # Set digest handler

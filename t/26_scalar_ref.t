@@ -7,9 +7,6 @@ use_ok( 'DBM::Deep' );
 unlink "t/test.db";
 {
     my $db = DBM::Deep->new( "t/test.db" );
-    if ($db->error()) {
-        die "ERROR: " . $db->error();
-    }
 
     my $x = 25;
     my $y = 30;
@@ -27,9 +24,6 @@ unlink "t/test.db";
 
 {
     my $db = DBM::Deep->new( "t/test.db" );
-    if ($db->error()) {
-        die "ERROR: " . $db->error();
-    }
 
     my $x = 25;
     my $y = 30;

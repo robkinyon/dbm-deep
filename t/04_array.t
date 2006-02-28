@@ -15,9 +15,6 @@ my $db = DBM::Deep->new(
 	file => "t/test.db",
 	type => DBM::Deep->TYPE_ARRAY
 );
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 
 TODO: {
     local $TODO = "How is this test ever supposed to pass?";

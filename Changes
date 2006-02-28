@@ -1,5 +1,8 @@
 Revision history for DBM::Deep.
 
+0.99_01 ??? ?? ??;??:?? 2006 Pacific
+    - Removed error()/clear_error()
+
 0.98  Feb 28 11:00:00 2006 Pacific
     - Added in patch by David Cantrell to allow use of DATA filehandle
     - Fixed bug where attempting to export() a structure that used autobless would die

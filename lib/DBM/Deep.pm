@@ -35,6 +35,8 @@ use Fcntl qw( :DEFAULT :flock :seek );
 use Digest::MD5 ();
 use Scalar::Util ();
 
+use DBM::Deep::Engine;
+
 use vars qw( $VERSION );
 $VERSION = q(0.99_01);
 
@@ -163,8 +165,9 @@ sub _init {
 
     # These are the defaults to be optionally overridden below
     my $self = bless {
-        type => TYPE_HASH,
+        type        => TYPE_HASH,
         base_offset => length(SIG_FILE),
+        engine      => 'DBM::Deep::Engine',
     }, $class;
 
     foreach my $param ( keys %$self ) {
@@ -1207,48 +1210,12 @@ sub _base_offset {
 	return $self->{base_offset};
 }
 
-sub error {
-	##
-	# Get last error string, or undef if no error
-	##
-	return $_[0]
-        ? ( $_[0]->_get_self->{root}->{error} or undef )
-        : $@;
-}
-
 ##
 # Utility methods
 ##
 
 sub _throw_error {
-	##
-	# Store error string in self
-	##
-	my $error_text = $_[1];
-	
-    if ( Scalar::Util::blessed $_[0] ) {
-        my $self = $_[0]->_get_self;
-        $self->_root->{error} = $error_text;
-	
-        unless ($self->_root->{debug}) {
-            die "DBM::Deep: $error_text\n";
-        }
-
-        warn "DBM::Deep: $error_text\n";
-        return;
-    }
-    else {
-        die "DBM::Deep: $error_text\n";
-    }
-}
-
-sub clear_error {
-	##
-	# Clear error state
-	##
-    my $self = $_[0]->_get_self;
-	
-	undef $self->_root->{error};
+    die "DBM::Deep: $_[1]\n";
 }
 
 sub _precalc_sizes {
@@ -1323,9 +1290,9 @@ sub STORE {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->_fh) && !$self->_open()) {
-		return;
-	}
+#	if (!defined($self->_fh) && !$self->_open()) {
+#		return;
+#	}
 
     unless ( _is_writable( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
@@ -1393,7 +1360,7 @@ sub FETCH {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->_fh)) { $self->_open(); }
+#	if (!defined($self->_fh)) { $self->_open(); }
 	
 	my $md5 = $DIGEST_FUNC->($key);
 
@@ -1435,7 +1402,7 @@ sub DELETE {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->_fh)) { $self->_open(); }
+#	if (!defined($self->_fh)) { $self->_open(); }
 	
 	##
 	# Request exclusive lock for writing
@@ -1480,7 +1447,7 @@ sub EXISTS {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->_fh)) { $self->_open(); }
+#	if (!defined($self->_fh)) { $self->_open(); }
 	
 	##
 	# Request shared lock for reading
@@ -1516,7 +1483,7 @@ sub CLEAR {
 	##
 	# Make sure file is open
 	##
-	if (!defined($self->_fh)) { $self->_open(); }
+#	if (!defined($self->_fh)) { $self->_open(); }
 	
 	##
 	# Request exclusive lock for writing
@@ -1934,10 +1901,6 @@ Data going in and out.
 
 q.v. adjusting the interal parameters.
 
-=item * error() / clear_error()
-
-Error handling methods. These are deprecated and will be removed in 1.00.
-.
 =back
 
 =head2 HASHES
@@ -2309,27 +2272,12 @@ actually numerical index numbers, and are not filtered.
 =head1 ERROR HANDLING
 
 Most DBM::Deep methods return a true value for success, and call die() on
-failure.  You can wrap calls in an eval block to catch the die.  Also, the 
-actual error message is stored in an internal scalar, which can be fetched by 
-calling the C<error()> method.
+failure.  You can wrap calls in an eval block to catch the die.
 
 	my $db = DBM::Deep->new( "foo.db" ); # create hash
 	eval { $db->push("foo"); }; # ILLEGAL -- push is array-only call
 	
     print $@;           # prints error message
-	print $db->error(); # prints error message
-
-You can then call C<clear_error()> to clear the current error state.
-
-	$db->clear_error();
-
-If you set the C<debug> option to true when creating your DBM::Deep object,
-all errors are considered NON-FATAL, and dumped to STDERR.  This should only
-be used for debugging purposes and not production work. DBM::Deep expects errors
-to be thrown, not propagated back up the stack.
-
-B<NOTE>: error() and clear_error() are considered deprecated and I<will> be removed
-in 1.00. Please don't use them. Instead, wrap all your functions with in eval-blocks.
 
 =head1 LARGEFILE SUPPORT
 

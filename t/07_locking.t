@@ -15,9 +15,6 @@ my $db = DBM::Deep->new(
 	file => "t/test.db",
 	locking => 1,
 );
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 
 ##
 # basic put/get

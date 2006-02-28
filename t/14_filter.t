@@ -10,9 +10,6 @@ unlink "t/test.db";
 my $db = DBM::Deep->new(
 	file => "t/test.db",
 );
-if ($db->error()) {
-	die "ERROR: " . $db->error();
-}
 
 ok( !$db->set_filter( 'floober', sub {} ), "floober isn't a value filter key" );
 

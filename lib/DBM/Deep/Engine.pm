@@ -24,7 +24,7 @@ our ($LONG_SIZE, $LONG_PACK, $DATA_LENGTH_SIZE, $DATA_LENGTH_PACK);
 ##
 our $MAX_BUCKETS = 16;
 our ($HASH_SIZE);
-our ($INDEX_SIZE, $BUCKET_SIZE, $BUCKET_LIST_SIZE);
+our ($BUCKET_SIZE, $BUCKET_LIST_SIZE);
 set_digest();
 
 sub precalc_sizes {
@@ -35,7 +35,6 @@ sub precalc_sizes {
     #XXX I don't like this ...
     set_pack() unless defined $LONG_SIZE;
 
-	$INDEX_SIZE = 256 * $LONG_SIZE;
 	$BUCKET_SIZE = $HASH_SIZE + $LONG_SIZE;
 	$BUCKET_LIST_SIZE = $MAX_BUCKETS * $BUCKET_SIZE;
 }
@@ -83,8 +82,7 @@ sub new {
         max_buckets => 16,
     }, $class;
 
-    #XXX Where does 256 come from?
-    $self->{index_size}       = 256 * $self->{long_size};
+    $self->{index_size}       = (2**8) * $self->{long_size};
     $self->{bucket_size}      = $self->{hash_size} + $self->{long_size};
     $self->{bucket_list_size} = $self->{max_buckets} * $self->{bucket_size};
 
@@ -155,7 +153,7 @@ sub open {
     if (!$bytes_read) {
         seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
         print( $fh DBM::Deep->SIG_FILE);
-        $self->create_tag($obj, $obj->_base_offset, $obj->_type, chr(0) x $INDEX_SIZE);
+        $self->create_tag($obj, $obj->_base_offset, $obj->_type, chr(0) x $self->{index_size});
 
         my $plain_key = "[base]";
         print( $fh pack($DATA_LENGTH_PACK, length($plain_key)) . $plain_key );
@@ -335,7 +333,7 @@ sub add_bucket {
             my $actual_length;
             my $r = Scalar::Util::reftype( $value ) || '';
             if ( $r eq 'HASH' || $r eq 'ARRAY' ) {
-                $actual_length = $INDEX_SIZE;
+                $actual_length = $self->{index_size};
 
                 # if autobless is enabled, must also take into consideration
                 # the class name, as it is stored along with key/value.
@@ -376,7 +374,7 @@ sub add_bucket {
         seek($fh, $tag->{ref_loc} + $root->{file_offset}, SEEK_SET);
         print( $fh pack($LONG_PACK, $root->{end}) );
 
-        my $index_tag = $self->create_tag($obj, $root->{end}, DBM::Deep->SIG_INDEX, chr(0) x $INDEX_SIZE);
+        my $index_tag = $self->create_tag($obj, $root->{end}, DBM::Deep->SIG_INDEX, chr(0) x $self->{index_size});
         my @offsets = ();
 
         $keys .= $md5 . pack($LONG_PACK, 0);
@@ -433,13 +431,13 @@ sub add_bucket {
         my $r = Scalar::Util::reftype($value) || '';
         if ($r eq 'HASH') {
             print( $fh DBM::Deep->TYPE_HASH );
-            print( $fh pack($DATA_LENGTH_PACK, $INDEX_SIZE) . chr(0) x $INDEX_SIZE );
-            $content_length = $INDEX_SIZE;
+            print( $fh pack($DATA_LENGTH_PACK, $self->{index_size}) . chr(0) x $self->{index_size} );
+            $content_length = $self->{index_size};
         }
         elsif ($r eq 'ARRAY') {
             print( $fh DBM::Deep->TYPE_ARRAY );
-            print( $fh pack($DATA_LENGTH_PACK, $INDEX_SIZE) . chr(0) x $INDEX_SIZE );
-            $content_length = $INDEX_SIZE;
+            print( $fh pack($DATA_LENGTH_PACK, $self->{index_size}) . chr(0) x $self->{index_size} );
+            $content_length = $self->{index_size};
         }
         elsif (!defined($value)) {
             print( $fh DBM::Deep->SIG_NULL );
@@ -570,7 +568,7 @@ sub get_bucket_value {
                 # Skip over value and plain key to see if object needs
                 # to be re-blessed
                 ##
-                seek($fh, $DATA_LENGTH_SIZE + $INDEX_SIZE, SEEK_CUR);
+                seek($fh, $DATA_LENGTH_SIZE + $self->{index_size}, SEEK_CUR);
                 
                 my $size;
                 read( $fh, $size, $DATA_LENGTH_SIZE); $size = unpack($DATA_LENGTH_PACK, $size);

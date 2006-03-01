@@ -510,7 +510,7 @@ sub STORE {
 	##
 	my $tag = $self->{engine}->load_tag($self, $self->_base_offset);
 	if (!$tag) {
-		$tag = $self->{engine}->create_tag($self, $self->_base_offset, SIG_INDEX, chr(0) x $DBM::Deep::Engine::INDEX_SIZE);
+		$tag = $self->{engine}->create_tag($self, $self->_base_offset, SIG_INDEX, chr(0) x $self->{engine}{index_size});
 	}
 	
 	my $ch = 0;
@@ -678,7 +678,7 @@ sub CLEAR {
 		return;
 	}
 	
-	$self->{engine}->create_tag($self, $self->_base_offset, $self->_type, chr(0) x $DBM::Deep::Engine::INDEX_SIZE);
+	$self->{engine}->create_tag($self, $self->_base_offset, $self->_type, chr(0) x $self->{engine}{index_size});
 	
 	$self->unlock();
 	

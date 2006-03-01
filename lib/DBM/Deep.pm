@@ -700,19 +700,18 @@ sub new {
     my ($args) = @_;
 
     my $self = bless {
-        file => undef,
-        fh => undef,
-        file_offset => 0,
-        end => 0,
-        autoflush => undef,
-        locking => undef,
-        debug => undef,
-        filter_store_key => undef,
+        file               => undef,
+        fh                 => undef,
+        file_offset        => 0,
+        end                => 0,
+        autoflush          => undef,
+        locking            => undef,
+        locked             => 0,
+        filter_store_key   => undef,
         filter_store_value => undef,
-        filter_fetch_key => undef,
+        filter_fetch_key   => undef,
         filter_fetch_value => undef,
-        autobless => undef,
-        locked => 0,
+        autobless          => undef,
         %$args,
     }, $class;
 
@@ -916,14 +915,6 @@ This is an optional parameter, and defaults to 0 (disabled).
 =item * filter_*
 
 See L<FILTERS> below.
-
-=item * debug
-
-Setting I<debug> mode will make all errors non-fatal, dump them out to
-STDERR, and continue on.  This is for debugging purposes only, and probably
-not what you want.  This is an optional parameter, and defaults to 0 (disabled).
-
-B<NOTE>: This parameter is considered deprecated and should not be used anymore.
 
 =back
 
@@ -1495,9 +1486,9 @@ calling the C<root()> method.
 	my $root = $db->_root();
 
 This is useful for changing options after the object has already been created,
-such as enabling/disabling locking, or debug modes.  You can also
-store your own temporary user data in this structure (be wary of name 
-collision), which is then accessible from any child hash or array.
+such as enabling/disabling locking.  You can also store your own temporary user
+data in this structure (be wary of name collision), which is then accessible from
+any child hash or array.
 
 =head1 CUSTOM DIGEST ALGORITHM
 

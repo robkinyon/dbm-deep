@@ -5,9 +5,9 @@ use strict;
 use Fcntl qw( :DEFAULT :flock :seek );
 
 sub precalc_sizes {
-	##
-	# Precalculate index, bucket and bucket list sizes
-	##
+    ##
+    # Precalculate index, bucket and bucket list sizes
+    ##
     my $self = shift;
 
     $self->{index_size}       = (2**8) * $self->{long_size};
@@ -18,18 +18,18 @@ sub precalc_sizes {
 }
 
 sub set_pack {
-	##
-	# Set pack/unpack modes (see file header for more)
-	##
+    ##
+    # Set pack/unpack modes (see file header for more)
+    ##
     my $self = shift;
     my ($long_s, $long_p, $data_s, $data_p) = @_;
 
     ##
     # Set to 4 and 'N' for 32-bit offset tags (default).  Theoretical limit of 4 GB per file.
-    #	(Perl must be compiled with largefile support for files > 2 GB)
+    #    (Perl must be compiled with largefile support for files > 2 GB)
     #
     # Set to 8 and 'Q' for 64-bit offsets.  Theoretical limit of 16 XB per file.
-    #	(Perl must be compiled with largefile and 64-bit long support)
+    #    (Perl must be compiled with largefile and 64-bit long support)
     ##
     $self->{long_size} = $long_s ? $long_s : 4;
     $self->{long_pack} = $long_p ? $long_p : 'N';
@@ -42,20 +42,20 @@ sub set_pack {
     $self->{data_size} = $data_s ? $data_s : 4;
     $self->{data_pack} = $data_p ? $data_p : 'N';
 
-	return $self->precalc_sizes();
+    return $self->precalc_sizes();
 }
 
 sub set_digest {
-	##
-	# Set key digest function (default is MD5)
-	##
+    ##
+    # Set key digest function (default is MD5)
+    ##
     my $self = shift;
     my ($digest_func, $hash_size) = @_;
 
     $self->{digest} = $digest_func ? $digest_func : \&Digest::MD5::md5; 
     $self->{hash_size} = $hash_size ? $hash_size : 16;
 
-	return $self->precalc_sizes();
+    return $self->precalc_sizes();
 }
 
 sub new {
@@ -513,29 +513,29 @@ sub add_bucket {
 }
 
 sub get_bucket_value {
-	##
-	# Fetch single value given tag and MD5 digested key.
-	##
-	my $self = shift;
-	my ($obj, $tag, $md5) = @_;
-	my $keys = $tag->{content};
+    ##
+    # Fetch single value given tag and MD5 digested key.
+    ##
+    my $self = shift;
+    my ($obj, $tag, $md5) = @_;
+    my $keys = $tag->{content};
 
     my $fh = $obj->_fh;
 
-	##
-	# Iterate through buckets, looking for a key match
-	##
+    ##
+    # Iterate through buckets, looking for a key match
+    ##
     BUCKET:
-	for (my $i=0; $i<$self->{max_buckets}; $i++) {
-		my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
-		my $subloc = unpack($self->{long_pack}, substr($keys, ($i * $self->{bucket_size}) + $self->{hash_size}, $self->{long_size}));
+    for (my $i=0; $i<$self->{max_buckets}; $i++) {
+        my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
+        my $subloc = unpack($self->{long_pack}, substr($keys, ($i * $self->{bucket_size}) + $self->{hash_size}, $self->{long_size}));
 
-		if (!$subloc) {
-			##
-			# Hit end of list, no match
-			##
-			return;
-		}
+        if (!$subloc) {
+            ##
+            # Hit end of list, no match
+            ##
+            return;
+        }
 
         if ( $md5 ne $key ) {
             next BUCKET;
@@ -600,35 +600,35 @@ sub get_bucket_value {
         # Key exists, but content is null
         ##
         else { return; }
-	} # i loop
+    } # i loop
 
-	return;
+    return;
 }
 
 sub delete_bucket {
-	##
-	# Delete single key/value pair given tag and MD5 digested key.
-	##
-	my $self = shift;
-	my ($obj, $tag, $md5) = @_;
-	my $keys = $tag->{content};
+    ##
+    # Delete single key/value pair given tag and MD5 digested key.
+    ##
+    my $self = shift;
+    my ($obj, $tag, $md5) = @_;
+    my $keys = $tag->{content};
 
     my $fh = $obj->_fh;
-	
-	##
-	# Iterate through buckets, looking for a key match
-	##
+    
+    ##
+    # Iterate through buckets, looking for a key match
+    ##
     BUCKET:
-	for (my $i=0; $i<$self->{max_buckets}; $i++) {
-		my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
-		my $subloc = unpack($self->{long_pack}, substr($keys, ($i * $self->{bucket_size}) + $self->{hash_size}, $self->{long_size}));
+    for (my $i=0; $i<$self->{max_buckets}; $i++) {
+        my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
+        my $subloc = unpack($self->{long_pack}, substr($keys, ($i * $self->{bucket_size}) + $self->{hash_size}, $self->{long_size}));
 
-		if (!$subloc) {
-			##
-			# Hit end of list, no match
-			##
-			return;
-		}
+        if (!$subloc) {
+            ##
+            # Hit end of list, no match
+            ##
+            return;
+        }
 
         if ( $md5 ne $key ) {
             next BUCKET;
@@ -642,33 +642,33 @@ sub delete_bucket {
         print( $fh chr(0) x $self->{bucket_size} );
         
         return 1;
-	} # i loop
+    } # i loop
 
-	return;
+    return;
 }
 
 sub bucket_exists {
-	##
-	# Check existence of single key given tag and MD5 digested key.
-	##
-	my $self = shift;
-	my ($obj, $tag, $md5) = @_;
-	my $keys = $tag->{content};
-	
-	##
-	# Iterate through buckets, looking for a key match
-	##
+    ##
+    # Check existence of single key given tag and MD5 digested key.
+    ##
+    my $self = shift;
+    my ($obj, $tag, $md5) = @_;
+    my $keys = $tag->{content};
+    
+    ##
+    # Iterate through buckets, looking for a key match
+    ##
     BUCKET:
-	for (my $i=0; $i<$self->{max_buckets}; $i++) {
-		my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
-		my $subloc = unpack($self->{long_pack}, substr($keys, ($i * $self->{bucket_size}) + $self->{hash_size}, $self->{long_size}));
+    for (my $i=0; $i<$self->{max_buckets}; $i++) {
+        my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
+        my $subloc = unpack($self->{long_pack}, substr($keys, ($i * $self->{bucket_size}) + $self->{hash_size}, $self->{long_size}));
 
-		if (!$subloc) {
-			##
-			# Hit end of list, no match
-			##
-			return;
-		}
+        if (!$subloc) {
+            ##
+            # Hit end of list, no match
+            ##
+            return;
+        }
 
         if ( $md5 ne $key ) {
             next BUCKET;
@@ -678,138 +678,138 @@ sub bucket_exists {
         # Matched key -- return true
         ##
         return 1;
-	} # i loop
+    } # i loop
 
-	return;
+    return;
 }
 
 sub find_bucket_list {
-	##
-	# Locate offset for bucket list, given digested key
-	##
-	my $self = shift;
-	my ($obj, $md5) = @_;
-	
-	##
-	# Locate offset for bucket list using digest index system
-	##
-	my $ch = 0;
-	my $tag = $self->load_tag($obj, $obj->_base_offset);
-	if (!$tag) { return; }
-	
-	while ($tag->{signature} ne DBM::Deep->SIG_BLIST) {
-		$tag = $self->index_lookup($obj, $tag, ord(substr($md5, $ch, 1)));
-		if (!$tag) { return; }
-		$ch++;
-	}
-	
-	return $tag;
+    ##
+    # Locate offset for bucket list, given digested key
+    ##
+    my $self = shift;
+    my ($obj, $md5) = @_;
+    
+    ##
+    # Locate offset for bucket list using digest index system
+    ##
+    my $ch = 0;
+    my $tag = $self->load_tag($obj, $obj->_base_offset);
+    if (!$tag) { return; }
+    
+    while ($tag->{signature} ne DBM::Deep->SIG_BLIST) {
+        $tag = $self->index_lookup($obj, $tag, ord(substr($md5, $ch, 1)));
+        if (!$tag) { return; }
+        $ch++;
+    }
+    
+    return $tag;
 }
 
 sub traverse_index {
-	##
-	# Scan index and recursively step into deeper levels, looking for next key.
-	##
+    ##
+    # Scan index and recursively step into deeper levels, looking for next key.
+    ##
     my $self = shift;
     my ($obj, $offset, $ch, $force_return_next) = @_;
     $force_return_next = undef unless $force_return_next;
-	
-	my $tag = $self->load_tag($obj, $offset );
+    
+    my $tag = $self->load_tag($obj, $offset );
 
     my $fh = $obj->_fh;
-	
-	if ($tag->{signature} ne DBM::Deep->SIG_BLIST) {
-		my $content = $tag->{content};
-		my $start;
-		if ($obj->{return_next}) { $start = 0; }
-		else { $start = ord(substr($obj->{prev_md5}, $ch, 1)); }
-		
-		for (my $index = $start; $index < 256; $index++) {
-			my $subloc = unpack($self->{long_pack}, substr($content, $index * $self->{long_size}, $self->{long_size}) );
-			if ($subloc) {
-				my $result = $self->traverse_index( $obj, $subloc, $ch + 1, $force_return_next );
-				if (defined($result)) { return $result; }
-			}
-		} # index loop
-		
-		$obj->{return_next} = 1;
-	} # tag is an index
-	
-	elsif ($tag->{signature} eq DBM::Deep->SIG_BLIST) {
-		my $keys = $tag->{content};
-		if ($force_return_next) { $obj->{return_next} = 1; }
-		
-		##
-		# Iterate through buckets, looking for a key match
-		##
-		for (my $i=0; $i<$self->{max_buckets}; $i++) {
-			my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
-			my $subloc = unpack($self->{long_pack}, substr($keys, ($i * $self->{bucket_size}) + $self->{hash_size}, $self->{long_size}));
-	
-			if (!$subloc) {
-				##
-				# End of bucket list -- return to outer loop
-				##
-				$obj->{return_next} = 1;
-				last;
-			}
-			elsif ($key eq $obj->{prev_md5}) {
-				##
-				# Located previous key -- return next one found
-				##
-				$obj->{return_next} = 1;
-				next;
-			}
-			elsif ($obj->{return_next}) {
-				##
-				# Seek to bucket location and skip over signature
-				##
-				seek($fh, $subloc + DBM::Deep->SIG_SIZE + $obj->_root->{file_offset}, SEEK_SET);
-				
-				##
-				# Skip over value to get to plain key
-				##
-				my $size;
-				read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
-				if ($size) { seek($fh, $size, SEEK_CUR); }
-				
-				##
-				# Read in plain key and return as scalar
-				##
-				my $plain_key;
-				read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
-				if ($size) { read( $fh, $plain_key, $size); }
-				
-				return $plain_key;
-			}
-		} # bucket loop
-		
-		$obj->{return_next} = 1;
-	} # tag is a bucket list
-	
-	return;
+    
+    if ($tag->{signature} ne DBM::Deep->SIG_BLIST) {
+        my $content = $tag->{content};
+        my $start;
+        if ($obj->{return_next}) { $start = 0; }
+        else { $start = ord(substr($obj->{prev_md5}, $ch, 1)); }
+        
+        for (my $index = $start; $index < 256; $index++) {
+            my $subloc = unpack($self->{long_pack}, substr($content, $index * $self->{long_size}, $self->{long_size}) );
+            if ($subloc) {
+                my $result = $self->traverse_index( $obj, $subloc, $ch + 1, $force_return_next );
+                if (defined($result)) { return $result; }
+            }
+        } # index loop
+        
+        $obj->{return_next} = 1;
+    } # tag is an index
+    
+    elsif ($tag->{signature} eq DBM::Deep->SIG_BLIST) {
+        my $keys = $tag->{content};
+        if ($force_return_next) { $obj->{return_next} = 1; }
+        
+        ##
+        # Iterate through buckets, looking for a key match
+        ##
+        for (my $i=0; $i<$self->{max_buckets}; $i++) {
+            my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
+            my $subloc = unpack($self->{long_pack}, substr($keys, ($i * $self->{bucket_size}) + $self->{hash_size}, $self->{long_size}));
+    
+            if (!$subloc) {
+                ##
+                # End of bucket list -- return to outer loop
+                ##
+                $obj->{return_next} = 1;
+                last;
+            }
+            elsif ($key eq $obj->{prev_md5}) {
+                ##
+                # Located previous key -- return next one found
+                ##
+                $obj->{return_next} = 1;
+                next;
+            }
+            elsif ($obj->{return_next}) {
+                ##
+                # Seek to bucket location and skip over signature
+                ##
+                seek($fh, $subloc + DBM::Deep->SIG_SIZE + $obj->_root->{file_offset}, SEEK_SET);
+                
+                ##
+                # Skip over value to get to plain key
+                ##
+                my $size;
+                read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
+                if ($size) { seek($fh, $size, SEEK_CUR); }
+                
+                ##
+                # Read in plain key and return as scalar
+                ##
+                my $plain_key;
+                read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
+                if ($size) { read( $fh, $plain_key, $size); }
+                
+                return $plain_key;
+            }
+        } # bucket loop
+        
+        $obj->{return_next} = 1;
+    } # tag is a bucket list
+    
+    return;
 }
 
 sub get_next_key {
-	##
-	# Locate next key, given digested previous one
-	##
+    ##
+    # Locate next key, given digested previous one
+    ##
     my $self = shift;
     my ($obj) = @_;
-	
-	$obj->{prev_md5} = $_[1] ? $_[1] : undef;
-	$obj->{return_next} = 0;
-	
-	##
-	# If the previous key was not specifed, start at the top and
-	# return the first one found.
-	##
-	if (!$obj->{prev_md5}) {
-		$obj->{prev_md5} = chr(0) x $self->{hash_size};
-		$obj->{return_next} = 1;
-	}
-	
-	return $self->traverse_index( $obj, $obj->_base_offset, 0 );
+    
+    $obj->{prev_md5} = $_[1] ? $_[1] : undef;
+    $obj->{return_next} = 0;
+    
+    ##
+    # If the previous key was not specifed, start at the top and
+    # return the first one found.
+    ##
+    if (!$obj->{prev_md5}) {
+        $obj->{prev_md5} = chr(0) x $self->{hash_size};
+        $obj->{return_next} = 1;
+    }
+    
+    return $self->traverse_index( $obj, $obj->_base_offset, 0 );
 }
 
 1;

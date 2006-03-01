@@ -475,10 +475,6 @@ sub _is_writable {
 #    (O_RDONLY | O_RDWR) & fcntl( $fh, F_GETFL, my $slush = 0);
 #}
 
-##
-# tie() methods (hashes and arrays)
-##
-
 sub STORE {
     ##
     # Store single hash key/value or array element in database.
@@ -542,9 +538,8 @@ sub FETCH {
 
     $self->unlock();
 
-    #XXX What is ref() checking here?
-    #YYY Filters only apply on scalar values, so the ref check is making
-    #YYY sure the fetched bucket is a scalar, not a child hash or array.
+    # Filters only apply to scalar values, so the ref check is making
+    # sure the fetched bucket is a scalar, not a child hash or array.
     return ($result && !ref($result) && $self->_root->{filter_fetch_value})
         ? $self->_root->{filter_fetch_value}->($result)
         : $result;
@@ -557,12 +552,16 @@ sub DELETE {
     my $self = $_[0]->_get_self;
     my $key = $_[1];
 
-    my $md5 = $self->{engine}{digest}->($key);
+    unless ( _is_writable( $self->_fh ) ) {
+        $self->_throw_error( 'Cannot write to a readonly filehandle' );
+    }
 
     ##
     # Request exclusive lock for writing
     ##
     $self->lock( LOCK_EX );
+
+    my $md5 = $self->{engine}{digest}->($key);
 
     my $tag = $self->{engine}->find_bucket_list( $self, $md5 );
     if (!$tag) {
@@ -574,7 +573,8 @@ sub DELETE {
     # Delete bucket
     ##
     my $value = $self->{engine}->get_bucket_value($self,  $tag, $md5 );
-    if ($value && !ref($value) && $self->_root->{filter_fetch_value}) {
+
+    if (defined $value && !ref($value) && $self->_root->{filter_fetch_value}) {
         $value = $self->_root->{filter_fetch_value}->($value);
     }
 
@@ -630,6 +630,10 @@ sub CLEAR {
     ##
     my $self = $_[0]->_get_self;
 
+    unless ( _is_writable( $self->_fh ) ) {
+        $self->_throw_error( 'Cannot write to a readonly filehandle' );
+    }
+
     ##
     # Request exclusive lock for writing
     ##
@@ -668,18 +672,18 @@ sub new {
     my ($args) = @_;
 
     my $self = bless {
-        file               => undef,
-        fh                 => undef,
-        file_offset        => 0,
-        end                => 0,
+        autobless          => undef,
         autoflush          => undef,
+        end                => 0,
+        fh                 => undef,
+        file               => undef,
+        file_offset        => 0,
         locking            => undef,
         locked             => 0,
         filter_store_key   => undef,
         filter_store_value => undef,
         filter_fetch_key   => undef,
         filter_fetch_value => undef,
-        autobless          => undef,
         %$args,
     }, $class;
 

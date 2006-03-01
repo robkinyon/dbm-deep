@@ -190,7 +190,7 @@ sub open {
 
 sub close_fh {
     my $self = shift;
-    my $obj = shift;
+    my ($obj) = @_;
 
     if ( my $fh = $obj->_root->{fh} ) {
         close $fh;

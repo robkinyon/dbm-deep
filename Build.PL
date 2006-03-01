@@ -14,6 +14,7 @@ my $build = Module::Build->new(
     build_requires => {
         'Test::More'      => '0.47',
         'Test::Exception' => '0.21',
+        'File::Temp'      => '0.01',
     },
     create_makefile_pl => 'traditional',
     add_to_cleanup => [

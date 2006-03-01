@@ -517,14 +517,18 @@ sub STORE {
 	while ($tag->{signature} ne SIG_BLIST) {
 		my $num = ord(substr($md5, $ch, 1));
 
-        my $ref_loc = $tag->{offset} + ($num * $DBM::Deep::Engine::LONG_SIZE);
+        my $ref_loc = $tag->{offset} + ($num * $self->{engine}{long_size});
 		my $new_tag = $self->{engine}->index_lookup($self, $tag, $num);
 
 		if (!$new_tag) {
 			seek($fh, $ref_loc + $self->_root->{file_offset}, SEEK_SET);
-			print( $fh pack($DBM::Deep::Engine::LONG_PACK, $self->_root->{end}) );
+			print( $fh pack($self->{engine}{long_pack}, $self->_root->{end}) );
 			
-			$tag = $self->{engine}->create_tag($self, $self->_root->{end}, SIG_BLIST, chr(0) x $DBM::Deep::Engine::BUCKET_LIST_SIZE);
+			$tag = $self->{engine}->create_tag(
+                $self, $self->_root->{end},
+                SIG_BLIST,
+                chr(0) x $self->{engine}{bucket_list_size},
+            );
 
 			$tag->{ref_loc} = $ref_loc;
 			$tag->{ch} = $ch;
@@ -1854,10 +1858,11 @@ B<Devel::Cover> report on this module's test suite.
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
   File                           stmt   bran   cond    sub    pod   time  total
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm           95.2   83.8   70.0   98.2  100.0   58.0   91.0
-  blib/lib/DBM/Deep/Array.pm    100.0   91.1  100.0  100.0    n/a   26.7   98.0
-  blib/lib/DBM/Deep/Hash.pm      95.3   80.0  100.0  100.0    n/a   15.3   92.4
-  Total                          96.2   84.8   74.4   98.8  100.0  100.0   92.4
+  blib/lib/DBM/Deep.pm           95.1   81.6   70.3  100.0  100.0   33.4   91.0
+  blib/lib/DBM/Deep/Array.pm    100.0   91.1  100.0  100.0    n/a   27.8   98.0
+  blib/lib/DBM/Deep/Engine.pm    97.8   85.6   75.0  100.0    0.0   25.8   90.8
+  blib/lib/DBM/Deep/Hash.pm     100.0   87.5  100.0  100.0    n/a   13.0   97.2
+  Total                          97.5   85.4   76.6  100.0   46.9  100.0   92.5
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 MORE INFORMATION

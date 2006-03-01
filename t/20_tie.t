@@ -58,17 +58,14 @@ throws_ok {
     tie my %hash, 'DBM::Deep', [ file => $filename ];
 } qr/Not a hashref/, "Passing an arrayref to TIEHASH fails";
 
-unlink "t/test.db";
 throws_ok {
     tie my @array, 'DBM::Deep', [ file => $filename ];
 } qr/Not a hashref/, "Passing an arrayref to TIEARRAY fails";
 
-unlink "t/test.db";
 throws_ok {
     tie my %hash, 'DBM::Deep', undef, file => $filename;
 } qr/Odd number of parameters/, "Odd number of params to TIEHASH fails";
 
-unlink "t/test.db";
 throws_ok {
     tie my @array, 'DBM::Deep', undef, file => $filename;
 } qr/Odd number of parameters/, "Odd number of params to TIEARRAY fails";

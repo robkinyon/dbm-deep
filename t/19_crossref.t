@@ -3,38 +3,36 @@
 ##
 use strict;
 use Test::More tests => 5;
+use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
 
-unlink "t/test.db";
-my $db = DBM::Deep->new( "t/test.db" );
+my $dir = tempdir( CLEANUP => 1 );
+my ($fh2, $filename2) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+my $db2 = DBM::Deep->new( $filename2 );
 
-unlink "t/test2.db";
-my $db2 = DBM::Deep->new( "t/test2.db" );
+{
+    my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    my $db = DBM::Deep->new( $filename );
 
-##
-# Create structure in $db
-##
-$db->import(
-	hash1 => {
-		subkey1 => "subvalue1",
-		subkey2 => "subvalue2"
-	}
-);
+    ##
+    # Create structure in $db
+    ##
+    $db->import(
+        hash1 => {
+            subkey1 => "subvalue1",
+            subkey2 => "subvalue2"
+        }
+    );
 
-is( $db->{hash1}{subkey1}, 'subvalue1', "Value imported correctly" );
-is( $db->{hash1}{subkey2}, 'subvalue2', "Value imported correctly" );
+    is( $db->{hash1}{subkey1}, 'subvalue1', "Value imported correctly" );
+    is( $db->{hash1}{subkey2}, 'subvalue2', "Value imported correctly" );
 
-##
-# Cross-ref nested hash accross DB objects
-##
-$db2->{copy} = $db->{hash1};
-
-##
-# close, delete $db
-##
-undef $db;
-unlink "t/test.db";
+    ##
+    # Cross-ref nested hash accross DB objects
+    ##
+    $db2->{copy} = $db->{hash1};
+}
 
 ##
 # Make sure $db2 has copy of $db's hash structure

@@ -88,13 +88,6 @@ $db->put("key1", "value222222222222222222222222");
 
 ok( $db->get("key1") eq "value222222222222222222222222" );
 
-##
-# close, delete file, exit
-##
-undef $db;
-unlink "t/test.db";
-exit(0);
-
 sub my_digest {
 	##
 	# Warning: This digest function is for testing ONLY

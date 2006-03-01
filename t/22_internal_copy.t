@@ -3,11 +3,13 @@
 ##
 use strict;
 use Test::More tests => 13;
+use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
 
-unlink "t/test.db";
-my $db = DBM::Deep->new( "t/test.db" );
+my $dir = tempdir( CLEANUP => 1 );
+my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+my $db = DBM::Deep->new( $filename );
 
 ##
 # Create structure in $db
@@ -47,9 +49,9 @@ is( $db->{copy}{subkey3}, 'subvalue3', "After the second copy, we're still good"
 
 my $max_keys = 1000;
 
-unlink 't/test2.db';
+my ($fh2, $filename2) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
 {
-    my $db = DBM::Deep->new( 't/test2.db' );
+    my $db = DBM::Deep->new( $filename2 );
 
     $db->{foo} = [ 1 .. 3 ];
     for ( 0 .. $max_keys ) {
@@ -58,7 +60,7 @@ unlink 't/test2.db';
 }
 
 {
-    my $db = DBM::Deep->new( 't/test2.db' );
+    my $db = DBM::Deep->new( $filename2 );
 
     my $base_offset = $db->{foo}->_base_offset;
     my $count = -1;

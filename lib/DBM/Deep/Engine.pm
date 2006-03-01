@@ -108,7 +108,7 @@ sub open {
     my $self = shift;
     my ($obj) = @_;
 
-    if (defined($obj->_fh)) { $self->close( $obj ); }
+    if (defined($obj->_fh)) { $self->close_fh( $obj ); }
 
     eval {
         local $SIG{'__DIE__'};
@@ -165,7 +165,7 @@ sub open {
     # Check signature was valid
     ##
     unless ($signature eq DBM::Deep->SIG_FILE) {
-        $self->close( $obj );
+        $self->close_fh( $obj );
         return $obj->_throw_error("Signature not found -- file is not a Deep DB");
     }
 
@@ -187,7 +187,7 @@ sub open {
     return 1;
 }
 
-sub close {
+sub close_fh {
     my $self = shift;
     my $obj = shift;
 

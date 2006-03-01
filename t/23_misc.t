@@ -33,7 +33,7 @@ throws_ok {
         file => 't/test.db',
         locking => 1,
     );
-    $db->_get_self->{engine}->close( $db->_get_self );
+    $db->_get_self->{engine}->close_fh( $db->_get_self );
     ok( !$db->lock );
 }
 
@@ -43,6 +43,6 @@ throws_ok {
         locking => 1,
     );
     $db->lock;
-    $db->_get_self->{engine}->close( $db->_get_self );
+    $db->_get_self->{engine}->close_fh( $db->_get_self );
     ok( !$db->unlock );
 }

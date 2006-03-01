@@ -181,7 +181,7 @@ sub lock {
 			# double-check file inode, in case another process
 			# has optimize()d our file while we were waiting.
 			if ($stats[1] != $self->_root->{inode}) {
-                $self->{engine}->close( $self );
+                $self->{engine}->close_fh( $self );
                 $self->{engine}->setup_fh( $self );
 				flock($self->_fh, $type); # re-lock
 
@@ -366,7 +366,7 @@ sub optimize {
 		# with a soft copy.
 		##
 		$self->unlock();
-		$self->{engine}->close( $self );
+		$self->{engine}->close_fh( $self );
 	}
 	
 	if (!rename $self->_root->{file} . '.tmp', $self->_root->{file}) {
@@ -376,7 +376,7 @@ sub optimize {
 	}
 	
 	$self->unlock();
-	$self->{engine}->close( $self );
+	$self->{engine}->close_fh( $self );
     $self->{engine}->setup_fh( $self );
 
 	return 1;

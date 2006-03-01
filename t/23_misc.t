@@ -2,15 +2,15 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More;
+use Test::More tests => 7;
 use Test::Exception;
-
-plan tests => 7;
+use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
 
-unlink "t/test.db";
-my $db = DBM::Deep->new( "t/test.db" );
+my $dir = tempdir( CLEANUP => 1 );
+my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+my $db = DBM::Deep->new( $filename );
 
 $db->{key1} = "value1";
 is( $db->{key1}, "value1", "Value set correctly" );
@@ -30,7 +30,7 @@ throws_ok {
 
 {
     my $db = DBM::Deep->new(
-        file => 't/test.db',
+        file => $filename,
         locking => 1,
     );
     $db->_get_self->{engine}->close_fh( $db->_get_self );
@@ -39,7 +39,7 @@ throws_ok {
 
 {
     my $db = DBM::Deep->new(
-        file => 't/test.db',
+        file => $filename,
         locking => 1,
     );
     $db->lock;

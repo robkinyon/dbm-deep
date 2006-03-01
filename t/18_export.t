@@ -3,35 +3,35 @@
 ##
 use strict;
 use Test::More tests => 2;
+use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
 
-unlink "t/test.db";
-my $db = DBM::Deep->new( "t/test.db" );
+my $dir = tempdir( CLEANUP => 1 );
 
-##
-# Create structure in DB
-##
-$db->import(
-	key1 => "value1",
-	key2 => "value2",
-	array1 => [ "elem0", "elem1", "elem2", { foo => 'bar' }, [ 5 ] ],
-	hash1 => {
-		subkey1 => "subvalue1",
-		subkey2 => "subvalue2",
-	}
-);
+my $struct;
+{
+    my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    my $db = DBM::Deep->new( $filename );
 
-##
-# Export entire thing
-##
-my $struct = $db->export();
+    ##
+    # Create structure in DB
+    ##
+    $db->import(
+        key1 => "value1",
+        key2 => "value2",
+        array1 => [ "elem0", "elem1", "elem2", { foo => 'bar' }, [ 5 ] ],
+        hash1 => {
+            subkey1 => "subvalue1",
+            subkey2 => "subvalue2",
+        }
+    );
 
-##
-# close, delete file
-##
-undef $db;
-unlink "t/test.db";
+    ##
+    # Export entire thing
+    ##
+    $struct = $db->export();
+}
 
 ##
 # Make sure everything is here, outside DB

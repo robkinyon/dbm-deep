@@ -3,12 +3,13 @@
 ##
 use strict;
 use Test::More tests => 9;
+use File::Temp qw( tmpnam );
 
 use_ok( 'DBM::Deep' );
 
-unlink "t/test.db";
+my $filename = tmpnam();
 my $db = DBM::Deep->new(
-	file => "t/test.db",
+	file => $filename,
 	autoflush => 1,
 );
 
@@ -79,7 +80,7 @@ SKIP: {
         
         # re-open db
         $db = DBM::Deep->new(
-            file => "t/test.db",
+            file => $filename,
             autoflush => 1,
             locking => 1
         );
@@ -95,7 +96,7 @@ SKIP: {
     
     # re-open db
     $db = DBM::Deep->new(
-        file => "t/test.db",
+        file => $filename,
         autoflush => 1,
         locking => 1
     );
@@ -108,7 +109,6 @@ SKIP: {
     
     # see if it was stored successfully
     is( $db->{parentfork}, "hello", "stored key while optimize took place" );
-    # ok(1);
     
     # now check some existing values from before
     is( $db->{key1}, 'value1', "key1's value is still there after optimize" );

@@ -2,20 +2,18 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More;
+use Test::More tests => 7;
 use Test::Exception;
-
-plan tests => 7;
+use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
 
-# How should one test for creation failure with the tie mechanism?
-
-unlink "t/test.db";
+my $dir = tempdir( CLEANUP => 1 );
+my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
 
 {
     my %hash;
-    tie %hash, 'DBM::Deep', "t/test.db";
+    tie %hash, 'DBM::Deep', $filename;
 
     $hash{key1} = 'value';
     is( $hash{key1}, 'value', 'Set and retrieved key1' );
@@ -23,7 +21,7 @@ unlink "t/test.db";
 
 {
     my %hash;
-    tie %hash, 'DBM::Deep', "t/test.db";
+    tie %hash, 'DBM::Deep', $filename;
 
     is( $hash{key1}, 'value', 'Set and retrieved key1' );
 
@@ -33,17 +31,19 @@ unlink "t/test.db";
 
 throws_ok {
     tie my @array, 'DBM::Deep', {
-        file => 't/test.db',
+        file => $filename,
         type => DBM::Deep->TYPE_ARRAY,
     };
 } qr/DBM::Deep: File type mismatch/, "\$SIG_TYPE doesn't match file's type";
 
-unlink "t/test2.db";
-DBM::Deep->new( file => 't/test2.db', type => DBM::Deep->TYPE_ARRAY );
+{
+    my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    DBM::Deep->new( file => $filename, type => DBM::Deep->TYPE_ARRAY );
 
-throws_ok {
-    tie my %hash, 'DBM::Deep', {
-        file => 't/test2.db',
-        type => DBM::Deep->TYPE_HASH,
-    };
-} qr/DBM::Deep: File type mismatch/, "\$SIG_TYPE doesn't match file's type";
+    throws_ok {
+        tie my %hash, 'DBM::Deep', {
+            file => $filename,
+            type => DBM::Deep->TYPE_HASH,
+        };
+    } qr/DBM::Deep: File type mismatch/, "\$SIG_TYPE doesn't match file's type";
+}

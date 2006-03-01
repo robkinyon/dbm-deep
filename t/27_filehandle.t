@@ -2,13 +2,23 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 10;
+use Test::More tests => 11;
 use Test::Exception;
+use File::Temp qw( tempfile tempdir );
 
-use DBM::Deep;
+use_ok( 'DBM::Deep' );
+
+my $dir = tempdir( CLEANUP => 1 );
+my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+
+# Create the datafile to be used
+{
+    my $db = DBM::Deep->new( $filename );
+    $db->{hash} = { foo => [ 'a' .. 'c' ] };
+}
 
 {
-    open(FILE, "t/27_filehandle.t.db") || die("Can't open t/27_filehandle.t.db\n");
+    open(FILE, $filename) || die("Can't open '$filename' for reading: $!\n");
 
     my $db;
 

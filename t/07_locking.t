@@ -3,16 +3,14 @@
 ##
 use strict;
 use Test::More tests => 4;
-$|=1;
+use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
 
-##
-# basic file open
-##
-unlink "t/test.db";
+my $dir = tempdir( CLEANUP => 1 );
+my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
 my $db = DBM::Deep->new(
-	file => "t/test.db",
+	file => $filename,
 	locking => 1,
 );
 

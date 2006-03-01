@@ -3,12 +3,14 @@
 ##
 use strict;
 use Test::More tests => 17;
+use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
 
-unlink "t/test.db";
+my $dir = tempdir( CLEANUP => 1 );
+my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
 my $db = DBM::Deep->new(
-	file => "t/test.db",
+	file => $filename,
 );
 
 ok( !$db->set_filter( 'floober', sub {} ), "floober isn't a value filter key" );

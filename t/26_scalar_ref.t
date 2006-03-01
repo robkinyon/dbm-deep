@@ -1,12 +1,15 @@
 use strict;
 
 use Test::More tests => 7;
+use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
 
-unlink "t/test.db";
+my $dir = tempdir( CLEANUP => 1 );
+my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+
 {
-    my $db = DBM::Deep->new( "t/test.db" );
+    my $db = DBM::Deep->new( $filename );
 
     my $x = 25;
     my $y = 30;
@@ -23,7 +26,7 @@ unlink "t/test.db";
 }
 
 {
-    my $db = DBM::Deep->new( "t/test.db" );
+    my $db = DBM::Deep->new( $filename );
 
     my $x = 25;
     my $y = 30;

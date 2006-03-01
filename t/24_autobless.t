@@ -8,13 +8,15 @@ use strict;
 }
 
 use Test::More tests => 54;
+use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
 
-unlink 't/test.db';
+my $dir = tempdir( CLEANUP => 1 );
+my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
 {
     my $db = DBM::Deep->new(
-        file     => "t/test.db",
+        file     => $filename,
         autobless => 1,
     );
 
@@ -41,7 +43,7 @@ unlink 't/test.db';
 
 {
     my $db = DBM::Deep->new(
-        file     => 't/test.db',
+        file     => $filename,
         autobless => 1,
     );
 
@@ -74,7 +76,7 @@ unlink 't/test.db';
 
 {
     my $db = DBM::Deep->new(
-        file     => 't/test.db',
+        file     => $filename,
         autobless => 1,
     );
     is( $db->{blessed}{c}, 'new' );
@@ -107,7 +109,7 @@ unlink 't/test.db';
 
 {
     my $db = DBM::Deep->new(
-        file     => 't/test.db',
+        file     => $filename,
     );
 
     my $obj = $db->{blessed};
@@ -134,10 +136,10 @@ unlink 't/test.db';
     is( $db->{unblessed}{b}[2], 3 );
 }
 
+my ($fh2, $filename2) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
 {
-    unlink 't/test2.db';
     my $db = DBM::Deep->new(
-        file     => "t/test2.db",
+        file     => $filename2,
         autobless => 1,
     );
     my $obj = bless {
@@ -146,11 +148,11 @@ unlink 't/test.db';
     }, 'Foo';
 
     $db->import( { blessed => $obj } );
+}
 
-    undef $db;
-
-    $db = DBM::Deep->new(
-        file     => "t/test2.db",
+{
+    my $db = DBM::Deep->new(
+        file     => $filename2,
         autobless => 1,
     );
 
@@ -165,9 +167,9 @@ unlink 't/test.db';
 	# longer named class (FooFoo) and replacing key in db file, then validating
 	# content after that point in file to check for corruption.
 	##
-    unlink 't/test3.db';
+    my ($fh3, $filename3) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
     my $db = DBM::Deep->new(
-        file     => "t/test3.db",
+        file     => $filename3,
         autobless => 1,
     );
 
@@ -182,4 +184,3 @@ unlink 't/test.db';
 
     is( $db->{after}, "hello" );
 }
-

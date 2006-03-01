@@ -3,15 +3,18 @@
 ##
 use strict;
 use Test::More tests => 2;
+use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
+
+my $dir = tempdir( CLEANUP => 1 );
 
 my ($before, $after);
 
 {
-    unlink "t/test.db";
+    my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
     my $db = DBM::Deep->new(
-        file => "t/test.db",
+        file => $filename,
         autoflush => 1
     );
     $db->{key1} = "value1";
@@ -20,9 +23,9 @@ my ($before, $after);
 }
 
 {
-    unlink "t/test.db";
+    my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
     my $db = DBM::Deep->new(
-        file => "t/test.db",
+        file => $filename,
         autoflush => 1
     );
 

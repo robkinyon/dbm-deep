@@ -3,46 +3,53 @@
 ##
 use strict;
 use Test::More tests => 14;
+use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
 
-unlink "t/test.db";
-my $db = DBM::Deep->new(
-	file => "t/test.db",
-);
+my $dir = tempdir( CLEANUP => 1 );
+my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
 
-$db->{key1} = "value1";
+{
+    my $clone;
 
-##
-# clone db handle, make sure both are usable
-##
-my $clone = $db->clone();
+    {
+        my $db = DBM::Deep->new(
+            file => $filename,
+        );
 
-is($clone->{key1}, "value1");
+        $db->{key1} = "value1";
 
-$clone->{key2} = "value2";
-$db->{key3} = "value3";
+        ##
+        # clone db handle, make sure both are usable
+        ##
+        $clone = $db->clone();
 
-is($db->{key1}, "value1");
-is($db->{key2}, "value2");
-is($db->{key3}, "value3");
+        is($clone->{key1}, "value1");
 
-is($clone->{key1}, "value1");
-is($clone->{key2}, "value2");
-is($clone->{key3}, "value3");
+        $clone->{key2} = "value2";
+        $db->{key3} = "value3";
 
-undef $db;
+        is($db->{key1}, "value1");
+        is($db->{key2}, "value2");
+        is($db->{key3}, "value3");
 
-is($clone->{key1}, "value1");
-is($clone->{key2}, "value2");
-is($clone->{key3}, "value3");
+        is($clone->{key1}, "value1");
+        is($clone->{key2}, "value2");
+        is($clone->{key3}, "value3");
+    }
 
-undef $clone;
+    is($clone->{key1}, "value1");
+    is($clone->{key2}, "value2");
+    is($clone->{key3}, "value3");
+}
 
-$db = DBM::Deep->new(
-	file => "t/test.db",
-);
+{
+    my $db = DBM::Deep->new(
+        file => $filename,
+    );
 
-is($db->{key1}, "value1");
-is($db->{key2}, "value2");
-is($db->{key3}, "value3");
+    is($db->{key1}, "value1");
+    is($db->{key2}, "value2");
+    is($db->{key3}, "value3");
+}

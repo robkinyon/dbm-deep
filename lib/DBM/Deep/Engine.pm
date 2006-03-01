@@ -23,11 +23,11 @@ our ($LONG_SIZE, $LONG_PACK, $DATA_LENGTH_SIZE, $DATA_LENGTH_PACK);
 # DO NOT decrease this value below 16, due to risk of recursive reindex overrun.
 ##
 our $MAX_BUCKETS = 16;
-our ($DIGEST_FUNC, $HASH_SIZE);
+our ($HASH_SIZE);
 our ($INDEX_SIZE, $BUCKET_SIZE, $BUCKET_LIST_SIZE);
 set_digest();
 
-sub _precalc_sizes {
+sub precalc_sizes {
 	##
 	# Precalculate index, bucket and bucket list sizes
 	##
@@ -52,19 +52,43 @@ sub set_pack {
     $DATA_LENGTH_SIZE = $data_s ? $data_s : 4;
     $DATA_LENGTH_PACK = $data_p ? $data_p : 'N';
 
-	_precalc_sizes();
+	precalc_sizes();
 }
 
 sub set_digest {
+    my $self = shift;
 	##
 	# Set key digest function (default is MD5)
 	##
     my ($digest_func, $hash_size) = @_;
 
-    $DIGEST_FUNC = $digest_func ? $digest_func : \&Digest::MD5::md5;
+    $self->{digest} = $digest_func ? $digest_func : \&Digest::MD5::md5; 
+
     $HASH_SIZE = $hash_size ? $hash_size : 16;
 
-	_precalc_sizes();
+	precalc_sizes();
+}
+
+sub new {
+    my $class = shift;
+    my ($args) = @_;
+
+    my $self = bless {
+        long_size   => 4,
+        long_pack   => 'N',
+        data_size   => 4,
+        data_pack   => 'N',
+        digest      => \&Digest::MD5::md5,
+        hash_size   => 16,
+        max_buckets => 16,
+    }, $class;
+
+    #XXX Where does 256 come from?
+    $self->{index_size}       = 256 * $self->{long_size};
+    $self->{bucket_size}      = $self->{hash_size} + $self->{long_size};
+    $self->{bucket_list_size} = $self->{max_buckets} * $self->{bucket_size};
+
+    return $self;
 }
 
 sub setup_fh {

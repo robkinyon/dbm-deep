@@ -2,8 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test;
-BEGIN { plan tests => 13 }
+use Test::More tests => 13;
 
 use DBM::Deep;
 
@@ -20,7 +19,7 @@ my $db = new DBM::Deep(
 ##
 # Set digest handler
 ##
-DBM::Deep::Engine::set_digest( \&my_digest, 8 );
+$db->_get_self->{engine}->set_digest( \&my_digest, 8 );
 
 ##
 # put/get key

@@ -122,7 +122,7 @@ sub _init {
     my $self = bless {
         type        => TYPE_HASH,
         base_offset => length(SIG_FILE),
-        engine      => 'DBM::Deep::Engine',
+        engine      => DBM::Deep::Engine->new,
     }, $class;
 
     foreach my $param ( keys %$self ) {
@@ -492,7 +492,7 @@ sub STORE {
         ? $self->_root->{filter_store_value}->($_[2])
         : $_[2];
 	
-	my $md5 = $DBM::Deep::Engine::DIGEST_FUNC->($key);
+	my $md5 = $self->{engine}{digest}->($key);
 	
     unless ( _is_writable( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
@@ -557,7 +557,7 @@ sub FETCH {
     my $self = shift->_get_self;
     my $key = shift;
 
-	my $md5 = $DBM::Deep::Engine::DIGEST_FUNC->($key);
+	my $md5 = $self->{engine}{digest}->($key);
 
 	##
 	# Request shared lock for reading
@@ -592,7 +592,7 @@ sub DELETE {
     my $self = $_[0]->_get_self;
 	my $key = $_[1];
 	
-	my $md5 = $DBM::Deep::Engine::DIGEST_FUNC->($key);
+	my $md5 = $self->{engine}{digest}->($key);
 
 	##
 	# Request exclusive lock for writing
@@ -632,7 +632,7 @@ sub EXISTS {
     my $self = $_[0]->_get_self;
 	my $key = $_[1];
 	
-	my $md5 = $DBM::Deep::Engine::DIGEST_FUNC->($key);
+	my $md5 = $self->{engine}{digest}->($key);
 
 	##
 	# Request shared lock for reading

@@ -4,25 +4,6 @@ use strict;
 
 use Fcntl qw( :DEFAULT :flock :seek );
 
-##
-# Set to 4 and 'N' for 32-bit offset tags (default).  Theoretical limit of 4 GB per file.
-#	(Perl must be compiled with largefile support for files > 2 GB)
-#
-# Set to 8 and 'Q' for 64-bit offsets.  Theoretical limit of 16 XB per file.
-#	(Perl must be compiled with largefile and 64-bit long support)
-##
-##
-# Set to 4 and 'N' for 32-bit data length prefixes.  Limit of 4 GB for each key/value.
-# Upgrading this is possible (see above) but probably not necessary.  If you need
-# more than 4 GB for a single key or value, this module is really not for you :-)
-##
-
-##
-# Maximum number of buckets per list before another level of indexing is done.
-# Increase this value for slightly greater speed, but larger database files.
-# DO NOT decrease this value below 16, due to risk of recursive reindex overrun.
-##
-
 sub precalc_sizes {
 	##
 	# Precalculate index, bucket and bucket list sizes
@@ -43,9 +24,21 @@ sub set_pack {
     my $self = shift;
     my ($long_s, $long_p, $data_s, $data_p) = @_;
 
+    ##
+    # Set to 4 and 'N' for 32-bit offset tags (default).  Theoretical limit of 4 GB per file.
+    #	(Perl must be compiled with largefile support for files > 2 GB)
+    #
+    # Set to 8 and 'Q' for 64-bit offsets.  Theoretical limit of 16 XB per file.
+    #	(Perl must be compiled with largefile and 64-bit long support)
+    ##
     $self->{long_size} = $long_s ? $long_s : 4;
     $self->{long_pack} = $long_p ? $long_p : 'N';
 
+    ##
+    # Set to 4 and 'N' for 32-bit data length prefixes.  Limit of 4 GB for each key/value.
+    # Upgrading this is possible (see above) but probably not necessary.  If you need
+    # more than 4 GB for a single key or value, this module is really not for you :-)
+    ##
     $self->{data_size} = $data_s ? $data_s : 4;
     $self->{data_pack} = $data_p ? $data_p : 'N';
 
@@ -78,6 +71,11 @@ sub new {
         digest      => \&Digest::MD5::md5,
         hash_size   => 16,
 
+        ##
+        # Maximum number of buckets per list before another level of indexing is done.
+        # Increase this value for slightly greater speed, but larger database files.
+        # DO NOT decrease this value below 16, due to risk of recursive reindex overrun.
+        ##
         max_buckets => 16,
     }, $class;
 

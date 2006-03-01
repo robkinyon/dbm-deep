@@ -67,13 +67,29 @@ sub set_digest {
 	_precalc_sizes();
 }
 
+sub setup_fh {
+    my $self = shift;
+    my ($obj) = @_;
+
+    $self->open( $obj ) if !defined $obj->_fh;
+
+    #XXX Is {end} busted? Can't we just seek( $fh, 0, SEEK_END ) ?
+    unless ( $obj->_root->{inode} ) {
+        my @stats = stat($obj->_fh);
+        $obj->_root->{inode} = $stats[1];
+        $obj->_root->{end} = $stats[7];
+    }
+
+    return 1;
+}
+
 sub open {
     ##
     # Open a fh to the database, create if nonexistent.
     # Make sure file signature matches DBM::Deep spec.
     ##
     my $self = shift;
-    my $obj = shift;
+    my ($obj) = @_;
 
     if (defined($obj->_fh)) { $self->close( $obj ); }
 
@@ -125,10 +141,6 @@ sub open {
         my $old_af = $|; $| = 1; $| = $old_af;
         select $old_fh;
 
-        my @stats = stat($fh);
-        $obj->_root->{inode} = $stats[1];
-        $obj->_root->{end} = $stats[7];
-
         return 1;
     }
 
@@ -139,10 +151,6 @@ sub open {
         $self->close( $obj );
         return $obj->_throw_error("Signature not found -- file is not a Deep DB");
     }
-
-    my @stats = stat($fh);
-    $obj->_root->{inode} = $stats[1];
-    $obj->_root->{end} = $stats[7];
 
     ##
     # Get our type from master index signature

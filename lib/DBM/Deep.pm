@@ -137,7 +137,7 @@ sub _init {
         ? $args->{root}
         : DBM::Deep::_::Root->new( $args );
 
-    if (!defined($self->_fh)) { $self->{engine}->open( $self ); }
+    $self->{engine}->setup_fh( $self );
 
     return $self;
 }
@@ -181,8 +181,11 @@ sub lock {
 			# double-check file inode, in case another process
 			# has optimize()d our file while we were waiting.
 			if ($stats[1] != $self->_root->{inode}) {
-				$self->{engine}->open( $self ); # re-open
+                $self->{engine}->close( $self );
+                $self->{engine}->setup_fh( $self );
 				flock($self->_fh, $type); # re-lock
+
+                # This may not be necessary after re-opening
 				$self->_root->{end} = (stat($self->_fh))[7]; # re-end
 			}
 		}
@@ -374,8 +377,8 @@ sub optimize {
 	
 	$self->unlock();
 	$self->{engine}->close( $self );
-	$self->{engine}->open( $self );
-	
+    $self->{engine}->setup_fh( $self );
+
 	return 1;
 }
 

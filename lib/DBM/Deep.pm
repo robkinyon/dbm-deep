@@ -436,7 +436,6 @@ sub _fh {
     ##
     # Get access to the raw fh
     ##
-    #XXX It will be useful, though, when we split out HASH and ARRAY
     my $self = $_[0]->_get_self;
     return $self->_root->{fh};
 }

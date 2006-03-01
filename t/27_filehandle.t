@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 7;
+use Test::More tests => 9;
 use Test::Exception;
 
 use DBM::Deep;
@@ -15,6 +15,10 @@ my $db;
 
 ok(($db = DBM::Deep->new(fh => *FILE)), "open db in filehandle");
 ok($db->{hash}->{foo}->[1] eq 'b', "and get at stuff in the database");
+throws_ok {
+    $db->{foo} = 1;
+} qr/Cannot write to a readonly filehandle/, "Can't write to a read-only filehandle";
+ok( !$db->exists( 'foo' ), "foo doesn't exist" );
 
 undef $db;
 close(FILE);
@@ -28,12 +32,12 @@ while(my $line = <FILE>) {
 my $offset = tell(FILE);
 close(FILE);
 
-open(FILE, '<', "t/28_DATA.t");
+open(FILE, "t/28_DATA.t");
 ok(($db = DBM::Deep->new(fh => *FILE, file_offset => $offset)), "open db in filehandle with offset");
 ok($db->{hash}->{foo}->[1] eq 'b', "and get at stuff in the database");
 
-ok( !$db->{foo}, "foo doesn't exist yet" );
+ok( !$db->exists( 'foo' ), "foo doesn't exist yet" );
 throws_ok {
     $db->{foo} = 1;
 } qr/Cannot write to a readonly filehandle/, "Can't write to a read-only filehandle";
-ok( !$db->{foo}, "foo doesn't exist yet" );
+ok( !$db->exists( 'foo' ), "foo doesn't exist" );

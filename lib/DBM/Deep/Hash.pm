@@ -106,8 +106,8 @@ sub NEXTKEY {
 ##
 # Public method aliases
 ##
-*first_key = *FIRSTKEY;
-*next_key = *NEXTKEY;
+sub first_key { (CORE::shift)->FIRSTKEY(@_) }
+sub next_key { (CORE::shift)->NEXTKEY(@_) }
 
 1;
 __END__

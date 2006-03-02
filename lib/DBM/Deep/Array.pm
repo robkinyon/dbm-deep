@@ -376,12 +376,12 @@ sub SPLICE {
 ##
 # Public method aliases
 ##
-*length = *FETCHSIZE;
-*pop = *POP;
-*push = *PUSH;
-*shift = *SHIFT;
-*unshift = *UNSHIFT;
-*splice = *SPLICE;
+sub length { (CORE::shift)->FETCHSIZE(@_) }
+sub pop { (CORE::shift)->POP(@_) }
+sub push { (CORE::shift)->PUSH(@_) }
+sub shift { (CORE::shift)->SHIFT(@_) }
+sub unshift { (CORE::shift)->UNSHIFT(@_) }
+sub splice { (CORE::shift)->SPLICE(@_) }
 
 1;
 __END__

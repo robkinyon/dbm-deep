@@ -273,7 +273,7 @@ sub add_bucket {
     ##
     BUCKET:
     for (my $i = 0; $i < $self->{max_buckets}; $i++) {
-        my $subloc = $self->_get_subloc( $keys, $i );
+        my ($key, $subloc) = $self->_get_key_subloc( $keys, $i );
 
         if (!$subloc) {
             ##
@@ -296,7 +296,6 @@ print "NEW: $location\n";
             last;
         }
 
-        my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
         if ( $md5 ne $key ) {
             next BUCKET;
         }
@@ -494,15 +493,9 @@ sub split_index {
 
     BUCKET:
     for (my $i = 0; $i <= $self->{max_buckets}; $i++) {
-        my $key = substr(
-            $keys,
-            ($i * $self->{bucket_size}),
-            $self->{hash_size},
-        );
+        my ($key, $old_subloc) = $self->_get_key_subloc( $keys, $i );
 
         next BUCKET unless $key;
-
-        my $old_subloc = $self->_get_subloc( $keys, $i );
 
         my $num = ord(substr($key, $tag->{ch} + 1, 1));
 
@@ -513,7 +506,7 @@ sub split_index {
             read( $fh, $subkeys, $self->{bucket_list_size});
 
             for (my $k=0; $k<$self->{max_buckets}; $k++) {
-                my $subloc = $self->_get_subloc( $subkeys, $k );
+                my ($temp, $subloc) = $self->_get_key_subloc( $subkeys, $k );
 
                 if (!$subloc) {
                     seek($fh, $offset + ($k * $self->{bucket_size}) + $root->{file_offset}, SEEK_SET);
@@ -552,7 +545,7 @@ sub get_bucket_value {
     ##
     BUCKET:
     for (my $i = 0; $i < $self->{max_buckets}; $i++) {
-        my $subloc = $self->_get_subloc( $keys, $i );
+        my ($key, $subloc) = $self->_get_key_subloc( $keys, $i );
 
         if (!$subloc) {
             ##
@@ -561,7 +554,6 @@ sub get_bucket_value {
             return;
         }
 
-        my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
         if ( $md5 ne $key ) {
             next BUCKET;
         }
@@ -647,9 +639,7 @@ sub delete_bucket {
     ##
     BUCKET:
     for (my $i=0; $i<$self->{max_buckets}; $i++) {
-        my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
-#        my $subloc = unpack($self->{long_pack}, substr($keys, ($i * $self->{bucket_size}) + $self->{hash_size}, $self->{long_size}));
-        my $subloc = $self->_get_subloc( $keys, $i );
+        my ($key, $subloc) = $self->_get_key_subloc( $keys, $i );
 
         if (!$subloc) {
             ##
@@ -688,9 +678,7 @@ sub bucket_exists {
     ##
     BUCKET:
     for (my $i=0; $i<$self->{max_buckets}; $i++) {
-        my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
-        #my $subloc = unpack($self->{long_pack}, substr($keys, ($i * $self->{bucket_size}) + $self->{hash_size}, $self->{long_size}));
-        my $subloc = $self->_get_subloc( $keys, $i );
+        my ($key, $subloc) = $self->_get_key_subloc( $keys, $i );
 
         if (!$subloc) {
             ##
@@ -827,16 +815,7 @@ sub traverse_index {
         # Iterate through buckets, looking for a key match
         ##
         for (my $i=0; $i<$self->{max_buckets}; $i++) {
-            my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
-#            my $subloc = unpack(
-#                $self->{long_pack},
-#                substr(
-#                    $keys,
-#                    ($i * $self->{bucket_size}) + $self->{hash_size},
-#                    $self->{long_size},
-#                ),
-#            );
-            my $subloc = $self->_get_subloc( $keys, $i );
+            my ($key, $subloc) = $self->_get_key_subloc( $keys, $i );
 
             if (!$subloc) {
                 ##
@@ -908,20 +887,20 @@ sub get_next_key {
 
 # Utilities
 
-sub _get_subloc {
+sub _get_key_subloc {
     my $self = shift;
     my ($keys, $idx) = @_;
 
-    my $subloc = unpack(
-        $self->{long_pack},
+    my ($key, $subloc) = unpack(
+        "a$self->{hash_size} $self->{long_pack}",
         substr(
             $keys,
-            ($idx * $self->{bucket_size}) + $self->{hash_size},
-            $self->{long_size},
+            ($idx * $self->{bucket_size}),
+            $self->{bucket_size},
         ),
     );
 
-    return $subloc;
+    return ($key, $subloc);
 }
 
 1;

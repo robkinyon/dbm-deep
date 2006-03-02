@@ -317,7 +317,7 @@ sub import {
         $self->push( @$struct );
     }
     else {
-        return $self->_throw_error("Cannot import: type mismatch");
+        $self->_throw_error("Cannot import: type mismatch");
     }
 
     return 1;
@@ -332,7 +332,7 @@ sub optimize {
 
 #XXX Need to create a new test for this
 #    if ($self->_root->{links} > 1) {
-#        return $self->_throw_error("Cannot optimize: reference count is greater than 1");
+#        $self->_throw_error("Cannot optimize: reference count is greater than 1");
 #    }
 
     my $db_temp = DBM::Deep->new(
@@ -340,7 +340,7 @@ sub optimize {
         type => $self->_type
     );
     if (!$db_temp) {
-        return $self->_throw_error("Cannot optimize: failed to open temp file: $!");
+        $self->_throw_error("Cannot optimize: failed to open temp file: $!");
     }
 
     $self->lock();
@@ -372,7 +372,7 @@ sub optimize {
     if (!rename $self->_root->{file} . '.tmp', $self->_root->{file}) {
         unlink $self->_root->{file} . '.tmp';
         $self->unlock();
-        return $self->_throw_error("Optimize failed: Cannot copy temp file over original: $!");
+        $self->_throw_error("Optimize failed: Cannot copy temp file over original: $!");
     }
 
     $self->unlock();
@@ -673,7 +673,10 @@ sub new {
     my $self = bless {
         autobless          => undef,
         autoflush          => undef,
-        end                => 0,
+        #XXX It should be this in order to work with the initial create_tag(),
+        #XXX but it's not ... it works out because of the stat() in setup_fh(),
+        #XXX but that's not good.
+        end                => 0, #length(DBM::Deep->SIG_FILE),
         fh                 => undef,
         file               => undef,
         file_offset        => 0,

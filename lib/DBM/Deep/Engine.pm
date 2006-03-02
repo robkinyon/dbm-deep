@@ -1,4 +1,5 @@
 package DBM::Deep::Engine;
+use XXX;
 
 use strict;
 
@@ -143,6 +144,9 @@ sub open {
 
         $self->create_tag($obj, $obj->_base_offset, $obj->_type, chr(0) x $self->{index_size});
 
+        # Why is this being printed here? I'm not seeing where anything actually points to
+        # this spot.
+        #XXX $obj->_root->{end} isn't updated from these 10 bytes that are being written
         my $plain_key = "[base]";
         print( $fh pack($self->{data_pack}, length($plain_key)) . $plain_key );
 
@@ -159,19 +163,17 @@ sub open {
     ##
     unless ($signature eq DBM::Deep->SIG_FILE) {
         $self->close_fh( $obj );
-        return $obj->_throw_error("Signature not found -- file is not a Deep DB");
+        $obj->_throw_error("Signature not found -- file is not a Deep DB");
     }
 
     ##
     # Get our type from master index signature
     ##
-    my $tag = $self->load_tag($obj, $obj->_base_offset);
-    if (!$tag) {
-        return $obj->_throw_error("Corrupted file, no master index record");
-    }
+    my $tag = $self->load_tag($obj, $obj->_base_offset)
+        or $obj->_throw_error("Corrupted file, no master index record");
 
-    if ($obj->{type} ne $tag->{signature}) {
-        return $obj->_throw_error("File type mismatch");
+    unless ($obj->{type} eq $tag->{signature}) {
+        $obj->_throw_error("File type mismatch");
     }
 
 #XXX We probably also want to store the hash algorithm name and not assume anything
@@ -227,7 +229,9 @@ sub load_tag {
     my $fh = $obj->_fh;
 
     seek($fh, $offset + $obj->_root->{file_offset}, SEEK_SET);
-    if (eof $fh) { return undef; }
+
+    #XXX I'm not sure this check will work given autoflush ...
+    return if eof $fh;
 
     my $b;
     read( $fh, $b, DBM::Deep->SIG_SIZE + $self->{data_size} );
@@ -276,6 +280,7 @@ sub add_bucket {
             $location = $internal_ref
                 ? $value->_base_offset
                 : $root->{end};
+print "NEW: $location\n";
 
             seek($fh, $tag->{offset} + ($i * $self->{bucket_size}) + $root->{file_offset}, SEEK_SET);
             print( $fh $md5 . pack($self->{long_pack}, $location) );
@@ -489,7 +494,7 @@ sub add_bucket {
         return $result;
     }
 
-    return $obj->_throw_error("Fatal error: indexing failed -- possibly due to corruption in file");
+    $obj->_throw_error("Fatal error: indexing failed -- possibly due to corruption in file");
 }
 
 sub get_bucket_value {
@@ -674,12 +679,11 @@ sub find_bucket_list {
     ##
     # Locate offset for bucket list using digest index system
     ##
-    my $ch = 0;
-    my $tag = $self->load_tag($obj, $obj->_base_offset);
-    if (!$tag) {
-        return $self->_throw_error( "INTERNAL ERROR - Cannot find tag" );
-    }
+    my $tag = $self->load_tag($obj, $obj->_base_offset)
+        or $self->_throw_error( "INTERNAL ERROR - Cannot find tag" );
+#print $obj->_base_offset, " : $tag->{signature} : $tag->{offset} : $tag->{size}\n";
 
+    my $ch = 0;
     while ($tag->{signature} ne DBM::Deep->SIG_BLIST) {
         my $num = ord substr($md5, $ch, 1);
 
@@ -744,7 +748,6 @@ sub traverse_index {
     ##
     my $self = shift;
     my ($obj, $offset, $ch, $force_return_next) = @_;
-    $force_return_next = undef unless $force_return_next;
 
     my $tag = $self->load_tag($obj, $offset );
 
@@ -752,14 +755,19 @@ sub traverse_index {
 
     if ($tag->{signature} ne DBM::Deep->SIG_BLIST) {
         my $content = $tag->{content};
-        my $start;
-        if ($obj->{return_next}) { $start = 0; }
-        else { $start = ord(substr($obj->{prev_md5}, $ch, 1)); }
+        my $start = $obj->{return_next} ? 0 : ord(substr($obj->{prev_md5}, $ch, 1));
 
         for (my $index = $start; $index < 256; $index++) {
-            my $subloc = unpack($self->{long_pack}, substr($content, $index * $self->{long_size}, $self->{long_size}) );
+            my $subloc = unpack(
+                $self->{long_pack},
+                substr($content, $index * $self->{long_size}, $self->{long_size}),
+            );
+
             if ($subloc) {
-                my $result = $self->traverse_index( $obj, $subloc, $ch + 1, $force_return_next );
+                my $result = $self->traverse_index(
+                    $obj, $subloc, $ch + 1, $force_return_next,
+                );
+
                 if (defined($result)) { return $result; }
             }
         } # index loop
@@ -767,7 +775,7 @@ sub traverse_index {
         $obj->{return_next} = 1;
     } # tag is an index
 
-    elsif ($tag->{signature} eq DBM::Deep->SIG_BLIST) {
+    else {
         my $keys = $tag->{content};
         if ($force_return_next) { $obj->{return_next} = 1; }
 
@@ -776,7 +784,14 @@ sub traverse_index {
         ##
         for (my $i=0; $i<$self->{max_buckets}; $i++) {
             my $key = substr($keys, $i * $self->{bucket_size}, $self->{hash_size});
-            my $subloc = unpack($self->{long_pack}, substr($keys, ($i * $self->{bucket_size}) + $self->{hash_size}, $self->{long_size}));
+            my $subloc = unpack(
+                $self->{long_pack},
+                substr(
+                    $keys,
+                    ($i * $self->{bucket_size}) + $self->{hash_size},
+                    $self->{long_size},
+                ),
+            );
 
             if (!$subloc) {
                 ##
@@ -802,14 +817,16 @@ sub traverse_index {
                 # Skip over value to get to plain key
                 ##
                 my $size;
-                read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
+                read( $fh, $size, $self->{data_size});
+                $size = unpack($self->{data_pack}, $size);
                 if ($size) { seek($fh, $size, SEEK_CUR); }
 
                 ##
                 # Read in plain key and return as scalar
                 ##
                 my $plain_key;
-                read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
+                read( $fh, $size, $self->{data_size});
+                $size = unpack($self->{data_pack}, $size);
                 if ($size) { read( $fh, $plain_key, $size); }
 
                 return $plain_key;

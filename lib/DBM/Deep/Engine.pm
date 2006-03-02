@@ -90,7 +90,7 @@ sub setup_fh {
 
     $self->open( $obj ) if !defined $obj->_fh;
 
-    #XXX Is {end} busted? Can't we just seek( $fh, 0, SEEK_END ) ?
+    #XXX We have to make sure we don't mess up when autoflush isn't turned on
     unless ( $obj->_root->{inode} ) {
         my @stats = stat($obj->_fh);
         $obj->_root->{inode} = $stats[1];
@@ -110,22 +110,14 @@ sub open {
 
     if (defined($obj->_fh)) { $self->close_fh( $obj ); }
 
-    eval {
-        local $SIG{'__DIE__'};
-        # Theoretically, adding O_BINARY should remove the need for the binmode
-        # Of course, testing it is going to be ... interesting.
-        my $flags = O_RDWR | O_CREAT | O_BINARY;
+    # Theoretically, adding O_BINARY should remove the need for the binmode
+    # Of course, testing it is going to be ... interesting.
+    my $flags = O_RDWR | O_CREAT | O_BINARY;
 
-        my $fh;
-        sysopen( $fh, $obj->_root->{file}, $flags )
-            or $fh = undef;
-        $obj->_root->{fh} = $fh;
-    }; if ($@ ) { $obj->_throw_error( "Received error: $@\n" ); }
-    if (! defined($obj->_fh)) {
-        return $obj->_throw_error("Cannot sysopen file: " . $obj->_root->{file} . ": $!");
-    }
-
-    my $fh = $obj->_fh;
+    my $fh;
+    sysopen( $fh, $obj->_root->{file}, $flags )
+        or $obj->_throw_error("Cannot sysopen file: " . $obj->_root->{file} . ": $!");
+    $obj->_root->{fh} = $fh;
 
     #XXX Can we remove this by using the right sysopen() flags?
     # Maybe ... q.v. above

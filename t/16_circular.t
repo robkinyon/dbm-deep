@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 13;
+use Test::More tests => 19;
 use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
@@ -17,10 +17,44 @@ my $db = DBM::Deep->new( $filename );
 $db->{key1} = "value1";
 $db->{key2} = "value2";
 
+my @keys_1 = sort keys %$db;
+
+$db->{key3} = $db->{key1};
+
+my @keys_2 = sort keys %$db;
+is( @keys_2 + 0, @keys_1 + 1, "Correct number of keys" );
+is_deeply(
+    [ @keys_1, 'key3' ],
+    [ @keys_2 ],
+    "Keys still match after circular reference is added",
+);
+
+$db->{key4} = {};
+$db->{key4}{key1} = 'value1';
+$db->{key4}{key2} = $db->{key4};
+
+my @keys_3 = sort keys %$db;
+is( @keys_3 + 0, @keys_2 + 1, "Correct number of keys" );
+is_deeply(
+    [ @keys_2, 'key4' ],
+    [ @keys_3 ],
+    "Keys still match after circular reference is added",
+);
+
 ##
 # Insert circular reference
 ##
 $db->{circle} = $db;
+
+my @keys_4 = sort keys %$db;
+print "@keys_4\n";
+
+is( @keys_4 + 0, @keys_3 + 1, "Correct number of keys" );
+is_deeply(
+    [ '[base]', @keys_3 ],
+    [ @keys_4 ],
+    "Keys still match after circular reference is added",
+);
 
 ##
 # Make sure keys exist in both places

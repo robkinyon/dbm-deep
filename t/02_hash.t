@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 29;
+use Test::More tests => 30;
 use Test::Exception;
 use File::Temp qw( tempfile tempdir );
 
@@ -64,8 +64,9 @@ is( $temphash->{key3}, 'value3', "Third key copied successfully" );
 ##
 # delete keys
 ##
-is( delete $db->{key1}, 'value1', "delete through tied inteface works" );
-is( $db->delete("key2"), undef, "delete through OO inteface works" );
+is( delete $db->{key2}, undef, "delete through tied inteface works" );
+is( $db->delete("key1"), 'value1', "delete through OO inteface works" );
+is( $db->{key3}, 'value3', "The other key is still there" );
 
 is( scalar keys %$db, 1, "After deleting two keys, 1 remains" );
 

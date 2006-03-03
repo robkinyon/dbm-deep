@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 19;
+use Test::More tests => 31;
 use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
@@ -29,35 +29,32 @@ is_deeply(
     "Keys still match after circular reference is added",
 );
 
-$db->{key4} = {};
+$db->{key4} = { 'foo' => 'bar' };
 $db->{key5} = $db->{key4};
+$db->{key6} = $db->{key5};
 
 my @keys_3 = sort keys %$db;
 
-TODO: {
-    local $TODO = "Need to fix how internal references are stored";
-    is( @keys_3 + 0, @keys_2 + 2, "Correct number of keys" );
-    is_deeply(
-        [ @keys_2, 'key4', 'key5' ],
-        [ @keys_3 ],
-        "Keys still match after circular reference is added (@keys_3)",
-    );
+is( @keys_3 + 0, @keys_2 + 3, "Correct number of keys" );
+is_deeply(
+    [ @keys_2, 'key4', 'key5', 'key6', ],
+    [ @keys_3 ],
+    "Keys still match after circular reference is added (@keys_3)",
+);
 
-    ##
-    # Insert circular reference
-    ##
-    $db->{circle} = $db;
+##
+# Insert circular reference
+##
+$db->{circle} = $db;
 
-    my @keys_4 = sort keys %$db;
-    print "@keys_4\n";
+my @keys_4 = sort keys %$db;
 
-    is( @keys_4 + 0, @keys_3 + 1, "Correct number of keys" );
-    is_deeply(
-        [ '[base]', @keys_3 ],
-        [ @keys_4 ],
-        "Keys still match after circular reference is added",
-    );
-}
+is( @keys_4 + 0, @keys_3 + 1, "Correct number of keys" );
+is_deeply(
+    [ 'circle', @keys_3 ],
+    [ @keys_4 ],
+    "Keys still match after circular reference is added",
+);
 
 ##
 # Make sure keys exist in both places
@@ -83,3 +80,23 @@ is( $db->{key1}, 'circles', "The value is there directly" );
 is( $db->{circle}{key1}, 'circles', "The value is there in one loop of the circle" );
 is( $db->{circle}{circle}{key1}, 'circles', "The value is there in two loops of the circle" );
 is( $db->{circle}{circle}{circle}{key1}, 'circles', "The value is there in three loops of the circle" );
+
+is( $db->{key4}{foo}, 'bar' );
+is( $db->{key5}{foo}, 'bar' );
+is( $db->{key6}{foo}, 'bar' );
+
+$db->{key4}{foo2} = 'bar2';
+is( $db->{key4}{foo2}, 'bar2' );
+is( $db->{key5}{foo2}, 'bar2' );
+is( $db->{key6}{foo2}, 'bar2' );
+
+$db->{key4}{foo3} = 'bar3';
+is( $db->{key4}{foo3}, 'bar3' );
+is( $db->{key5}{foo3}, 'bar3' );
+is( $db->{key6}{foo3}, 'bar3' );
+
+$db->{key4}{foo4} = 'bar4';
+is( $db->{key4}{foo4}, 'bar4' );
+is( $db->{key5}{foo4}, 'bar4' );
+is( $db->{key6}{foo4}, 'bar4' );
+

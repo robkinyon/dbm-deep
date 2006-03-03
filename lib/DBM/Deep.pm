@@ -40,26 +40,12 @@ use DBM::Deep::Engine;
 use vars qw( $VERSION );
 $VERSION = q(0.99_01);
 
-
-##
-# Setup file and tag signatures.  These should never change.
-##
-sub SIG_FILE   () { 'DPDB' }
-sub SIG_HASH   () { 'H' }
-sub SIG_ARRAY  () { 'A' }
-sub SIG_SCALAR () { 'S' }
-sub SIG_NULL   () { 'N' }
-sub SIG_DATA   () { 'D' }
-sub SIG_INDEX  () { 'I' }
-sub SIG_BLIST  () { 'B' }
-sub SIG_SIZE   () {  1  }
-
 ##
 # Setup constants for users to pass to new()
 ##
-sub TYPE_HASH   () { SIG_HASH   }
-sub TYPE_ARRAY  () { SIG_ARRAY  }
-sub TYPE_SCALAR () { SIG_SCALAR }
+sub TYPE_HASH   () { DBM::Deep::Engine::SIG_HASH   }
+sub TYPE_ARRAY  () { DBM::Deep::Engine::SIG_ARRAY  }
+sub TYPE_SCALAR () { DBM::Deep::Engine::SIG_SCALAR }
 
 sub _get_args {
     my $proto = shift;
@@ -121,9 +107,10 @@ sub _init {
     # These are the defaults to be optionally overridden below
     my $self = bless {
         type        => TYPE_HASH,
-        base_offset => length(SIG_FILE),
         engine      => DBM::Deep::Engine->new,
     }, $class;
+
+    $self->{base_offset} = length( $self->{engine}->SIG_FILE );
 
     foreach my $param ( keys %$self ) {
         next unless exists $args->{$param};
@@ -739,6 +726,11 @@ handle millions of keys and unlimited hash levels without significant
 slow-down.  Written from the ground-up in pure perl -- this is NOT a
 wrapper around a C-based DBM.  Out-of-the-box compatibility with Unix,
 Mac OS X and Windows.
+
+=head1 VERSION DIFFERENCES
+
+B<NOTE>: 0.99_01 and above have significant file format differences from 0.98 and
+before. While attempts have been made to be backwards compatible, no guarantees.
 
 =head1 INSTALLATION
 

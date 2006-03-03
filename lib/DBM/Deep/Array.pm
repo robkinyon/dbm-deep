@@ -13,8 +13,7 @@ use base 'DBM::Deep';
 use Scalar::Util ();
 
 sub _get_self {
-    #eval { local $SIG{'__DIE__'}; tied( @{$_[0]} ) } || $_[0]
-    eval { tied( @{$_[0]} ) } || $_[0]
+    eval { local $SIG{'__DIE__'}; tied( @{$_[0]} ) } || $_[0]
 }
 
 sub TIEARRAY {

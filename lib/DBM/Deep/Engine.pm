@@ -4,6 +4,20 @@ use strict;
 
 use Fcntl qw( :DEFAULT :flock :seek );
 
+##
+# Setup file and tag signatures.  These should never change.
+##
+sub SIG_FILE     () { 'DPDB' }
+sub SIG_INTERNAL () { 'i'    }
+sub SIG_HASH     () { 'H'    }
+sub SIG_ARRAY    () { 'A'    }
+sub SIG_SCALAR   () { 'S'    }
+sub SIG_NULL     () { 'N'    }
+sub SIG_DATA     () { 'D'    }
+sub SIG_INDEX    () { 'I'    }
+sub SIG_BLIST    () { 'B'    }
+sub SIG_SIZE     () {  1     }
+
 sub precalc_sizes {
     ##
     # Precalculate index, bucket and bucket list sizes
@@ -134,14 +148,14 @@ sub open {
     seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
 
     my $signature;
-    my $bytes_read = read( $fh, $signature, length(DBM::Deep->SIG_FILE));
+    my $bytes_read = read( $fh, $signature, length(SIG_FILE));
 
     ##
     # File is empty -- write signature and master index
     ##
     if (!$bytes_read) {
         seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
-        print( $fh DBM::Deep->SIG_FILE);
+        print( $fh SIG_FILE);
 
         $self->create_tag($obj, $obj->_base_offset, $obj->_type, chr(0) x $self->{index_size});
 
@@ -162,7 +176,7 @@ sub open {
     ##
     # Check signature was valid
     ##
-    unless ($signature eq DBM::Deep->SIG_FILE) {
+    unless ($signature eq SIG_FILE) {
         $self->close_fh( $obj );
         $obj->_throw_error("Signature not found -- file is not a Deep DB");
     }
@@ -209,13 +223,13 @@ sub create_tag {
     print( $fh $sig . pack($self->{data_pack}, $size) . $content );
 
     if ($offset == $obj->_root->{end}) {
-        $obj->_root->{end} += DBM::Deep->SIG_SIZE + $self->{data_size} + $size;
+        $obj->_root->{end} += SIG_SIZE + $self->{data_size} + $size;
     }
 
     return {
         signature => $sig,
         size => $size,
-        offset => $offset + DBM::Deep->SIG_SIZE + $self->{data_size},
+        offset => $offset + SIG_SIZE + $self->{data_size},
         content => $content
     };
 }
@@ -235,7 +249,7 @@ sub load_tag {
     return if eof $fh;
 
     my $b;
-    read( $fh, $b, DBM::Deep->SIG_SIZE + $self->{data_size} );
+    read( $fh, $b, SIG_SIZE + $self->{data_size} );
     my ($sig, $size) = unpack( "A $self->{data_pack}", $b );
 
     my $buffer;
@@ -244,7 +258,7 @@ sub load_tag {
     return {
         signature => $sig,
         size => $size,
-        offset => $offset + DBM::Deep->SIG_SIZE + $self->{data_size},
+        offset => $offset + SIG_SIZE + $self->{data_size},
         content => $buffer
     };
 }
@@ -281,10 +295,7 @@ sub add_bucket {
             ##
             $result = 2;
 
-            $location = $internal_ref
-                ? $value->_base_offset
-                : $root->{end};
-print "NEW: $location\n";
+            $location = $root->{end};
 
             seek(
                 $fh,
@@ -305,14 +316,7 @@ print "NEW: $location\n";
         ##
         $result = 1;
 
-        if ($internal_ref) {
-            $location = $value->_base_offset;
-            seek($fh, $tag->{offset} + ($i * $self->{bucket_size}) + $root->{file_offset}, SEEK_SET);
-            print( $fh $md5 . pack($self->{long_pack}, $location) );
-            return $result;
-        }
-
-        seek($fh, $subloc + DBM::Deep->SIG_SIZE + $root->{file_offset}, SEEK_SET);
+        seek($fh, $subloc + SIG_SIZE + $root->{file_offset}, SEEK_SET);
         my $size;
         read( $fh, $size, $self->{data_size});
         $size = unpack($self->{data_pack}, $size);
@@ -323,27 +327,36 @@ print "NEW: $location\n";
         # a new content area at the EOF.
         ##
         my $actual_length;
-        my $r = Scalar::Util::reftype( $value ) || '';
-        if ( $r eq 'HASH' || $r eq 'ARRAY' ) {
-            $actual_length = $self->{index_size};
+        if ( $internal_ref ) {
+            $actual_length = $self->{long_size};
+        }
+        else {
+            my $r = Scalar::Util::reftype( $value ) || '';
+            if ( $r eq 'HASH' || $r eq 'ARRAY' ) {
+                $actual_length = $self->{index_size};
 
-            # if autobless is enabled, must also take into consideration
-            # the class name, as it is stored along with key/value.
-            if ( $root->{autobless} ) {
-                my $value_class = Scalar::Util::blessed($value);
-                if ( defined $value_class && !$value->isa('DBM::Deep') ) {
-                    $actual_length += length($value_class);
+                # if autobless is enabled, must also take into consideration
+                # the class name, as it is stored along with key/value.
+                if ( $root->{autobless} ) {
+                    my $value_class = Scalar::Util::blessed($value);
+                    if ( defined $value_class && !$value->isa('DBM::Deep') ) {
+                        $actual_length += length($value_class);
+                    }
                 }
             }
+            else { $actual_length = length($value); }
         }
-        else { $actual_length = length($value); }
 
         if ($actual_length <= $size) {
             $location = $subloc;
         }
         else {
             $location = $root->{end};
-            seek($fh, $tag->{offset} + ($i * $self->{bucket_size}) + $self->{hash_size} + $root->{file_offset}, SEEK_SET);
+            seek(
+                $fh,
+                $tag->{offset} + ($i * $self->{bucket_size}) + $self->{hash_size} + $root->{file_offset},
+                SEEK_SET,
+            );
             print( $fh pack($self->{long_pack}, $location) );
         }
 
@@ -351,20 +364,9 @@ print "NEW: $location\n";
     }
 
     ##
-    # If this is an internal reference, return now.
-    # No need to write value or plain key
-    ##
-    #XXX We need to store the key as a reference to the internal spot
-    if ($internal_ref) {
-        return $result;
-    }
-
-    ##
     # If bucket didn't fit into list, split into a new index level
     ##
     if (!$location) {
-        # re-index bucket list
-
         $self->split_index( $obj, $md5, $tag );
 
         $location = $root->{end};
@@ -374,32 +376,41 @@ print "NEW: $location\n";
     # Seek to content area and store signature, value and plaintext key
     ##
     if ($location) {
-        my $content_length;
         seek($fh, $location + $root->{file_offset}, SEEK_SET);
 
         ##
-        # Write signature based on content type, set content length and write actual value.
+        # Write signature based on content type, set content length and write
+        # actual value.
         ##
         my $r = Scalar::Util::reftype($value) || '';
-        if ($r eq 'HASH') {
-            print( $fh DBM::Deep->TYPE_HASH );
-            print( $fh pack($self->{data_pack}, $self->{index_size}) . chr(0) x $self->{index_size} );
-            $content_length = $self->{index_size};
-        }
-        elsif ($r eq 'ARRAY') {
-            print( $fh DBM::Deep->TYPE_ARRAY );
-            print( $fh pack($self->{data_pack}, $self->{index_size}) . chr(0) x $self->{index_size} );
-            $content_length = $self->{index_size};
-        }
-        elsif (!defined($value)) {
-            print( $fh DBM::Deep->SIG_NULL );
-            print( $fh pack($self->{data_pack}, 0) );
-            $content_length = 0;
+        my $content_length;
+        if ( $internal_ref ) {
+            print( $fh SIG_INTERNAL );
+            print( $fh pack($self->{data_pack}, $self->{long_size}) );
+            print( $fh pack($self->{long_pack}, $value->_base_offset) );
+            $content_length = $self->{long_size};
         }
         else {
-            print( $fh DBM::Deep->SIG_DATA );
-            print( $fh pack($self->{data_pack}, length($value)) . $value );
-            $content_length = length($value);
+            if ($r eq 'HASH') {
+                print( $fh SIG_HASH );
+                print( $fh pack($self->{data_pack}, $self->{index_size}) . chr(0) x $self->{index_size} );
+                $content_length = $self->{index_size};
+            }
+            elsif ($r eq 'ARRAY') {
+                print( $fh SIG_ARRAY );
+                print( $fh pack($self->{data_pack}, $self->{index_size}) . chr(0) x $self->{index_size} );
+                $content_length = $self->{index_size};
+            }
+            elsif (!defined($value)) {
+                print( $fh SIG_NULL );
+                print( $fh pack($self->{data_pack}, 0) );
+                $content_length = 0;
+            }
+            else {
+                print( $fh SIG_DATA );
+                print( $fh pack($self->{data_pack}, length($value)) . $value );
+                $content_length = length($value);
+            }
         }
 
         ##
@@ -412,7 +423,7 @@ print "NEW: $location\n";
         ##
         if ( $root->{autobless} ) {
             my $value_class = Scalar::Util::blessed($value);
-            if ( defined $value_class && $value_class ne 'DBM::Deep' ) {
+            if ( defined $value_class && !$value->isa( 'DBM::Deep' ) ) {
                 ##
                 # Blessed ref -- will restore later
                 ##
@@ -431,7 +442,7 @@ print "NEW: $location\n";
         # If this is a new content area, advance EOF counter
         ##
         if ($location == $root->{end}) {
-            $root->{end} += DBM::Deep->SIG_SIZE;
+            $root->{end} += SIG_SIZE;
             $root->{end} += $self->{data_size} + $content_length;
             $root->{end} += $self->{data_size} + length($plain_key);
         }
@@ -440,26 +451,28 @@ print "NEW: $location\n";
         # If content is a hash or array, create new child DBM::Deep object and
         # pass each key or element to it.
         ##
-        if ($r eq 'HASH') {
-            my $branch = DBM::Deep->new(
-                type => DBM::Deep->TYPE_HASH,
-                base_offset => $location,
-                root => $root,
-            );
-            foreach my $key (keys %{$value}) {
-                $branch->STORE( $key, $value->{$key} );
+        if ( ! $internal_ref ) {
+            if ($r eq 'HASH') {
+                my $branch = DBM::Deep->new(
+                    type => DBM::Deep->TYPE_HASH,
+                    base_offset => $location,
+                    root => $root,
+                );
+                foreach my $key (keys %{$value}) {
+                    $branch->STORE( $key, $value->{$key} );
+                }
             }
-        }
-        elsif ($r eq 'ARRAY') {
-            my $branch = DBM::Deep->new(
-                type => DBM::Deep->TYPE_ARRAY,
-                base_offset => $location,
-                root => $root,
-            );
-            my $index = 0;
-            foreach my $element (@{$value}) {
-                $branch->STORE( $index, $element );
-                $index++;
+            elsif ($r eq 'ARRAY') {
+                my $branch = DBM::Deep->new(
+                    type => DBM::Deep->TYPE_ARRAY,
+                    base_offset => $location,
+                    root => $root,
+                );
+                my $index = 0;
+                foreach my $element (@{$value}) {
+                    $branch->STORE( $index, $element );
+                    $index++;
+                }
             }
         }
 
@@ -483,7 +496,7 @@ sub split_index {
     my $index_tag = $self->create_tag(
         $obj,
         $root->{end},
-        DBM::Deep->SIG_INDEX,
+        SIG_INDEX,
         chr(0) x $self->{index_size},
     );
 
@@ -500,7 +513,7 @@ sub split_index {
         my $num = ord(substr($key, $tag->{ch} + 1, 1));
 
         if ($offsets[$num]) {
-            my $offset = $offsets[$num] + DBM::Deep->SIG_SIZE + $self->{data_size};
+            my $offset = $offsets[$num] + SIG_SIZE + $self->{data_size};
             seek($fh, $offset + $root->{file_offset}, SEEK_SET);
             my $subkeys;
             read( $fh, $subkeys, $self->{bucket_list_size});
@@ -520,13 +533,97 @@ sub split_index {
             seek($fh, $index_tag->{offset} + ($num * $self->{long_size}) + $root->{file_offset}, SEEK_SET);
             print( $fh pack($self->{long_pack}, $root->{end}) );
 
-            my $blist_tag = $self->create_tag($obj, $root->{end}, DBM::Deep->SIG_BLIST, chr(0) x $self->{bucket_list_size});
+            my $blist_tag = $self->create_tag($obj, $root->{end}, SIG_BLIST, chr(0) x $self->{bucket_list_size});
 
             seek($fh, $blist_tag->{offset} + $root->{file_offset}, SEEK_SET);
             print( $fh $key . pack($self->{long_pack}, $old_subloc || $root->{end}) );
         }
     } # i loop
 
+    return;
+}
+
+sub read_from_loc {
+    my $self = shift;
+    my ($obj, $subloc) = @_;
+
+    my $fh = $obj->_fh;
+
+    ##
+    # Found match -- seek to offset and read signature
+    ##
+    my $signature;
+    seek($fh, $subloc + $obj->_root->{file_offset}, SEEK_SET);
+    read( $fh, $signature, SIG_SIZE);
+
+    ##
+    # If value is a hash or array, return new DBM::Deep object with correct offset
+    ##
+    if (($signature eq SIG_HASH) || ($signature eq SIG_ARRAY)) {
+        my $obj = DBM::Deep->new(
+            type => $signature,
+            base_offset => $subloc,
+            root => $obj->_root,
+        );
+
+        if ($obj->_root->{autobless}) {
+            ##
+            # Skip over value and plain key to see if object needs
+            # to be re-blessed
+            ##
+            seek($fh, $self->{data_size} + $self->{index_size}, SEEK_CUR);
+
+            my $size;
+            read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
+            if ($size) { seek($fh, $size, SEEK_CUR); }
+
+            my $bless_bit;
+            read( $fh, $bless_bit, 1);
+            if (ord($bless_bit)) {
+                ##
+                # Yes, object needs to be re-blessed
+                ##
+                my $class_name;
+                read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
+                if ($size) { read( $fh, $class_name, $size); }
+                if ($class_name) { $obj = bless( $obj, $class_name ); }
+            }
+        }
+
+        return $obj;
+    }
+    elsif ( $signature eq SIG_INTERNAL ) {
+        my $size;
+        read( $fh, $size, $self->{data_size});
+        $size = unpack($self->{data_pack}, $size);
+
+        if ( $size ) {
+            my $new_loc;
+            read( $fh, $new_loc, $size );
+            $new_loc = unpack( $self->{long_pack}, $new_loc );
+
+            return $self->read_from_loc( $obj, $new_loc );
+        }
+        else {
+            return;
+        }
+    }
+    ##
+    # Otherwise return actual value
+    ##
+    elsif ($signature eq SIG_DATA) {
+        my $size;
+        read( $fh, $size, $self->{data_size});
+        $size = unpack($self->{data_pack}, $size);
+
+        my $value = '';
+        if ($size) { read( $fh, $value, $size); }
+        return $value;
+    }
+
+    ##
+    # Key exists, but content is null
+    ##
     return;
 }
 
@@ -558,67 +655,7 @@ sub get_bucket_value {
             next BUCKET;
         }
 
-        ##
-        # Found match -- seek to offset and read signature
-        ##
-        my $signature;
-        seek($fh, $subloc + $obj->_root->{file_offset}, SEEK_SET);
-        read( $fh, $signature, DBM::Deep->SIG_SIZE);
-
-        ##
-        # If value is a hash or array, return new DBM::Deep object with correct offset
-        ##
-        if (($signature eq DBM::Deep->TYPE_HASH) || ($signature eq DBM::Deep->TYPE_ARRAY)) {
-            my $obj = DBM::Deep->new(
-                type => $signature,
-                base_offset => $subloc,
-                root => $obj->_root,
-            );
-
-            if ($obj->_root->{autobless}) {
-                ##
-                # Skip over value and plain key to see if object needs
-                # to be re-blessed
-                ##
-                seek($fh, $self->{data_size} + $self->{index_size}, SEEK_CUR);
-
-                my $size;
-                read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
-                if ($size) { seek($fh, $size, SEEK_CUR); }
-
-                my $bless_bit;
-                read( $fh, $bless_bit, 1);
-                if (ord($bless_bit)) {
-                    ##
-                    # Yes, object needs to be re-blessed
-                    ##
-                    my $class_name;
-                    read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
-                    if ($size) { read( $fh, $class_name, $size); }
-                    if ($class_name) { $obj = bless( $obj, $class_name ); }
-                }
-            }
-
-            return $obj;
-        }
-
-        ##
-        # Otherwise return actual value
-        ##
-        elsif ($signature eq DBM::Deep->SIG_DATA) {
-            my $size;
-            read( $fh, $size, $self->{data_size});
-            $size = unpack($self->{data_pack}, $size);
-
-            my $value = '';
-            if ($size) { read( $fh, $value, $size); }
-            return $value;
-        }
-
-        ##
-        # Key exists, but content is null
-        ##
-        else { return; }
+        return $self->read_from_loc( $obj, $subloc );
     } # i loop
 
     return;
@@ -713,10 +750,9 @@ sub find_bucket_list {
     ##
     my $tag = $self->load_tag($obj, $obj->_base_offset)
         or $self->_throw_error( "INTERNAL ERROR - Cannot find tag" );
-#print $obj->_base_offset, " : $tag->{signature} : $tag->{offset} : $tag->{size}\n";
 
     my $ch = 0;
-    while ($tag->{signature} ne DBM::Deep->SIG_BLIST) {
+    while ($tag->{signature} ne SIG_BLIST) {
         my $num = ord substr($md5, $ch, 1);
 
         my $ref_loc = $tag->{offset} + ($num * $self->{long_size});
@@ -730,7 +766,7 @@ sub find_bucket_list {
 
                 $tag = $self->create_tag(
                     $obj, $obj->_root->{end},
-                    DBM::Deep->SIG_BLIST,
+                    SIG_BLIST,
                     chr(0) x $self->{bucket_list_size},
                 );
 
@@ -785,7 +821,7 @@ sub traverse_index {
 
     my $fh = $obj->_fh;
 
-    if ($tag->{signature} ne DBM::Deep->SIG_BLIST) {
+    if ($tag->{signature} ne SIG_BLIST) {
         my $content = $tag->{content};
         my $start = $obj->{return_next} ? 0 : ord(substr($obj->{prev_md5}, $ch, 1));
 
@@ -814,40 +850,33 @@ sub traverse_index {
         ##
         # Iterate through buckets, looking for a key match
         ##
-        for (my $i=0; $i<$self->{max_buckets}; $i++) {
+        for (my $i = 0; $i < $self->{max_buckets}; $i++) {
             my ($key, $subloc) = $self->_get_key_subloc( $keys, $i );
 
+            # End of bucket list -- return to outer loop
             if (!$subloc) {
-                ##
-                # End of bucket list -- return to outer loop
-                ##
                 $obj->{return_next} = 1;
                 last;
             }
+            # Located previous key -- return next one found
             elsif ($key eq $obj->{prev_md5}) {
-                ##
-                # Located previous key -- return next one found
-                ##
                 $obj->{return_next} = 1;
                 next;
             }
+            # Seek to bucket location and skip over signature
             elsif ($obj->{return_next}) {
-                ##
-                # Seek to bucket location and skip over signature
-                ##
-                seek($fh, $subloc + DBM::Deep->SIG_SIZE + $obj->_root->{file_offset}, SEEK_SET);
+                seek($fh, $subloc + $obj->_root->{file_offset}, SEEK_SET);
 
-                ##
                 # Skip over value to get to plain key
-                ##
+                my $sig;
+                read( $fh, $sig, SIG_SIZE );
+
                 my $size;
                 read( $fh, $size, $self->{data_size});
                 $size = unpack($self->{data_pack}, $size);
                 if ($size) { seek($fh, $size, SEEK_CUR); }
 
-                ##
                 # Read in plain key and return as scalar
-                ##
                 my $plain_key;
                 read( $fh, $size, $self->{data_size});
                 $size = unpack($self->{data_pack}, $size);
@@ -855,7 +884,7 @@ sub traverse_index {
 
                 return $plain_key;
             }
-        } # bucket loop
+        }
 
         $obj->{return_next} = 1;
     } # tag is a bucket list

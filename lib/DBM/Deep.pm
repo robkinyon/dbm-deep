@@ -1809,15 +1809,15 @@ built-in hashes.
 We use B<Devel::Cover> to test the code coverage of our tests, below is the
 B<Devel::Cover> report on this module's test suite.
 
-  ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  File                           stmt   bran   cond    sub    pod   time  total
-  ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm           95.1   81.6   70.3  100.0  100.0   33.4   91.0
-  blib/lib/DBM/Deep/Array.pm    100.0   91.1  100.0  100.0    n/a   27.8   98.0
-  blib/lib/DBM/Deep/Engine.pm    97.8   85.6   75.0  100.0    0.0   25.8   90.8
-  blib/lib/DBM/Deep/Hash.pm     100.0   87.5  100.0  100.0    n/a   13.0   97.2
-  Total                          97.5   85.4   76.6  100.0   46.9  100.0   92.5
-  ---------------------------- ------ ------ ------ ------ ------ ------ ------
+  ----------------------------------- ------ ------ ------ ------ ------ ------
+  File                                  stmt   bran   cond    sub   time  total
+  ----------------------------------- ------ ------ ------ ------ ------ ------
+  blib/lib/DBM/Deep.pm                  94.9   80.6   73.0  100.0   37.9   90.4
+  blib/lib/DBM/Deep/Array.pm           100.0   91.1  100.0  100.0   18.2   98.1
+  blib/lib/DBM/Deep/Engine.pm           98.9   87.3   80.0  100.0   34.2   95.2
+  blib/lib/DBM/Deep/Hash.pm            100.0   87.5  100.0  100.0    9.7   97.3
+  Total                                 97.9   85.9   79.7  100.0  100.0   94.3
+  ----------------------------------- ------ ------ ------ ------ ------ ------
 
 =head1 MORE INFORMATION
 

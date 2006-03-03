@@ -275,71 +275,69 @@ sub add_bucket {
 
     my $fh = $obj->_fh;
 
-    {
-        my ($subloc, $offset) = $self->_find_in_buckets( $tag, $md5 );
+    my ($subloc, $offset) = $self->_find_in_buckets( $tag, $md5 );
 
-        # Updating a known md5
-        if ( $subloc ) {
-            $result = 1;
+    # Updating a known md5
+    if ( $subloc ) {
+        $result = 1;
 
-            seek($fh, $subloc + SIG_SIZE + $root->{file_offset}, SEEK_SET);
-            my $size;
-            read( $fh, $size, $self->{data_size});
-            $size = unpack($self->{data_pack}, $size);
+        seek($fh, $subloc + SIG_SIZE + $root->{file_offset}, SEEK_SET);
+        my $size;
+        read( $fh, $size, $self->{data_size});
+        $size = unpack($self->{data_pack}, $size);
 
-            ##
-            # If value is a hash, array, or raw value with equal or less size, we can
-            # reuse the same content area of the database.  Otherwise, we have to create
-            # a new content area at the EOF.
-            ##
-            my $actual_length;
-            if ( $internal_ref ) {
-                $actual_length = $self->{long_size};
-            }
-            else {
-                my $r = Scalar::Util::reftype( $value ) || '';
-                if ( $r eq 'HASH' || $r eq 'ARRAY' ) {
-                    $actual_length = $self->{index_size};
+        ##
+        # If value is a hash, array, or raw value with equal or less size, we can
+        # reuse the same content area of the database.  Otherwise, we have to create
+        # a new content area at the EOF.
+        ##
+        my $actual_length;
+        if ( $internal_ref ) {
+            $actual_length = $self->{long_size};
+        }
+        else {
+            my $r = Scalar::Util::reftype( $value ) || '';
+            if ( $r eq 'HASH' || $r eq 'ARRAY' ) {
+                $actual_length = $self->{index_size};
 
-                    # if autobless is enabled, must also take into consideration
-                    # the class name, as it is stored along with key/value.
-                    if ( $root->{autobless} ) {
-                        my $value_class = Scalar::Util::blessed($value);
-                        if ( defined $value_class && !$value->isa('DBM::Deep') ) {
-                            $actual_length += length($value_class);
-                        }
+                # if autobless is enabled, must also take into consideration
+                # the class name, as it is stored along with key/value.
+                if ( $root->{autobless} ) {
+                    my $value_class = Scalar::Util::blessed($value);
+                    if ( defined $value_class && !$value->isa('DBM::Deep') ) {
+                        $actual_length += length($value_class);
                     }
                 }
-                else { $actual_length = length($value); }
             }
-
-            if ($actual_length <= $size) {
-                $location = $subloc;
-            }
-            else {
-                $location = $root->{end};
-                seek(
-                    $fh,
-                    $tag->{offset} + $offset + $self->{hash_size} + $root->{file_offset},
-                    SEEK_SET,
-                );
-                print( $fh pack($self->{long_pack}, $location) );
-            }
+            else { $actual_length = length($value); }
         }
-        # Adding a new md5
-        elsif ( defined $offset ) {
-            $result = 2;
-            $location = $root->{end};
 
-            seek( $fh, $tag->{offset} + $offset + $root->{file_offset}, SEEK_SET );
-            print( $fh $md5 . pack($self->{long_pack}, $location) );
+        if ($actual_length <= $size) {
+            $location = $subloc;
         }
-        # If bucket didn't fit into list, split into a new index level
         else {
-            $self->split_index( $obj, $md5, $tag );
-
             $location = $root->{end};
+            seek(
+                $fh,
+                $tag->{offset} + $offset + $self->{hash_size} + $root->{file_offset},
+                SEEK_SET,
+            );
+            print( $fh pack($self->{long_pack}, $location) );
         }
+    }
+    # Adding a new md5
+    elsif ( defined $offset ) {
+        $result = 2;
+        $location = $root->{end};
+
+        seek( $fh, $tag->{offset} + $offset + $root->{file_offset}, SEEK_SET );
+        print( $fh $md5 . pack($self->{long_pack}, $location) );
+    }
+    # If bucket didn't fit into list, split into a new index level
+    else {
+        $self->split_index( $obj, $md5, $tag );
+
+        $location = $root->{end};
     }
 
     ##
@@ -603,29 +601,11 @@ sub get_bucket_value {
     ##
     my $self = shift;
     my ($obj, $tag, $md5) = @_;
-    my $keys = $tag->{content};
 
-    ##
-    # Iterate through buckets, looking for a key match
-    ##
-    BUCKET:
-    for (my $i = 0; $i < $self->{max_buckets}; $i++) {
-        my ($key, $subloc) = $self->_get_key_subloc( $keys, $i );
-
-        if (!$subloc) {
-            ##
-            # Hit end of list, no match
-            ##
-            return;
-        }
-
-        if ( $md5 ne $key ) {
-            next BUCKET;
-        }
-
+    my ($subloc, $offset) = $self->_find_in_buckets( $tag, $md5 );
+    if ( $subloc ) {
         return $self->read_from_loc( $obj, $subloc );
-    } # i loop
-
+    }
     return;
 }
 
@@ -635,38 +615,16 @@ sub delete_bucket {
     ##
     my $self = shift;
     my ($obj, $tag, $md5) = @_;
-    my $keys = $tag->{content};
 
-    my $fh = $obj->_fh;
-
-    ##
-    # Iterate through buckets, looking for a key match
-    ##
-    BUCKET:
-    for (my $i=0; $i<$self->{max_buckets}; $i++) {
-        my ($key, $subloc) = $self->_get_key_subloc( $keys, $i );
-
-        if (!$subloc) {
-            ##
-            # Hit end of list, no match
-            ##
-            return;
-        }
-
-        if ( $md5 ne $key ) {
-            next BUCKET;
-        }
-
-        ##
-        # Matched key -- delete bucket and return
-        ##
-        seek($fh, $tag->{offset} + ($i * $self->{bucket_size}) + $obj->_root->{file_offset}, SEEK_SET);
-        print( $fh substr($keys, ($i+1) * $self->{bucket_size} ) );
+    my ($subloc, $offset) = $self->_find_in_buckets( $tag, $md5 );
+    if ( $subloc ) {
+        my $fh = $obj->_fh;
+        seek($fh, $tag->{offset} + $offset + $obj->_root->{file_offset}, SEEK_SET);
+        print( $fh substr($tag->{content}, $offset + $self->{bucket_size} ) );
         print( $fh chr(0) x $self->{bucket_size} );
 
         return 1;
-    } # i loop
-
+    }
     return;
 }
 
@@ -676,32 +634,11 @@ sub bucket_exists {
     ##
     my $self = shift;
     my ($obj, $tag, $md5) = @_;
-    my $keys = $tag->{content};
 
-    ##
-    # Iterate through buckets, looking for a key match
-    ##
-    BUCKET:
-    for (my $i=0; $i<$self->{max_buckets}; $i++) {
-        my ($key, $subloc) = $self->_get_key_subloc( $keys, $i );
-
-        if (!$subloc) {
-            ##
-            # Hit end of list, no match
-            ##
-            return;
-        }
-
-        if ( $md5 ne $key ) {
-            next BUCKET;
-        }
-
-        ##
-        # Matched key -- return true
-        ##
+    my ($subloc, $offset) = $self->_find_in_buckets( $tag, $md5 );
+    if ( $subloc ) {
         return 1;
-    } # i loop
-
+    }
     return;
 }
 

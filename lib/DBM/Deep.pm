@@ -1512,15 +1512,10 @@ Here is an example:
     print $db->{foo} . "\n"; # prints "foo"
     print $db->{circle}->{foo} . "\n"; # prints "foo" again
 
-One catch is, passing the object to a function that recursively walks the
+B<Note>: Passing the object to a function that recursively walks the
 object tree (such as I<Data::Dumper> or even the built-in C<optimize()> or
-C<export()> methods) will result in an infinite loop.  The other catch is,
-if you fetch the I<key> of a circular reference (i.e. using the C<first_key()>
-or C<next_key()> methods), you will get the I<target object's key>, not the
-ref's key.  This gets even more interesting with the above example, where
-the I<circle> key points to the base DB object, which technically doesn't
-have a key.  So I made DBM::Deep return "[base]" as the key name in that
-special case.
+C<export()> methods) will result in an infinite loop. This will be fixed in
+a future release.
 
 =head1 CAVEATS / ISSUES / BUGS
 

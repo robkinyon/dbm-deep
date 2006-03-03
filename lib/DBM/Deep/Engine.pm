@@ -159,12 +159,6 @@ sub open {
 
         $self->create_tag($obj, $obj->_base_offset, $obj->_type, chr(0) x $self->{index_size});
 
-        # Why is this being printed here? I'm not seeing where anything actually points to
-        # this spot.
-        #XXX $obj->_root->{end} isn't updated from these 10 bytes that are being written
-        my $plain_key = "[base]";
-        print( $fh pack($self->{data_pack}, length($plain_key)) . $plain_key );
-
         # Flush the filehandle
         my $old_fh = select $fh;
         my $old_af = $|; $| = 1; $| = $old_af;

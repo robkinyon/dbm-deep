@@ -11,7 +11,7 @@ sub SIG_FILE     () { 'DPDB' }
 sub SIG_INTERNAL () { 'i'    }
 sub SIG_HASH     () { 'H'    }
 sub SIG_ARRAY    () { 'A'    }
-sub SIG_SCALAR   () { 'S'    }
+sub SIG_REF      () { 'R'    }
 sub SIG_NULL     () { 'N'    }
 sub SIG_DATA     () { 'D'    }
 sub SIG_INDEX    () { 'I'    }
@@ -51,9 +51,9 @@ sub set_pack {
 
     ##
     # Set to 4 and 'N' for 32-bit data length prefixes.  Limit of 4 GB for each
-    # key/value. Upgrading this is possible (see above) but probably not necessary.
-    # If you need more than 4 GB for a single key or value, this module is really
-    # not for you :-)
+    # key/value. Upgrading this is possible (see above) but probably not
+    # necessary. If you need more than 4 GB for a single key or value, this
+    # module is really not for you :-)
     ##
     $self->{data_size} = $data_s ? $data_s : 4;
     $self->{data_pack} = $data_p ? $data_p : 'N';
@@ -88,9 +88,11 @@ sub new {
         hash_size   => 16,
 
         ##
-        # Maximum number of buckets per list before another level of indexing is done.
-        # Increase this value for slightly greater speed, but larger database files.
-        # DO NOT decrease this value below 16, due to risk of recursive reindex overrun.
+        # Maximum number of buckets per list before another level of indexing is
+        # done.
+        # Increase this value for slightly greater speed, but larger database
+        # files. DO NOT decrease this value below 16, due to risk of recursive
+        # reindex overrun.
         ##
         max_buckets => 16,
     }, $class;
@@ -131,8 +133,9 @@ sub open {
     my $flags = O_RDWR | O_CREAT | O_BINARY;
 
     my $fh;
-    sysopen( $fh, $obj->_root->{file}, $flags )
-        or $obj->_throw_error("Cannot sysopen file: " . $obj->_root->{file} . ": $!");
+    my $filename = $obj->_root->{file};
+    sysopen( $fh, $filename, $flags )
+        or $obj->_throw_error("Cannot sysopen file '$filename': $!");
     $obj->_root->{fh} = $fh;
 
     #XXX Can we remove this by using the right sysopen() flags?
@@ -146,7 +149,6 @@ sub open {
     }
 
     seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
-
     my $signature;
     my $bytes_read = read( $fh, $signature, length(SIG_FILE));
 
@@ -157,7 +159,10 @@ sub open {
         seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
         print( $fh SIG_FILE);
 
-        $self->create_tag($obj, $obj->_base_offset, $obj->_type, chr(0) x $self->{index_size});
+        $self->create_tag(
+            $obj, $obj->_base_offset, $obj->_type,
+            chr(0) x $self->{index_size},
+        );
 
         # Flush the filehandle
         my $old_fh = select $fh;
@@ -270,7 +275,11 @@ sub add_bucket {
 
     my $root = $obj->_root;
 
-    my $is_dbm_deep = eval { local $SIG{'__DIE__'}; $value->isa( 'DBM::Deep' ) };
+    my $is_dbm_deep = eval {
+        local $SIG{'__DIE__'};
+        $value->isa( 'DBM::Deep' );
+    };
+
     my $internal_ref = $is_dbm_deep && ($value->_root eq $root);
 
     my $fh = $obj->_fh;
@@ -281,15 +290,10 @@ sub add_bucket {
     if ( $subloc ) {
         $result = 1;
 
-        seek($fh, $subloc + SIG_SIZE + $root->{file_offset}, SEEK_SET);
-        my $size;
-        read( $fh, $size, $self->{data_size});
-        $size = unpack($self->{data_pack}, $size);
-
         ##
-        # If value is a hash, array, or raw value with equal or less size, we can
-        # reuse the same content area of the database.  Otherwise, we have to create
-        # a new content area at the EOF.
+        # If value is a hash, array, or raw value with equal or less size, we
+        # can reuse the same content area of the database.  Otherwise, we have
+        # to create a new content area at the EOF.
         ##
         my $actual_length;
         if ( $internal_ref ) {
@@ -311,6 +315,11 @@ sub add_bucket {
             }
             else { $actual_length = length($value); }
         }
+
+        seek($fh, $subloc + SIG_SIZE + $root->{file_offset}, SEEK_SET);
+        my $size;
+        read( $fh, $size, $self->{data_size});
+        $size = unpack($self->{data_pack}, $size);
 
         if ($actual_length <= $size) {
             $location = $subloc;
@@ -340,114 +349,126 @@ sub add_bucket {
         $location = $root->{end};
     }
 
-    ##
-    # Seek to content area and store signature, value and plaintext key
-    ##
-    if ($location) {
-        seek($fh, $location + $root->{file_offset}, SEEK_SET);
+    $self->write_value( $obj, $location, $plain_key, $value );
 
-        ##
-        # Write signature based on content type, set content length and write
-        # actual value.
-        ##
-        my $r = Scalar::Util::reftype($value) || '';
-        my $content_length;
-        if ( $internal_ref ) {
-            print( $fh SIG_INTERNAL );
-            print( $fh pack($self->{data_pack}, $self->{long_size}) );
-            print( $fh pack($self->{long_pack}, $value->_base_offset) );
-            $content_length = $self->{long_size};
+    return $result;
+}
+
+sub write_value {
+    my $self = shift;
+    my ($obj, $location, $key, $value) = @_;
+
+    my $fh = $obj->_fh;
+    my $root = $obj->_root;
+
+    my $is_dbm_deep = eval {
+        local $SIG{'__DIE__'};
+        $value->isa( 'DBM::Deep' );
+    };
+
+    my $internal_ref = $is_dbm_deep && ($value->_root eq $root);
+
+    seek($fh, $location + $root->{file_offset}, SEEK_SET);
+
+    ##
+    # Write signature based on content type, set content length and write
+    # actual value.
+    ##
+    my $r = Scalar::Util::reftype($value) || '';
+    my $content_length;
+    if ( $internal_ref ) {
+        print( $fh SIG_INTERNAL );
+        print( $fh pack($self->{data_pack}, $self->{long_size}) );
+        print( $fh pack($self->{long_pack}, $value->_base_offset) );
+        $content_length = $self->{long_size};
+    }
+    else {
+        if ($r eq 'HASH') {
+            print( $fh SIG_HASH );
+            print( $fh pack($self->{data_pack}, $self->{index_size}) . chr(0) x $self->{index_size} );
+            $content_length = $self->{index_size};
+        }
+        elsif ($r eq 'ARRAY') {
+            print( $fh SIG_ARRAY );
+            print( $fh pack($self->{data_pack}, $self->{index_size}) . chr(0) x $self->{index_size} );
+            $content_length = $self->{index_size};
+        }
+        elsif (!defined($value)) {
+            print( $fh SIG_NULL );
+            print( $fh pack($self->{data_pack}, 0) );
+            $content_length = 0;
         }
         else {
-            if ($r eq 'HASH') {
-                print( $fh SIG_HASH );
-                print( $fh pack($self->{data_pack}, $self->{index_size}) . chr(0) x $self->{index_size} );
-                $content_length = $self->{index_size};
-            }
-            elsif ($r eq 'ARRAY') {
-                print( $fh SIG_ARRAY );
-                print( $fh pack($self->{data_pack}, $self->{index_size}) . chr(0) x $self->{index_size} );
-                $content_length = $self->{index_size};
-            }
-            elsif (!defined($value)) {
-                print( $fh SIG_NULL );
-                print( $fh pack($self->{data_pack}, 0) );
-                $content_length = 0;
-            }
-            else {
-                print( $fh SIG_DATA );
-                print( $fh pack($self->{data_pack}, length($value)) . $value );
-                $content_length = length($value);
-            }
+            print( $fh SIG_DATA );
+            print( $fh pack($self->{data_pack}, length($value)) . $value );
+            $content_length = length($value);
         }
-
-        ##
-        # Plain key is stored AFTER value, as keys are typically fetched less often.
-        ##
-        print( $fh pack($self->{data_pack}, length($plain_key)) . $plain_key );
-
-        ##
-        # If value is blessed, preserve class name
-        ##
-        if ( $root->{autobless} ) {
-            my $value_class = Scalar::Util::blessed($value);
-            if ( defined $value_class && !$value->isa( 'DBM::Deep' ) ) {
-                ##
-                # Blessed ref -- will restore later
-                ##
-                print( $fh chr(1) );
-                print( $fh pack($self->{data_pack}, length($value_class)) . $value_class );
-                $content_length += 1;
-                $content_length += $self->{data_size} + length($value_class);
-            }
-            else {
-                print( $fh chr(0) );
-                $content_length += 1;
-            }
-        }
-
-        ##
-        # If this is a new content area, advance EOF counter
-        ##
-        if ($location == $root->{end}) {
-            $root->{end} += SIG_SIZE;
-            $root->{end} += $self->{data_size} + $content_length;
-            $root->{end} += $self->{data_size} + length($plain_key);
-        }
-
-        ##
-        # If content is a hash or array, create new child DBM::Deep object and
-        # pass each key or element to it.
-        ##
-        if ( ! $internal_ref ) {
-            if ($r eq 'HASH') {
-                my $branch = DBM::Deep->new(
-                    type => DBM::Deep->TYPE_HASH,
-                    base_offset => $location,
-                    root => $root,
-                );
-                foreach my $key (keys %{$value}) {
-                    $branch->STORE( $key, $value->{$key} );
-                }
-            }
-            elsif ($r eq 'ARRAY') {
-                my $branch = DBM::Deep->new(
-                    type => DBM::Deep->TYPE_ARRAY,
-                    base_offset => $location,
-                    root => $root,
-                );
-                my $index = 0;
-                foreach my $element (@{$value}) {
-                    $branch->STORE( $index, $element );
-                    $index++;
-                }
-            }
-        }
-
-        return $result;
     }
 
-    $obj->_throw_error("Fatal error: indexing failed -- possibly due to corruption in file");
+    ##
+    # Plain key is stored AFTER value, as keys are typically fetched less often.
+    ##
+    print( $fh pack($self->{data_pack}, length($key)) . $key );
+
+    ##
+    # If value is blessed, preserve class name
+    ##
+    if ( $root->{autobless} ) {
+        my $value_class = Scalar::Util::blessed($value);
+        if ( defined $value_class && !$value->isa( 'DBM::Deep' ) ) {
+            ##
+            # Blessed ref -- will restore later
+            ##
+            print( $fh chr(1) );
+            print( $fh pack($self->{data_pack}, length($value_class)) . $value_class );
+            $content_length += 1;
+            $content_length += $self->{data_size} + length($value_class);
+        }
+        else {
+            print( $fh chr(0) );
+            $content_length += 1;
+        }
+    }
+
+    ##
+    # If this is a new content area, advance EOF counter
+    ##
+    if ($location == $root->{end}) {
+        $root->{end} += SIG_SIZE;
+        $root->{end} += $self->{data_size} + $content_length;
+        $root->{end} += $self->{data_size} + length($key);
+    }
+
+    ##
+    # If content is a hash or array, create new child DBM::Deep object and
+    # pass each key or element to it.
+    ##
+    if ( ! $internal_ref ) {
+        if ($r eq 'HASH') {
+            my $branch = DBM::Deep->new(
+                type => DBM::Deep->TYPE_HASH,
+                base_offset => $location,
+                root => $root,
+            );
+            foreach my $key (keys %{$value}) {
+                $branch->STORE( $key, $value->{$key} );
+            }
+        }
+        elsif ($r eq 'ARRAY') {
+            my $branch = DBM::Deep->new(
+                type => DBM::Deep->TYPE_ARRAY,
+                base_offset => $location,
+                root => $root,
+            );
+            my $index = 0;
+            foreach my $element (@{$value}) {
+                $branch->STORE( $index, $element );
+                $index++;
+            }
+        }
+    }
+
+    return 1;
 }
 
 sub split_index {
@@ -636,10 +657,7 @@ sub bucket_exists {
     my ($obj, $tag, $md5) = @_;
 
     my ($subloc, $offset) = $self->_find_in_buckets( $tag, $md5 );
-    if ( $subloc ) {
-        return 1;
-    }
-    return;
+    return $subloc && 1;
 }
 
 sub find_bucket_list {
@@ -654,7 +672,7 @@ sub find_bucket_list {
     # Locate offset for bucket list using digest index system
     ##
     my $tag = $self->load_tag($obj, $obj->_base_offset)
-        or $self->_throw_error( "INTERNAL ERROR - Cannot find tag" );
+        or $obj->_throw_error( "INTERNAL ERROR - Cannot find tag" );
 
     my $ch = 0;
     while ($tag->{signature} ne SIG_BLIST) {
@@ -664,25 +682,22 @@ sub find_bucket_list {
         $tag = $self->index_lookup( $obj, $tag, $num );
 
         if (!$tag) {
-            if ( $args->{create} ) {
-                my $fh = $obj->_fh;
-                seek($fh, $ref_loc + $obj->_root->{file_offset}, SEEK_SET);
-                print( $fh pack($self->{long_pack}, $obj->_root->{end}) );
+            return if ! $args->{create};
 
-                $tag = $self->create_tag(
-                    $obj, $obj->_root->{end},
-                    SIG_BLIST,
-                    chr(0) x $self->{bucket_list_size},
-                );
+            my $fh = $obj->_fh;
+            seek($fh, $ref_loc + $obj->_root->{file_offset}, SEEK_SET);
+            print( $fh pack($self->{long_pack}, $obj->_root->{end}) );
 
-                $tag->{ref_loc} = $ref_loc;
-                $tag->{ch} = $ch;
+            $tag = $self->create_tag(
+                $obj, $obj->_root->{end},
+                SIG_BLIST,
+                chr(0) x $self->{bucket_list_size},
+            );
 
-                last;
-            }
-            else {
-                return;
-            }
+            $tag->{ref_loc} = $ref_loc;
+            $tag->{ch} = $ch;
+
+            last;
         }
 
         $tag->{ch} = $ch;
@@ -730,10 +745,10 @@ sub traverse_index {
         my $content = $tag->{content};
         my $start = $obj->{return_next} ? 0 : ord(substr($obj->{prev_md5}, $ch, 1));
 
-        for (my $index = $start; $index < 256; $index++) {
+        for (my $idx = $start; $idx < (2**8); $idx++) {
             my $subloc = unpack(
                 $self->{long_pack},
-                substr($content, $index * $self->{long_size}, $self->{long_size}),
+                substr($content, $idx * $self->{long_size}, $self->{long_size}),
             );
 
             if ($subloc) {
@@ -857,3 +872,27 @@ sub _find_in_buckets {
 
 1;
 __END__
+
+# This will be added in later, after more refactoring is done. This is an early
+# attempt at refactoring on the physical level instead of the virtual level.
+sub _read_at {
+    my $self = shift;
+    my ($obj, $spot, $amount, $unpack) = @_;
+
+    my $fh = $obj->_fh;
+    seek( $fh, $spot + $obj->_root->{file_offset}, SEEK_SET );
+
+    my $buffer;
+    my $bytes_read = read( $fh, $buffer, $amount );
+
+    if ( $unpack ) {
+        $buffer = unpack( $unpack, $buffer );
+    }
+
+    if ( wantarray ) {
+        return ($buffer, $bytes_read);
+    }
+    else {
+        return $buffer;
+    }
+}

@@ -22,7 +22,7 @@ is( $db->{key1}, "value1", "Value still set after re-open" );
 
 throws_ok {
     my $db = DBM::Deep->new( 't' );
-} qr/^DBM::Deep: Cannot sysopen file: t: /, "Can't open a file we aren't allowed to touch";
+} qr/^DBM::Deep: Cannot sysopen file 't': /, "Can't open a file we aren't allowed to touch";
 
 throws_ok {
     my $db = DBM::Deep->new( __FILE__ );

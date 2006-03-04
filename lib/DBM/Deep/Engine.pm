@@ -336,7 +336,6 @@ sub add_bucket {
     }
     # Adding a new md5
     elsif ( defined $offset ) {
-        $result = 2;
         $location = $root->{end};
 
         seek( $fh, $tag->{offset} + $offset + $root->{file_offset}, SEEK_SET );

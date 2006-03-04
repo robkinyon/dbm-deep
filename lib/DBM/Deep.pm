@@ -1564,6 +1564,56 @@ As of Perl 5.8.7, this bug still exists.  I have walked very carefully through
 the execution path, and Perl indeed passes an empty hash to the STORE() method.
 Probably a bug in Perl.
 
+=head2 REFERENCES
+
+(The reasons given assume a high level of Perl understanding, specifically of
+references. You can safely skip this section.)
+
+Currently, the only references supported are HASH and ARRAY. The other reference
+types (SCALAR, CODE, GLOB, and REF) cannot be supported for various reasons.
+
+=over 4
+
+=item * GLOB
+
+These are things like filehandles and other sockets. They can't be supported
+because it's completely unclear how DBM::Deep should serialize them.
+
+=item * SCALAR / REF
+
+The discussion here refers to the following type of example:
+
+  my $x = 25;
+  $db->{key1} = \$x;
+
+  $x = 50;
+
+  # In some other process ...
+
+  my $val = ${ $db->{key1} };
+
+  is( $val, 50, "What actually gets stored in the DB file?" );
+
+The problem is one of synchronization. When the variable being referred to
+changes value, the reference isn't notified. This means that the new value won't
+be stored in the datafile for other processes to read. There is no TIEREF.
+
+It is theoretically possible to store references to values already within a
+DBM::Deep object because everything already is synchronized, but the change to
+the internals would be quite large. Specifically, DBM::Deep would have to tie
+every single value that is stored. This would bloat the RAM footprint of
+DBM::Deep at least twofold (if not more) and be a significant performance drain,
+all to support a feature that has never been requested.
+
+=item * CODE
+
+L<http://search.cpan.org/search?module=Data::Dump::Streamer> provides a
+mechanism for serializing coderefs, including saving off all closure state.
+However, just as for SCALAR and REF, that closure state may change without
+notifying the DBM::Deep object storing the reference.
+
+=back
+
 =head2 FILE CORRUPTION
 
 The current level of error handling in DBM::Deep is minimal.  Files I<are> checked

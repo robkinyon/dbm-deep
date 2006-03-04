@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 31;
+use Test::More tests => 32;
 use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
@@ -68,6 +68,8 @@ is( $db->{circle}{circle}{circle}{key1}, 'value1', "The value is there in three 
 # Make sure changes are reflected in both places
 ##
 $db->{key1} = "another value";
+
+isnt( $db->{key3}, 'another value', "Simple scalars are copied by value" );
 
 is( $db->{key1}, 'another value', "The value is there directly" );
 is( $db->{circle}{key1}, 'another value', "The value is there in one loop of the circle" );

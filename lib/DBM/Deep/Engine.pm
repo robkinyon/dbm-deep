@@ -270,6 +270,19 @@ sub add_bucket {
     my $self = shift;
     my ($obj, $tag, $md5, $plain_key, $value) = @_;
 
+    # This verifies that only supported values will be stored.
+    {
+        my $r = Scalar::Util::reftype( $value );
+        last if !defined $r;
+
+        last if $r eq 'HASH';
+        last if $r eq 'ARRAY';
+
+        $obj->_throw_error(
+            "Storage of variables of type '$r' is not supported."
+        );
+    }
+
     my $location = 0;
     my $result = 2;
 

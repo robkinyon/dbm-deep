@@ -61,7 +61,7 @@ sub FIRSTKEY {
 	##
 	# Locate and return first key (in no particular order)
 	##
-    my $self = $_[0]->_get_self;
+    my $self = shift->_get_self;
 
 	##
 	# Request shared lock for reading
@@ -81,11 +81,11 @@ sub NEXTKEY {
 	##
 	# Return next key (in no particular order), given previous one
 	##
-    my $self = $_[0]->_get_self;
+    my $self = shift->_get_self;
 
 	my $prev_key = ($self->_root->{filter_store_key})
-        ? $self->_root->{filter_store_key}->($_[1])
-        : $_[1];
+        ? $self->_root->{filter_store_key}->($_[0])
+        : $_[0];
 
 	my $prev_md5 = $self->{engine}{digest}->($prev_key);
 

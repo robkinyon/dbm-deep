@@ -1,4 +1,4 @@
-package DBM::Deep::Scalar;
+package DBM::Deep::Ref;
 
 use strict;
 
@@ -18,6 +18,17 @@ sub TIESCALAR {
     $args->{type} = $class->TYPE_SCALAR;
 
     return $class->_init($args);
+}
+
+sub FETCH {
+    my $self = shift->_get_self;
+
+    #my $value = $self->
+}
+
+sub STORE {
+    my $self = shift->_get_self;
+    my ($value) = @_;
 }
 
 1;

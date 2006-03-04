@@ -29,8 +29,8 @@ sub TIEARRAY {
 }
 
 sub FETCH {
-    my $self = $_[0]->_get_self;
-    my $key = $_[1];
+    my $self = shift->_get_self;
+    my ($key) = @_;
 
 	$self->lock( $self->LOCK_SH );
 	
@@ -91,8 +91,8 @@ sub STORE {
 }
 
 sub EXISTS {
-    my $self = $_[0]->_get_self;
-    my $key = $_[1];
+    my $self = shift->_get_self;
+    my ($key) = @_;
 
 	$self->lock( $self->LOCK_SH );
 
@@ -116,8 +116,8 @@ sub EXISTS {
 }
 
 sub DELETE {
-    my $self = $_[0]->_get_self;
-    my $key = $_[1];
+    my $self = shift->_get_self;
+    my ($key) = @_;
 
     my $unpacked_key = $key;
 
@@ -175,8 +175,8 @@ sub STORESIZE {
 	##
 	# Set the length of the array
 	##
-    my $self = $_[0]->_get_self;
-	my $new_length = $_[1];
+    my $self = shift->_get_self;
+	my ($new_length) = @_;
 	
     $self->lock( $self->LOCK_EX );
 
@@ -196,7 +196,7 @@ sub POP {
 	##
 	# Remove and return the last element on the array
 	##
-    my $self = $_[0]->_get_self;
+    my $self = shift->_get_self;
 
     $self->lock( $self->LOCK_EX );
 
@@ -241,7 +241,7 @@ sub SHIFT {
 	# Remove and return first element on the array.
 	# Shift over remaining elements to take up space.
 	##
-    my $self = $_[0]->_get_self;
+    my $self = shift->_get_self;
 
     $self->lock( $self->LOCK_EX );
 

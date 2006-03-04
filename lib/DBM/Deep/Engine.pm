@@ -11,7 +11,6 @@ sub SIG_FILE     () { 'DPDB' }
 sub SIG_INTERNAL () { 'i'    }
 sub SIG_HASH     () { 'H'    }
 sub SIG_ARRAY    () { 'A'    }
-sub SIG_REF      () { 'R'    }
 sub SIG_NULL     () { 'N'    }
 sub SIG_DATA     () { 'D'    }
 sub SIG_INDEX    () { 'I'    }

@@ -102,14 +102,13 @@ sub _init {
     # Setup $self and bless into this class.
     ##
     my $class = shift;
-    my $args = shift;
+    my ($args) = @_;
 
     # These are the defaults to be optionally overridden below
     my $self = bless {
         type        => TYPE_HASH,
         engine      => DBM::Deep::Engine->new,
     }, $class;
-
     $self->{base_offset} = length( $self->{engine}->SIG_FILE );
 
     foreach my $param ( keys %$self ) {
@@ -151,8 +150,8 @@ sub lock {
     # times before unlock(), then the same number of unlocks() must
     # be called before the lock is released.
     ##
-    my $self = $_[0]->_get_self;
-    my $type = $_[1];
+    my $self = shift->_get_self;
+    my ($type) = @_;
     $type = LOCK_EX unless defined $type;
 
     if (!defined($self->_fh)) { return; }
@@ -189,7 +188,7 @@ sub unlock {
     # If db locking is set, unlock the db file.  See note in lock()
     # regarding calling lock() multiple times.
     ##
-    my $self = $_[0]->_get_self;
+    my $self = shift->_get_self;
 
     if (!defined($self->_fh)) { return; }
 
@@ -262,7 +261,7 @@ sub export {
     ##
     # Recursively export into standard Perl hashes and arrays.
     ##
-    my $self = $_[0]->_get_self;
+    my $self = shift->_get_self;
 
     my $temp;
     if ($self->_type eq TYPE_HASH) { $temp = {}; }
@@ -282,8 +281,8 @@ sub import {
     #XXX This use of ref() seems to be ok
     if (!ref($_[0])) { return; } # Perl calls import() on use -- ignore
 
-    my $self = $_[0]->_get_self;
-    my $struct = $_[1];
+    my $self = shift->_get_self;
+    my ($struct) = @_;
 
     #XXX This use of ref() seems to be ok
     if (!ref($struct)) {
@@ -315,7 +314,7 @@ sub optimize {
     # Rebuild entire database into new file, then move
     # it back on top of original.
     ##
-    my $self = $_[0]->_get_self;
+    my $self = shift->_get_self;
 
 #XXX Need to create a new test for this
 #    if ($self->_root->{links} > 1) {
@@ -373,7 +372,7 @@ sub clone {
     ##
     # Make copy of object and return
     ##
-    my $self = $_[0]->_get_self;
+    my $self = shift->_get_self;
 
     return DBM::Deep->new(
         type => $self->_type,
@@ -394,9 +393,9 @@ sub clone {
         ##
         # Setup filter function for storing or fetching the key or value
         ##
-        my $self = $_[0]->_get_self;
-        my $type = lc $_[1];
-        my $func = $_[2] ? $_[2] : undef;
+        my $self = shift->_get_self;
+        my $type = lc shift;
+        my $func = shift;
 
         if ( $is_legal_filter{$type} ) {
             $self->_root->{"filter_$type"} = $func;
@@ -419,14 +418,6 @@ sub _root {
     return $self->{root};
 }
 
-sub _fh {
-    ##
-    # Get access to the raw fh
-    ##
-    my $self = $_[0]->_get_self;
-    return $self->_root->{fh};
-}
-
 sub _type {
     ##
     # Get type of current node (TYPE_HASH or TYPE_ARRAY)
@@ -441,6 +432,14 @@ sub _base_offset {
     ##
     my $self = $_[0]->_get_self;
     return $self->{base_offset};
+}
+
+sub _fh {
+    ##
+    # Get access to the raw fh
+    ##
+    my $self = $_[0]->_get_self;
+    return $self->_root->{fh};
 }
 
 ##

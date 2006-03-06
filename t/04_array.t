@@ -201,5 +201,5 @@ is($returned[0], "middle ABC");
 
 $db->[0] = [ 1 .. 3 ];
 $db->[1] = { a => 'foo' };
-is( $db->[0]->length, 3, "Reuse of same space with array successful" );
 is( $db->[1]->fetch('a'), 'foo', "Reuse of same space with hash successful" );
+is( $db->[0]->length, 3, "Reuse of same space with array successful" );

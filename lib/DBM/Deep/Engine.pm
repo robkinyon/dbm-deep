@@ -158,9 +158,12 @@ sub open {
         seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
         print( $fh SIG_FILE);
 
+        $obj->_root->{end} = length( SIG_FILE );
+
+        $obj->{base_offset} = $self->_request_space($obj, $self->{index_size});
+
         $self->create_tag(
-            $obj, $obj->_base_offset, $obj->_type,
-            chr(0) x $self->{index_size},
+            $obj, $obj->_base_offset, $obj->_type, chr(0) x $self->{index_size},
         );
 
         # Flush the filehandle
@@ -877,6 +880,22 @@ sub _find_in_buckets {
 
         return ($subloc, $i * $self->{bucket_size});
     }
+
+    return;
+}
+
+sub _request_space {
+    my $self = shift;
+    my ($obj, $size) = @_;
+
+    my $loc = $obj->_root->{end};
+
+    return $loc;
+}
+
+sub _release_space {
+    my $self = shift;
+    my ($obj, $size, $loc) = @_;
 
     return;
 }

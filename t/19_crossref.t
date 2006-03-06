@@ -21,10 +21,9 @@ my $db2 = DBM::Deep->new( $filename2 );
     $db->import(
         hash1 => {
             subkey1 => "subvalue1",
-            subkey2 => "subvalue2"
+            subkey2 => "subvalue2",
         }
     );
-
     is( $db->{hash1}{subkey1}, 'subvalue1', "Value imported correctly" );
     is( $db->{hash1}{subkey2}, 'subvalue2', "Value imported correctly" );
 

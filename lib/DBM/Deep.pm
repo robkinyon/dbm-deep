@@ -278,19 +278,13 @@ sub import {
     ##
     # Recursively import Perl hash/array structure
     ##
-    #XXX This use of ref() seems to be ok
     if (!ref($_[0])) { return; } # Perl calls import() on use -- ignore
 
     my $self = shift->_get_self;
     my ($struct) = @_;
 
-    #XXX This use of ref() seems to be ok
+    # struct is not a reference, so just import based on our type
     if (!ref($struct)) {
-        ##
-        # struct is not a reference, so just import based on our type
-        ##
-        shift @_;
-
         if ($self->_type eq TYPE_HASH) { $struct = {@_}; }
         elsif ($self->_type eq TYPE_ARRAY) { $struct = [@_]; }
     }

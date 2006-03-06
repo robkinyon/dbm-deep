@@ -54,7 +54,10 @@ is( $db->[-2], $db->[3], "-2nd index is 3rd index" );
 is( $db->[-3], $db->[2], "-3rd index is 2nd index" );
 is( $db->[-4], $db->[1], "-4th index is 1st index" );
 is( $db->[-5], $db->[0], "-5th index is 0th index" );
-is( $db->[-6], undef, "-6th index is undef" );
+
+# This is for Perls older than 5.8.0 because of is()'s prototype
+{ my $v = $db->[-6]; is( $v, undef, "-6th index is undef" ); }
+
 is( $db->length, 5, "... and we have five elements after abortive -6 index lookup" );
 
 $db->[-1] = 'elem4.1';

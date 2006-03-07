@@ -53,6 +53,8 @@ ok( $after < $before, "file size has shrunk" ); # make sure file shrunk
 is( $db->{key1}, 'value1', "key1's value is still there after optimize" );
 is( $db->{a}{c}, 'value2', "key2's value is still there after optimize" );
 
+#print keys %{$db->{a}}, $/;
+
 ##
 # now for the tricky one -- try to store a new key while file is being
 # optimized and locked by another process.  filehandle should be invalidated, 
@@ -109,6 +111,13 @@ SKIP: {
     
     # see if it was stored successfully
     is( $db->{parentfork}, "hello", "stored key while optimize took place" );
+
+#    undef $db;
+#    $db = DBM::Deep->new(
+#        file => $filename,
+#        autoflush => 1,
+#        locking => 1
+#    );
     
     # now check some existing values from before
     is( $db->{key1}, 'value1', "key1's value is still there after optimize" );

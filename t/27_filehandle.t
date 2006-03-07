@@ -28,7 +28,8 @@ my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
     ok($db->{hash}->{foo}->[1] eq 'b', "and get at stuff in the database");
     throws_ok {
         $db->{foo} = 1;
-    } qr/Cannot write to a readonly filehandle/, "Can't write to a read-only filehandle";
+    } qr/Cannot write to a readonly filehandle/,
+      "Can't write to a read-only filehandle";
     ok( !$db->exists( 'foo' ), "foo doesn't exist" );
 
     my $db_obj = $db->_get_self;

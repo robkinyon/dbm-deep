@@ -1,7 +1,11 @@
 Revision history for DBM::Deep.
 
 0.99_01 ??? ?? ??;??:?? 2006 Pacific
+    - Provided explicit dependency on Perl 5.6.0
+      - Digest::MD5 requires 5.6.0
+      - Sub::Uplevel (dep of Test::Exception) requires 5.6.0
     - Removed error()/clear_error()
+    - Broke out DBM::Deep's code into DBM::Deep::Engine
 
 0.98  Feb 28 11:00:00 2006 Pacific
     - Added in patch by David Cantrell to allow use of DATA filehandle

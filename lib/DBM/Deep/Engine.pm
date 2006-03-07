@@ -107,6 +107,9 @@ sub setup_fh {
 
     $self->open( $obj ) if !defined $obj->_fh;
 
+    $obj->{base_offset} = length( SIG_FILE )
+        unless defined $obj->{base_offset};
+
     #XXX We have to make sure we don't mess up when autoflush isn't turned on
     unless ( $obj->_root->{inode} ) {
         my @stats = stat($obj->_fh);
@@ -173,6 +176,9 @@ sub open {
 
         return 1;
     }
+
+    $obj->{base_offset} = $bytes_read
+        unless defined $obj->{base_offset};
 
     ##
     # Check signature was valid
@@ -241,6 +247,8 @@ sub load_tag {
     ##
     my $self = shift;
     my ($obj, $offset) = @_;
+
+#    print join(':',map{$_||''}caller(1)), $/;
 
     my $fh = $obj->_fh;
 
@@ -762,7 +770,11 @@ sub traverse_index {
         for (my $idx = $start; $idx < (2**8); $idx++) {
             my $subloc = unpack(
                 $self->{long_pack},
-                substr($content, $idx * $self->{long_size}, $self->{long_size}),
+                substr(
+                    $content,
+                    $idx * $self->{long_size},
+                    $self->{long_size},
+                ),
             );
 
             if ($subloc) {

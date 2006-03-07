@@ -43,9 +43,8 @@ $VERSION = q(0.99_01);
 ##
 # Setup constants for users to pass to new()
 ##
-sub TYPE_HASH   () { DBM::Deep::Engine::SIG_HASH   }
-sub TYPE_ARRAY  () { DBM::Deep::Engine::SIG_ARRAY  }
-sub TYPE_SCALAR () { DBM::Deep::Engine::SIG_SCALAR }
+sub TYPE_HASH   () { DBM::Deep::Engine->SIG_HASH   }
+sub TYPE_ARRAY  () { DBM::Deep::Engine->SIG_ARRAY  }
 
 sub _get_args {
     my $proto = shift;
@@ -108,8 +107,8 @@ sub _init {
     my $self = bless {
         type        => TYPE_HASH,
         engine      => DBM::Deep::Engine->new,
+        base_offset => undef,
     }, $class;
-    $self->{base_offset} = length( $self->{engine}->SIG_FILE );
 
     foreach my $param ( keys %$self ) {
         next unless exists $args->{$param};
@@ -319,9 +318,6 @@ sub optimize {
         file => $self->_root->{file} . '.tmp',
         type => $self->_type
     );
-    if (!$db_temp) {
-        $self->_throw_error("Cannot optimize: failed to open temp file: $!");
-    }
 
     $self->lock();
     $self->_copy_node( $db_temp );
@@ -495,7 +491,7 @@ sub FETCH {
     # Fetch single value or element given plain key or array index
     ##
     my $self = shift->_get_self;
-    my $key = shift;
+    my ($key) = @_;
 
     my $md5 = $self->{engine}{digest}->($key);
 

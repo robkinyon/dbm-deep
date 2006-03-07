@@ -160,7 +160,7 @@ sub lock {
             flock($self->_fh, $type);
 
             # refresh end counter in case file has changed size
-            my @stats = stat($self->_root->{file});
+            my @stats = stat($self->_fh);
             $self->_root->{end} = $stats[7];
 
             # double-check file inode, in case another process

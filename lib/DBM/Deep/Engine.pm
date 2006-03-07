@@ -107,8 +107,59 @@ sub setup_fh {
 
     $self->open( $obj ) if !defined $obj->_fh;
 
-    $obj->{base_offset} = length( SIG_FILE )
-        unless defined $obj->{base_offset};
+    unless ( $obj->{base_offset} ) {
+        my $fh = $obj->_fh;
+
+        flock $fh, LOCK_EX;
+
+        seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
+        my $signature;
+        my $bytes_read = read( $fh, $signature, length(SIG_FILE));
+
+        ##
+        # File is empty -- write signature and master index
+        ##
+        if (!$bytes_read) {
+            seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
+            print( $fh SIG_FILE);
+
+            $obj->_root->{end} = length( SIG_FILE );
+
+            $obj->{base_offset} = $self->_request_space($obj, $self->{index_size});
+
+            $self->create_tag(
+                $obj, $obj->_base_offset, $obj->_type, chr(0) x $self->{index_size},
+            );
+
+            # Flush the filehandle
+            my $old_fh = select $fh;
+            my $old_af = $|; $| = 1; $| = $old_af;
+            select $old_fh;
+        }
+        else {
+            $obj->{base_offset} = $bytes_read;
+
+            ##
+            # Check signature was valid
+            ##
+            unless ($signature eq SIG_FILE) {
+                $self->close_fh( $obj );
+                $obj->_throw_error("Signature not found -- file is not a Deep DB");
+            }
+
+            ##
+            # Get our type from master index signature
+            ##
+            my $tag = $self->load_tag($obj, $obj->_base_offset)
+            or $obj->_throw_error("Corrupted file, no master index record");
+
+            unless ($obj->{type} eq $tag->{signature}) {
+                $obj->_throw_error("File type mismatch");
+            }
+        }
+
+        flock $fh, LOCK_UN;
+    }
 
     #XXX We have to make sure we don't mess up when autoflush isn't turned on
     unless ( $obj->_root->{inode} ) {
@@ -149,57 +200,6 @@ sub open {
         $|=1;
         select $old;
     }
-
-    seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
-    my $signature;
-    my $bytes_read = read( $fh, $signature, length(SIG_FILE));
-
-    ##
-    # File is empty -- write signature and master index
-    ##
-    if (!$bytes_read) {
-        seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
-        print( $fh SIG_FILE);
-
-        $obj->_root->{end} = length( SIG_FILE );
-
-        $obj->{base_offset} = $self->_request_space($obj, $self->{index_size});
-
-        $self->create_tag(
-            $obj, $obj->_base_offset, $obj->_type, chr(0) x $self->{index_size},
-        );
-
-        # Flush the filehandle
-        my $old_fh = select $fh;
-        my $old_af = $|; $| = 1; $| = $old_af;
-        select $old_fh;
-
-        return 1;
-    }
-
-    $obj->{base_offset} = $bytes_read
-        unless defined $obj->{base_offset};
-
-    ##
-    # Check signature was valid
-    ##
-    unless ($signature eq SIG_FILE) {
-        $self->close_fh( $obj );
-        $obj->_throw_error("Signature not found -- file is not a Deep DB");
-    }
-
-    ##
-    # Get our type from master index signature
-    ##
-    my $tag = $self->load_tag($obj, $obj->_base_offset)
-        or $obj->_throw_error("Corrupted file, no master index record");
-
-    unless ($obj->{type} eq $tag->{signature}) {
-        $obj->_throw_error("File type mismatch");
-    }
-
-#XXX We probably also want to store the hash algorithm name and not assume anything
-#XXX The cool thing would be to allow a different hashing algorithm at every level
 
     return 1;
 }

@@ -649,10 +649,7 @@ sub new {
     my $self = bless {
         autobless          => undef,
         autoflush          => undef,
-        #XXX It should be this in order to work with the initial create_tag(),
-        #XXX but it's not ... it works out because of the stat() in setup_fh(),
-        #XXX but that's not good.
-        end                => 0, #length(DBM::Deep->SIG_FILE),
+        end                => 0,
         fh                 => undef,
         file               => undef,
         file_offset        => 0,

@@ -119,15 +119,17 @@ sub setup_fh {
         # File is empty -- write signature and master index
         ##
         if (!$bytes_read) {
-            seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
+            my $loc = $self->_request_space( $obj, length( SIG_FILE ) );
+            seek($fh, $loc + $obj->_root->{file_offset}, SEEK_SET);
             print( $fh SIG_FILE);
 
-            $obj->_root->{end} = length( SIG_FILE );
-
-            $obj->{base_offset} = $self->_request_space($obj, $self->{index_size});
+            $obj->{base_offset} = $self->_request_space(
+                $obj, $self->{index_size},
+            );
 
             $self->create_tag(
-                $obj, $obj->_base_offset, $obj->_type, chr(0) x $self->{index_size},
+                $obj, $obj->_base_offset, $obj->_type,
+                chr(0) x $self->{index_size},
             );
 
             # Flush the filehandle
@@ -177,8 +179,6 @@ sub open {
     ##
     my $self = shift;
     my ($obj) = @_;
-
-    if (defined($obj->_fh)) { $self->close_fh( $obj ); }
 
     # Theoretically, adding O_BINARY should remove the need for the binmode
     # Of course, testing it is going to be ... interesting.
@@ -900,6 +900,7 @@ sub _request_space {
     my ($obj, $size) = @_;
 
     my $loc = $obj->_root->{end};
+    $obj->_root->{end} += $size;
 
     return $loc;
 }

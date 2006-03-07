@@ -107,11 +107,10 @@ sub setup_fh {
 
     $self->open( $obj ) if !defined $obj->_fh;
 
+    my $fh = $obj->_fh;
+    flock $fh, LOCK_EX;
+
     unless ( $obj->{base_offset} ) {
-        my $fh = $obj->_fh;
-
-        flock $fh, LOCK_EX;
-
         seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
         my $signature;
         my $bytes_read = read( $fh, $signature, length(SIG_FILE));
@@ -157,8 +156,6 @@ sub setup_fh {
                 $obj->_throw_error("File type mismatch");
             }
         }
-
-        flock $fh, LOCK_UN;
     }
 
     #XXX We have to make sure we don't mess up when autoflush isn't turned on
@@ -167,6 +164,8 @@ sub setup_fh {
         $obj->_root->{inode} = $stats[1];
         $obj->_root->{end} = $stats[7];
     }
+
+    flock $fh, LOCK_UN;
 
     return 1;
 }

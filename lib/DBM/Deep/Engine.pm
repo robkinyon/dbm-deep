@@ -124,7 +124,7 @@ sub setup_fh {
             print( $fh SIG_FILE);
 
             $obj->{base_offset} = $self->_request_space(
-                $obj, $self->{index_size},
+                $obj, $self->tag_size( $self->{index_size} ),
             );
 
             $self->create_tag(
@@ -215,6 +215,12 @@ sub close_fh {
     return 1;
 }
 
+sub tag_size {
+    my $self = shift;
+    my ($size) = @_;
+    return SIG_SIZE + $self->{data_size} + $size;
+}
+
 sub create_tag {
     ##
     # Given offset, signature and content, create tag and write to disk
@@ -229,7 +235,7 @@ sub create_tag {
     print( $fh $sig . pack($self->{data_pack}, $size) . $content );
 
     if ($offset == $obj->_root->{end}) {
-        $obj->_root->{end} += SIG_SIZE + $self->{data_size} + $size;
+        $obj->_root->{end} += $self->tag_size( $size );
     }
 
     return {
@@ -504,12 +510,15 @@ sub split_index {
     my $keys = $tag->{content};
 
     seek($fh, $tag->{ref_loc} + $root->{file_offset}, SEEK_SET);
-    print( $fh pack($self->{long_pack}, $root->{end}) );
+
+    my $loc = $self->_request_space(
+        $obj, $self->tag_size( $self->{index_size} ),
+    );
+
+    print( $fh pack($self->{long_pack}, $loc) );
 
     my $index_tag = $self->create_tag(
-        $obj,
-        $root->{end},
-        SIG_INDEX,
+        $obj, $loc, SIG_INDEX,
         chr(0) x $self->{index_size},
     );
 
@@ -710,11 +719,15 @@ sub find_bucket_list {
 
             my $fh = $obj->_fh;
             seek($fh, $ref_loc + $obj->_root->{file_offset}, SEEK_SET);
-            print( $fh pack($self->{long_pack}, $obj->_root->{end}) );
+
+            my $loc = $self->_request_space(
+                $obj, $self->tag_size( $self->{bucket_list_size} ),
+            );
+
+            print( $fh pack($self->{long_pack}, $loc) );
 
             $tag = $self->create_tag(
-                $obj, $obj->_root->{end},
-                SIG_BLIST,
+                $obj, $loc, SIG_BLIST,
                 chr(0) x $self->{bucket_list_size},
             );
 
@@ -724,10 +737,8 @@ sub find_bucket_list {
             last;
         }
 
-        $tag->{ch} = $ch;
+        $tag->{ch} = $ch++;
         $tag->{ref_loc} = $ref_loc;
-
-        $ch++;
     }
 
     return $tag;

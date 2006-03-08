@@ -271,6 +271,40 @@ sub load_tag {
     };
 }
 
+sub _length_needed {
+    my $self = shift;
+    my ($obj, $value) = @_;
+
+    my $is_dbm_deep = eval {
+        local $SIG{'__DIE__'};
+        $value->isa( 'DBM::Deep' );
+    };
+
+    my $internal_ref = $is_dbm_deep && ($value->_root eq $obj->_root);
+
+    if ( $internal_ref ) {
+        return $self->{long_size};
+    }
+
+    my $r = Scalar::Util::reftype( $value ) || '';
+    unless ( $r eq 'HASH' || $r eq 'ARRAY' ) {
+        return length( $value );
+    }
+
+    my $actual_length = $self->{index_size};
+
+    # if autobless is enabled, must also take into consideration
+    # the class name, as it is stored along with key/value.
+    if ( $obj->_root->{autobless} ) {
+        my $value_class = Scalar::Util::blessed($value);
+        if ( defined $value_class && !$value->isa('DBM::Deep') ) {
+            $actual_length += length($value_class);
+        }
+    }
+
+    return $actual_length;
+}
+
 sub add_bucket {
     ##
     # Adds one key/value pair to bucket list, given offset, MD5 digest of key,
@@ -297,13 +331,6 @@ sub add_bucket {
 
     my $root = $obj->_root;
 
-    my $is_dbm_deep = eval {
-        local $SIG{'__DIE__'};
-        $value->isa( 'DBM::Deep' );
-    };
-
-    my $internal_ref = $is_dbm_deep && ($value->_root eq $root);
-
     my $fh = $obj->_fh;
 
     my ($subloc, $offset) = $self->_find_in_buckets( $tag, $md5 );
@@ -312,36 +339,12 @@ sub add_bucket {
     if ( $subloc ) {
         $result = 1;
 
-        ##
-        # If value is a hash, array, or raw value with equal or less size, we
-        # can reuse the same content area of the database.  Otherwise, we have
-        # to create a new content area at the EOF.
-        ##
-        my $actual_length;
-        if ( $internal_ref ) {
-            $actual_length = $self->{long_size};
-        }
-        else {
-            my $r = Scalar::Util::reftype( $value ) || '';
-            if ( $r eq 'HASH' || $r eq 'ARRAY' ) {
-                $actual_length = $self->{index_size};
-
-                # if autobless is enabled, must also take into consideration
-                # the class name, as it is stored along with key/value.
-                if ( $root->{autobless} ) {
-                    my $value_class = Scalar::Util::blessed($value);
-                    if ( defined $value_class && !$value->isa('DBM::Deep') ) {
-                        $actual_length += length($value_class);
-                    }
-                }
-            }
-            else { $actual_length = length($value); }
-        }
-
         seek($fh, $subloc + SIG_SIZE + $root->{file_offset}, SEEK_SET);
         my $size;
         read( $fh, $size, $self->{data_size});
         $size = unpack($self->{data_pack}, $size);
+
+        my $actual_length = $self->_length_needed( $obj, $value );
 
         if ($actual_length <= $size) {
             $location = $subloc;
@@ -703,7 +706,7 @@ sub find_bucket_list {
         $tag = $self->index_lookup( $obj, $tag, $num );
 
         if (!$tag) {
-            return if ! $args->{create};
+            return if !$args->{create};
 
             my $fh = $obj->_fh;
             seek($fh, $ref_loc + $obj->_root->{file_offset}, SEEK_SET);

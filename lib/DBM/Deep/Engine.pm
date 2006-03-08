@@ -24,7 +24,7 @@ sub precalc_sizes {
     my $self = shift;
 
     $self->{index_size}       = (2**8) * $self->{long_size};
-    $self->{bucket_size}      = $self->{hash_size} + $self->{long_size};
+    $self->{bucket_size}      = $self->{hash_size} + $self->{long_size} * 2;
     $self->{bucket_list_size} = $self->{max_buckets} * $self->{bucket_size};
 
     return 1;
@@ -865,8 +865,8 @@ sub _get_key_subloc {
     my $self = shift;
     my ($keys, $idx) = @_;
 
-    my ($key, $subloc) = unpack(
-        "a$self->{hash_size} $self->{long_pack}",
+    my ($key, $subloc, $size) = unpack(
+        "a$self->{hash_size} $self->{long_pack} $self->{long_pack}",
         substr(
             $keys,
             ($idx * $self->{bucket_size}),
@@ -874,7 +874,7 @@ sub _get_key_subloc {
         ),
     );
 
-    return ($key, $subloc);
+    return ($key, $subloc, $size);
 }
 
 sub _find_in_buckets {

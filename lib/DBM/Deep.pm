@@ -1497,8 +1497,8 @@ Here is an example:
     $db->{foo} = "bar";
     $db->{circle} = $db; # ref to self
 
-    print $db->{foo} . "\n"; # prints "foo"
-    print $db->{circle}->{foo} . "\n"; # prints "foo" again
+    print $db->{foo} . "\n"; # prints "bar"
+    print $db->{circle}->{foo} . "\n"; # prints "bar" again
 
 B<Note>: Passing the object to a function that recursively walks the
 object tree (such as I<Data::Dumper> or even the built-in C<optimize()> or

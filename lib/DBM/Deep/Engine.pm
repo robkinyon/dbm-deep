@@ -234,10 +234,6 @@ sub create_tag {
     seek($fh, $offset + $obj->_root->{file_offset}, SEEK_SET);
     print( $fh $sig . pack($self->{data_pack}, $size) . $content );
 
-    if ($offset == $obj->_root->{end}) {
-        $obj->_root->{end} += $self->tag_size( $size );
-    }
-
     return {
         signature => $sig,
         size => $size,
@@ -553,9 +549,17 @@ sub split_index {
         else {
             $offsets[$num] = $root->{end};
             seek($fh, $index_tag->{offset} + ($num * $self->{long_size}) + $root->{file_offset}, SEEK_SET);
-            print( $fh pack($self->{long_pack}, $root->{end}) );
 
-            my $blist_tag = $self->create_tag($obj, $root->{end}, SIG_BLIST, chr(0) x $self->{bucket_list_size});
+            my $loc = $self->_request_space(
+                $obj, $self->tag_size( $self->{bucket_list_size} ),
+            );
+
+            print( $fh pack($self->{long_pack}, $loc) );
+
+            my $blist_tag = $self->create_tag(
+                $obj, $loc, SIG_BLIST,
+                chr(0) x $self->{bucket_list_size},
+            );
 
             seek($fh, $blist_tag->{offset} + $root->{file_offset}, SEEK_SET);
             print( $fh $key . pack($self->{long_pack}, $old_subloc || $root->{end}) );

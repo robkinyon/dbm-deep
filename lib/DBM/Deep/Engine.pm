@@ -129,7 +129,7 @@ sub setup_fh {
 
             $self->create_tag(
                 $obj, $obj->_base_offset, $obj->_type,
-                chr(0) x $self->{index_size},
+                chr(0)x$self->{index_size},
             );
 
             # Flush the filehandle
@@ -227,12 +227,17 @@ sub create_tag {
     ##
     my $self = shift;
     my ($obj, $offset, $sig, $content) = @_;
-    my $size = length($content);
+    my $size = length( $content );
 
     my $fh = $obj->_fh;
 
-    seek($fh, $offset + $obj->_root->{file_offset}, SEEK_SET);
+    if ( defined $offset ) {
+        seek($fh, $offset + $obj->_root->{file_offset}, SEEK_SET);
+    }
+
     print( $fh $sig . pack($self->{data_pack}, $size) . $content );
+
+    return unless defined $offset;
 
     return {
         signature => $sig,
@@ -275,36 +280,43 @@ sub load_tag {
 
 sub _length_needed {
     my $self = shift;
-    my ($obj, $value) = @_;
+    my ($obj, $value, $key) = @_;
 
     my $is_dbm_deep = eval {
         local $SIG{'__DIE__'};
         $value->isa( 'DBM::Deep' );
     };
 
-    my $internal_ref = $is_dbm_deep && ($value->_root eq $obj->_root);
+    my $len = SIG_SIZE + $self->{data_size}
+            + $self->{data_size} + length( $key );
 
-    if ( $internal_ref ) {
-        return $self->{long_size};
+    if ( $is_dbm_deep && $value->_root eq $obj->_root ) {
+        return $len + $self->{long_size};
     }
 
     my $r = Scalar::Util::reftype( $value ) || '';
     unless ( $r eq 'HASH' || $r eq 'ARRAY' ) {
-        return length( $value );
+        if ( defined $value ) {
+            $len += length( $value );
+        }
+        return $len;
     }
 
-    my $actual_length = $self->{index_size};
+    $len += $self->{index_size};
 
     # if autobless is enabled, must also take into consideration
-    # the class name, as it is stored along with key/value.
+    # the class name as it is stored after the key.
     if ( $obj->_root->{autobless} ) {
+        # This is for the bit saying whether or not this thing is blessed.
+        $len += 1;
+
         my $value_class = Scalar::Util::blessed($value);
-        if ( defined $value_class && !$value->isa('DBM::Deep') ) {
-            $actual_length += length($value_class);
+        if ( defined $value_class && !$is_dbm_deep ) {
+            $len += $self->{data_size} + length($value_class);
         }
     }
 
-    return $actual_length;
+    return $len;
 }
 
 sub add_bucket {
@@ -332,8 +344,9 @@ sub add_bucket {
     my $result = 2;
 
     my $root = $obj->_root;
+    my $fh   = $obj->_fh;
 
-    my $fh = $obj->_fh;
+    my $actual_length = $self->_length_needed( $obj, $value, $plain_key );
 
     my ($subloc, $offset) = $self->_find_in_buckets( $tag, $md5 );
 
@@ -346,13 +359,11 @@ sub add_bucket {
         read( $fh, $size, $self->{data_size});
         $size = unpack($self->{data_pack}, $size);
 
-        my $actual_length = $self->_length_needed( $obj, $value );
-
         if ($actual_length <= $size) {
             $location = $subloc;
         }
         else {
-            $location = $root->{end};
+            $location = $self->_request_space( $obj, $actual_length );
             seek(
                 $fh,
                 $tag->{offset} + $offset + $self->{hash_size} + $root->{file_offset},
@@ -363,7 +374,7 @@ sub add_bucket {
     }
     # Adding a new md5
     elsif ( defined $offset ) {
-        $location = $root->{end};
+        $location = $self->_request_space( $obj, $actual_length );
 
         seek( $fh, $tag->{offset} + $offset + $root->{file_offset}, SEEK_SET );
         print( $fh $md5 . pack($self->{long_pack}, $location) );
@@ -372,7 +383,7 @@ sub add_bucket {
     else {
         $self->split_index( $obj, $md5, $tag );
 
-        $location = $root->{end};
+        $location = $self->_request_space( $obj, $actual_length );
     }
 
     $self->write_value( $obj, $location, $plain_key, $value );
@@ -401,34 +412,20 @@ sub write_value {
     # actual value.
     ##
     my $r = Scalar::Util::reftype($value) || '';
-    my $content_length;
     if ( $internal_ref ) {
-        print( $fh SIG_INTERNAL );
-        print( $fh pack($self->{data_pack}, $self->{long_size}) );
-        print( $fh pack($self->{long_pack}, $value->_base_offset) );
-        $content_length = $self->{long_size};
+        $self->create_tag( $obj, undef, SIG_INTERNAL,pack($self->{long_pack}, $value->_base_offset) );
+    }
+    elsif ($r eq 'HASH') {
+        $self->create_tag( $obj, undef, SIG_HASH, chr(0)x$self->{index_size} );
+    }
+    elsif ($r eq 'ARRAY') {
+        $self->create_tag( $obj, undef, SIG_ARRAY, chr(0)x$self->{index_size} );
+    }
+    elsif (!defined($value)) {
+        $self->create_tag( $obj, undef, SIG_INTERNAL, '' );
     }
     else {
-        if ($r eq 'HASH') {
-            print( $fh SIG_HASH );
-            print( $fh pack($self->{data_pack}, $self->{index_size}) . chr(0) x $self->{index_size} );
-            $content_length = $self->{index_size};
-        }
-        elsif ($r eq 'ARRAY') {
-            print( $fh SIG_ARRAY );
-            print( $fh pack($self->{data_pack}, $self->{index_size}) . chr(0) x $self->{index_size} );
-            $content_length = $self->{index_size};
-        }
-        elsif (!defined($value)) {
-            print( $fh SIG_NULL );
-            print( $fh pack($self->{data_pack}, 0) );
-            $content_length = 0;
-        }
-        else {
-            print( $fh SIG_DATA );
-            print( $fh pack($self->{data_pack}, length($value)) . $value );
-            $content_length = length($value);
-        }
+        $self->create_tag( $obj, undef, SIG_DATA, $value );
     }
 
     ##
@@ -441,35 +438,20 @@ sub write_value {
     ##
     if ( $root->{autobless} ) {
         my $value_class = Scalar::Util::blessed($value);
-        if ( defined $value_class && !$value->isa( 'DBM::Deep' ) ) {
-            ##
-            # Blessed ref -- will restore later
-            ##
+        if ( defined $value_class && !$is_dbm_deep ) {
             print( $fh chr(1) );
             print( $fh pack($self->{data_pack}, length($value_class)) . $value_class );
-            $content_length += 1;
-            $content_length += $self->{data_size} + length($value_class);
         }
         else {
             print( $fh chr(0) );
-            $content_length += 1;
         }
-    }
-
-    ##
-    # If this is a new content area, advance EOF counter
-    ##
-    if ($location == $root->{end}) {
-        $root->{end} += SIG_SIZE;
-        $root->{end} += $self->{data_size} + $content_length;
-        $root->{end} += $self->{data_size} + length($key);
     }
 
     ##
     # If content is a hash or array, create new child DBM::Deep object and
     # pass each key or element to it.
     ##
-    if ( ! $internal_ref ) {
+    if ( !$internal_ref ) {
         if ($r eq 'HASH') {
             my $branch = DBM::Deep->new(
                 type => DBM::Deep->TYPE_HASH,
@@ -515,7 +497,7 @@ sub split_index {
 
     my $index_tag = $self->create_tag(
         $obj, $loc, SIG_INDEX,
-        chr(0) x $self->{index_size},
+        chr(0)x$self->{index_size},
     );
 
     my @offsets = ();
@@ -558,7 +540,7 @@ sub split_index {
 
             my $blist_tag = $self->create_tag(
                 $obj, $loc, SIG_BLIST,
-                chr(0) x $self->{bucket_list_size},
+                chr(0)x$self->{bucket_list_size},
             );
 
             seek($fh, $blist_tag->{offset} + $root->{file_offset}, SEEK_SET);
@@ -732,7 +714,7 @@ sub find_bucket_list {
 
             $tag = $self->create_tag(
                 $obj, $loc, SIG_BLIST,
-                chr(0) x $self->{bucket_list_size},
+                chr(0)x$self->{bucket_list_size},
             );
 
             $tag->{ref_loc} = $ref_loc;

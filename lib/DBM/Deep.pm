@@ -624,7 +624,7 @@ sub CLEAR {
 
     $self->{engine}->create_tag(
         $self, $self->_base_offset, $self->_type,
-        chr(0) x $self->{engine}{index_size},
+        chr(0)x$self->{engine}{index_size},
     );
 
     $self->unlock();

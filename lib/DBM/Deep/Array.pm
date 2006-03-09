@@ -33,7 +33,7 @@ sub FETCH {
     my ($key) = @_;
 
 	$self->lock( $self->LOCK_SH );
-	
+
     if ( $key =~ /^-?\d+$/ ) {
         if ( $key < 0 ) {
             $key += $self->FETCHSIZE;

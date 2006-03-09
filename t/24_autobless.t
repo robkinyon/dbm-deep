@@ -7,7 +7,7 @@ use strict;
     sub foo { 'foo' };
 }
 
-use Test::More tests => 54;
+use Test::More tests => 64;
 use File::Temp qw( tempfile tempdir );
 
 use_ok( 'DBM::Deep' );
@@ -26,6 +26,10 @@ my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
     }, 'Foo';
 
     $db->{blessed} = $obj;
+    is( $db->{blessed}{a}, 1 );
+    is( $db->{blessed}{b}[0], 1 );
+    is( $db->{blessed}{b}[1], 2 );
+    is( $db->{blessed}{b}[2], 3 );
 
     my $obj2 = bless [
         { a => 'foo' },
@@ -33,12 +37,20 @@ my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
     ], 'Foo';
     $db->{blessed2} = $obj2;
 
+    is( $db->{blessed2}[0]{a}, 'foo' );
+    is( $db->{blessed2}[1], '2' );
+
     $db->{unblessed} = {};
     $db->{unblessed}{a} = 1;
     $db->{unblessed}{b} = [];
     $db->{unblessed}{b}[0] = 1;
     $db->{unblessed}{b}[1] = 2;
     $db->{unblessed}{b}[2] = 3;
+
+    is( $db->{unblessed}{a}, 1 );
+    is( $db->{unblessed}{b}[0], 1 );
+    is( $db->{unblessed}{b}[1], 2 );
+    is( $db->{unblessed}{b}[2], 3 );
 }
 
 {

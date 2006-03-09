@@ -457,7 +457,7 @@ sub STORE {
     my $self = shift->_get_self;
     my ($key, $value) = @_;
 
-    unless ( _is_writable( $self->_fh ) ) {
+    if ( $^O ne 'MSWin32' && !_is_writable( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
@@ -527,7 +527,7 @@ sub DELETE {
     my $self = $_[0]->_get_self;
     my $key = $_[1];
 
-    unless ( _is_writable( $self->_fh ) ) {
+    if ( $^O ne 'MSWin32' && !_is_writable( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
@@ -605,7 +605,7 @@ sub CLEAR {
     ##
     my $self = $_[0]->_get_self;
 
-    unless ( _is_writable( $self->_fh ) ) {
+    if ( $^O ne 'MSWin32' && !_is_writable( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
@@ -622,7 +622,7 @@ sub CLEAR {
         return;
     }
 
-    $self->{engine}->create_tag(
+    $self->{engine}->write_tag(
         $self, $self->_base_offset, $self->_type,
         chr(0)x$self->{engine}{index_size},
     );

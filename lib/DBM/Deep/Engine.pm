@@ -127,7 +127,7 @@ sub setup_fh {
                 $obj, $self->tag_size( $self->{index_size} ),
             );
 
-            $self->create_tag(
+            $self->write_tag(
                 $obj, $obj->_base_offset, $obj->_type,
                 chr(0)x$self->{index_size},
             );
@@ -221,7 +221,7 @@ sub tag_size {
     return SIG_SIZE + $self->{data_size} + $size;
 }
 
-sub create_tag {
+sub write_tag {
     ##
     # Given offset, signature and content, create tag and write to disk
     ##
@@ -414,19 +414,19 @@ sub write_value {
     ##
     my $r = Scalar::Util::reftype($value) || '';
     if ( $internal_ref ) {
-        $self->create_tag( $obj, undef, SIG_INTERNAL,pack($self->{long_pack}, $value->_base_offset) );
+        $self->write_tag( $obj, undef, SIG_INTERNAL,pack($self->{long_pack}, $value->_base_offset) );
     }
     elsif ($r eq 'HASH') {
-        $self->create_tag( $obj, undef, SIG_HASH, chr(0)x$self->{index_size} );
+        $self->write_tag( $obj, undef, SIG_HASH, chr(0)x$self->{index_size} );
     }
     elsif ($r eq 'ARRAY') {
-        $self->create_tag( $obj, undef, SIG_ARRAY, chr(0)x$self->{index_size} );
+        $self->write_tag( $obj, undef, SIG_ARRAY, chr(0)x$self->{index_size} );
     }
     elsif (!defined($value)) {
-        $self->create_tag( $obj, undef, SIG_NULL, '' );
+        $self->write_tag( $obj, undef, SIG_NULL, '' );
     }
     else {
-        $self->create_tag( $obj, undef, SIG_DATA, $value );
+        $self->write_tag( $obj, undef, SIG_DATA, $value );
     }
 
     ##
@@ -499,7 +499,7 @@ sub split_index {
 
     print( $fh pack($self->{long_pack}, $loc) );
 
-    my $index_tag = $self->create_tag(
+    my $index_tag = $self->write_tag(
         $obj, $loc, SIG_INDEX,
         chr(0)x$self->{index_size},
     );
@@ -542,7 +542,7 @@ sub split_index {
 
             print( $fh pack($self->{long_pack}, $loc) );
 
-            my $blist_tag = $self->create_tag(
+            my $blist_tag = $self->write_tag(
                 $obj, $loc, SIG_BLIST,
                 chr(0)x$self->{bucket_list_size},
             );
@@ -716,7 +716,7 @@ sub find_bucket_list {
 
             print( $fh pack($self->{long_pack}, $loc) );
 
-            $tag = $self->create_tag(
+            $tag = $self->write_tag(
                 $obj, $loc, SIG_BLIST,
                 chr(0)x$self->{bucket_list_size},
             );

@@ -15,6 +15,7 @@ sub SIG_NULL     () { 'N'    }
 sub SIG_DATA     () { 'D'    }
 sub SIG_INDEX    () { 'I'    }
 sub SIG_BLIST    () { 'B'    }
+sub SIG_FREE     () { 'F'    }
 sub SIG_SIZE     () {  1     }
 
 sub precalc_sizes {
@@ -382,7 +383,7 @@ sub add_bucket {
     # If bucket didn't fit into list, split into a new index level
     else {
 #XXX This is going to be a problem.
-        $self->split_index( $obj, $md5, $tag );
+       $self->split_index( $obj, $md5, $tag );
 
         $location = $self->_request_space( $obj, $actual_length );
     }
@@ -489,14 +490,12 @@ sub split_index {
 
     my $fh = $obj->_fh;
     my $root = $obj->_root;
-    my $keys = $tag->{content};
-
-    seek($fh, $tag->{ref_loc} + $root->{file_offset}, SEEK_SET);
 
     my $loc = $self->_request_space(
         $obj, $self->tag_size( $self->{index_size} ),
     );
 
+    seek($fh, $tag->{ref_loc} + $root->{file_offset}, SEEK_SET);
     print( $fh pack($self->{long_pack}, $loc) );
 
     my $index_tag = $self->write_tag(
@@ -506,7 +505,8 @@ sub split_index {
 
     my @offsets = ();
 
-    $keys .= $md5 . (pack($self->{long_pack}, 0) x 2);
+    my $keys = $tag->{content}
+             . $md5 . (pack($self->{long_pack}, 0) x 2);
 
     BUCKET:
     for (my $i = 0; $i <= $self->{max_buckets}; $i++) {
@@ -517,40 +517,43 @@ sub split_index {
         my $num = ord(substr($key, $tag->{ch} + 1, 1));
 
         if ($offsets[$num]) {
-            my $offset = $offsets[$num] + SIG_SIZE + $self->{data_size};
-            seek($fh, $offset + $root->{file_offset}, SEEK_SET);
+            seek($fh, $offsets[$num] + $root->{file_offset}, SEEK_SET);
             my $subkeys;
             read( $fh, $subkeys, $self->{bucket_list_size});
 
-            for (my $k=0; $k<$self->{max_buckets}; $k++) {
-                my ($temp, $subloc) = $self->_get_key_subloc( $subkeys, $k );
-
-                if (!$subloc) {
-                    seek($fh, $offset + ($k * $self->{bucket_size}) + $root->{file_offset}, SEEK_SET);
-                    print( $fh $key . pack($self->{long_pack}, $old_subloc || $root->{end}) );
-                    last;
-                }
-            } # k loop
-        }
-        else {
-            $offsets[$num] = $root->{end};
-            seek($fh, $index_tag->{offset} + ($num * $self->{long_size}) + $root->{file_offset}, SEEK_SET);
-
-            my $loc = $self->_request_space(
-                $obj, $self->tag_size( $self->{bucket_list_size} ),
+            my ($subloc, $offset, $size) = $self->_find_in_buckets(
+                { content => $subkeys }, ''
             );
 
-            print( $fh pack($self->{long_pack}, $loc) );
-
-            my $blist_tag = $self->write_tag(
-                $obj, $loc, SIG_BLIST,
-                chr(0)x$self->{bucket_list_size},
-            );
-
-            seek($fh, $blist_tag->{offset} + $root->{file_offset}, SEEK_SET);
+            seek($fh, $offsets[$num] + $offset + $root->{file_offset}, SEEK_SET);
             print( $fh $key . pack($self->{long_pack}, $old_subloc || $root->{end}) );
+
+            next;
         }
-    } # i loop
+
+        seek($fh, $index_tag->{offset} + ($num * $self->{long_size}) + $root->{file_offset}, SEEK_SET);
+
+        my $loc = $self->_request_space(
+            $obj, $self->tag_size( $self->{bucket_list_size} ),
+        );
+
+        print( $fh pack($self->{long_pack}, $loc) );
+
+        my $blist_tag = $self->write_tag(
+            $obj, $loc, SIG_BLIST,
+            chr(0)x$self->{bucket_list_size},
+        );
+
+        seek($fh, $blist_tag->{offset} + $root->{file_offset}, SEEK_SET);
+        print( $fh $key . pack($self->{long_pack}, $old_subloc || $root->{end}) );
+
+        $offsets[$num] = $blist_tag->{offset};
+    }
+
+    $self->_release_space(
+        $obj, $self->tag_size( $self->{index_size} ),
+        $tag->{offset} - SIG_SIZE - $self->{data_size},
+    );
 
     return;
 }
@@ -707,13 +710,12 @@ sub find_bucket_list {
         if (!$tag) {
             return if !$args->{create};
 
-            my $fh = $obj->_fh;
-            seek($fh, $ref_loc + $obj->_root->{file_offset}, SEEK_SET);
-
             my $loc = $self->_request_space(
                 $obj, $self->tag_size( $self->{bucket_list_size} ),
             );
 
+            my $fh = $obj->_fh;
+            seek($fh, $ref_loc + $obj->_root->{file_offset}, SEEK_SET);
             print( $fh pack($self->{long_pack}, $loc) );
 
             $tag = $self->write_tag(
@@ -901,6 +903,17 @@ sub _find_in_buckets {
     return;
 }
 
+#sub _print_at {
+#    my $self = shift;
+#    my ($obj, $spot, $data) = @_;
+#
+#    my $fh = $obj->_fh;
+#    seek( $fh, $spot, SEEK_SET );
+#    print( $fh $data );
+#
+#    return;
+#}
+
 sub _request_space {
     my $self = shift;
     my ($obj, $size) = @_;
@@ -914,6 +927,15 @@ sub _request_space {
 sub _release_space {
     my $self = shift;
     my ($obj, $size, $loc) = @_;
+
+    my $next_loc = 0;
+
+    my $fh = $obj->_fh;
+    seek( $fh, $loc + $obj->_root->{file_offset}, SEEK_SET );
+    print( $fh SIG_FREE
+        . pack($self->{long_pack}, $size )
+        . pack($self->{long_pack}, $next_loc )
+    );
 
     return;
 }

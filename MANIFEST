@@ -37,3 +37,4 @@ t/26_scalar_ref.t
 t/27_filehandle.t
 t/28_DATA.t
 t/29_freespace_manager.t
+

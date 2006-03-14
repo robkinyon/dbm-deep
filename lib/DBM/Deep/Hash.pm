@@ -8,6 +8,24 @@ sub _get_self {
     eval { local $SIG{'__DIE__'}; tied( %{$_[0]} ) } || $_[0]
 }
 
+sub _repr { shift;return { @_ } }
+
+sub _import {
+    my $self = shift;
+    my ($struct) = @_;
+
+    eval {
+        local $SIG{'__DIE__'};
+        foreach my $key (keys %$struct) {
+            $self->put($key, $struct->{$key});
+        }
+    }; if ($@) {
+        $self->_throw_error("Cannot import: type mismatch");
+    }
+
+    return 1;
+}
+
 sub TIEHASH {
     ##
     # Tied hash constructor method, called by Perl's tie() function.
@@ -106,8 +124,22 @@ sub NEXTKEY {
 ##
 # Public method aliases
 ##
-sub first_key { (CORE::shift)->FIRSTKEY(@_) }
-sub next_key { (CORE::shift)->NEXTKEY(@_) }
+sub first_key { (shift)->FIRSTKEY(@_) }
+sub next_key { (shift)->NEXTKEY(@_) }
+
+sub _copy_node {
+    my $self = shift->_get_self;
+    my ($db_temp) = @_;
+
+    my $key = $self->first_key();
+    while ($key) {
+        my $value = $self->get($key);
+        $self->_copy_value( \$db_temp->{$key}, $value );
+        $key = $self->next_key($key);
+    }
+
+    return 1;
+}
 
 1;
 __END__

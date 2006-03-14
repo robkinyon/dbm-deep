@@ -209,8 +209,7 @@ sub _copy_value {
         ${$spot} = $value;
     }
     elsif ( eval { local $SIG{__DIE__}; $value->isa( 'DBM::Deep' ) } ) {
-        my $type = $value->_type;
-        ${$spot} = $type eq TYPE_HASH ? {} : [];
+        ${$spot} = $value->_repr;
         $value->_copy_node( ${$spot} );
     }
     else {
@@ -230,30 +229,11 @@ sub _copy_value {
 }
 
 sub _copy_node {
-    ##
-    # Copy single level of keys or elements to new DB handle.
-    # Recurse for nested structures
-    ##
-    my $self = shift->_get_self;
-    my ($db_temp) = @_;
+    die "Must be implemented in a child class\n";
+}
 
-    if ($self->_type eq TYPE_HASH) {
-        my $key = $self->first_key();
-        while ($key) {
-            my $value = $self->get($key);
-            $self->_copy_value( \$db_temp->{$key}, $value );
-            $key = $self->next_key($key);
-        }
-    }
-    else {
-        my $length = $self->length();
-        for (my $index = 0; $index < $length; $index++) {
-            my $value = $self->get($index);
-            $self->_copy_value( \$db_temp->[$index], $value );
-        }
-    }
-
-    return 1;
+sub _repr {
+    die "Must be implemented in a child class\n";
 }
 
 sub export {
@@ -262,9 +242,7 @@ sub export {
     ##
     my $self = shift->_get_self;
 
-    my $temp;
-    if ($self->_type eq TYPE_HASH) { $temp = {}; }
-    elsif ($self->_type eq TYPE_ARRAY) { $temp = []; }
+    my $temp = $self->_repr;
 
     $self->lock();
     $self->_copy_node( $temp );
@@ -284,22 +262,10 @@ sub import {
 
     # struct is not a reference, so just import based on our type
     if (!ref($struct)) {
-        if ($self->_type eq TYPE_HASH) { $struct = {@_}; }
-        elsif ($self->_type eq TYPE_ARRAY) { $struct = [@_]; }
+        $struct = $self->_repr( @_ );
     }
 
-    my $r = Scalar::Util::reftype($struct) || '';
-    if ($r eq "HASH" && $self->_type eq TYPE_HASH) {
-        foreach my $key (keys %$struct) { $self->put($key, $struct->{$key}); }
-    }
-    elsif ($r eq "ARRAY" && $self->_type eq TYPE_ARRAY) {
-        $self->push( @$struct );
-    }
-    else {
-        $self->_throw_error("Cannot import: type mismatch");
-    }
-
-    return 1;
+    return $self->_import( $struct );
 }
 
 sub optimize {
@@ -622,6 +588,7 @@ sub CLEAR {
         return;
     }
 
+#XXX This needs updating to use _release_space
     $self->{engine}->write_tag(
         $self, $self->_base_offset, $self->_type,
         chr(0)x$self->{engine}{index_size},

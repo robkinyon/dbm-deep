@@ -16,6 +16,21 @@ sub _get_self {
     eval { local $SIG{'__DIE__'}; tied( @{$_[0]} ) } || $_[0]
 }
 
+sub _repr { shift;[ @_ ] }
+
+sub _import {
+    my $self = shift;
+    my ($struct) = @_;
+
+    eval {
+        local $SIG{'__DIE__'};
+        $self->push( @$struct );
+    }; if ($@) {
+        $self->_throw_error("Cannot import: type mismatch");
+    }
+
+    return 1;
+}
 sub TIEARRAY {
 ##
 # Tied array constructor method, called by Perl's tie() function.
@@ -373,15 +388,31 @@ sub SPLICE {
 	##
 #}
 
+sub _copy_node {
+    my $self = shift->_get_self;
+    my ($db_temp) = @_;
+
+    my $length = $self->length();
+    for (my $index = 0; $index < $length; $index++) {
+        my $value = $self->get($index);
+        $self->_copy_value( \$db_temp->[$index], $value );
+    }
+
+    return 1;
+}
+
 ##
 # Public method aliases
 ##
-sub length { (CORE::shift)->FETCHSIZE(@_) }
-sub pop { (CORE::shift)->POP(@_) }
-sub push { (CORE::shift)->PUSH(@_) }
+sub length { (shift)->FETCHSIZE(@_) }
+sub pop { (shift)->POP(@_) }
+sub push { (shift)->PUSH(@_) }
+sub unshift { (shift)->UNSHIFT(@_) }
+sub splice { (shift)->SPLICE(@_) }
+
+# This must be last otherwise we have to qualify all other calls to shift
+# as calls to CORE::shift
 sub shift { (CORE::shift)->SHIFT(@_) }
-sub unshift { (CORE::shift)->UNSHIFT(@_) }
-sub splice { (CORE::shift)->SPLICE(@_) }
 
 1;
 __END__

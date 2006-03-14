@@ -353,7 +353,9 @@ sub add_bucket {
 
     my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
 
+#    $self->_release_space( $obj, $size, $subloc );
     # Updating a known md5
+#XXX This needs updating to use _release_space
     if ( $subloc ) {
         $result = 1;
 
@@ -381,11 +383,9 @@ sub add_bucket {
         print( $fh pack($self->{long_pack}, $actual_length ) );
     }
     # If bucket didn't fit into list, split into a new index level
+    # split_index() will do the _request_space() call
     else {
-#XXX This is going to be a problem.
-       $self->split_index( $obj, $md5, $tag );
-
-        $location = $self->_request_space( $obj, $actual_length );
+        $location = $self->split_index( $obj, $md5, $tag );
     }
 
     $self->write_value( $obj, $location, $plain_key, $value );
@@ -405,7 +405,7 @@ sub write_value {
         $value->isa( 'DBM::Deep' );
     };
 
-    my $internal_ref = $is_dbm_deep && ($value->_root eq $root);
+    my $is_internal_ref = $is_dbm_deep && ($value->_root eq $root);
 
     seek($fh, $location + $root->{file_offset}, SEEK_SET);
 
@@ -414,7 +414,7 @@ sub write_value {
     # actual value.
     ##
     my $r = Scalar::Util::reftype($value) || '';
-    if ( $internal_ref ) {
+    if ( $is_internal_ref ) {
         $self->write_tag( $obj, undef, SIG_INTERNAL,pack($self->{long_pack}, $value->_base_offset) );
     }
     elsif ($r eq 'HASH') {
@@ -436,7 +436,7 @@ sub write_value {
     print( $fh pack($self->{data_pack}, length($key)) . $key );
 
     # Internal references don't care about autobless
-    return 1 if $internal_ref;
+    return 1 if $is_internal_ref;
 
     ##
     # If value is blessed, preserve class name
@@ -456,7 +456,7 @@ sub write_value {
     # If content is a hash or array, create new child DBM::Deep object and
     # pass each key or element to it.
     ##
-    if ( !$internal_ref ) {
+    if ( !$is_internal_ref ) {
         if ($r eq 'HASH') {
             my $branch = DBM::Deep->new(
                 type => DBM::Deep->TYPE_HASH,
@@ -503,30 +503,36 @@ sub split_index {
         chr(0)x$self->{index_size},
     );
 
-    my @offsets = ();
+    my $newtag_loc = $self->_request_space(
+        $obj, $self->tag_size( $self->{bucket_list_size} ),
+    );
 
     my $keys = $tag->{content}
-             . $md5 . (pack($self->{long_pack}, 0) x 2);
+             . $md5 . pack($self->{long_pack}, $newtag_loc)
+                    . pack($self->{long_pack}, 0);
 
+    my @newloc = ();
     BUCKET:
     for (my $i = 0; $i <= $self->{max_buckets}; $i++) {
         my ($key, $old_subloc, $size) = $self->_get_key_subloc( $keys, $i );
 
-        next BUCKET unless $key;
+        die "[INTERNAL ERROR]: No key in split_index()\n" unless $key;
+        die "[INTERNAL ERROR]: No subloc in split_index()\n" unless $old_subloc;
 
         my $num = ord(substr($key, $tag->{ch} + 1, 1));
 
-        if ($offsets[$num]) {
-            seek($fh, $offsets[$num] + $root->{file_offset}, SEEK_SET);
+        if ($newloc[$num]) {
+            seek($fh, $newloc[$num] + $root->{file_offset}, SEEK_SET);
             my $subkeys;
             read( $fh, $subkeys, $self->{bucket_list_size});
 
+            # This is looking for the first empty spot
             my ($subloc, $offset, $size) = $self->_find_in_buckets(
-                { content => $subkeys }, ''
+                { content => $subkeys }, '',
             );
 
-            seek($fh, $offsets[$num] + $offset + $root->{file_offset}, SEEK_SET);
-            print( $fh $key . pack($self->{long_pack}, $old_subloc || $root->{end}) );
+            seek($fh, $newloc[$num] + $offset + $root->{file_offset}, SEEK_SET);
+            print( $fh $key . pack($self->{long_pack}, $old_subloc) );
 
             next;
         }
@@ -545,17 +551,17 @@ sub split_index {
         );
 
         seek($fh, $blist_tag->{offset} + $root->{file_offset}, SEEK_SET);
-        print( $fh $key . pack($self->{long_pack}, $old_subloc || $root->{end}) );
+        print( $fh $key . pack($self->{long_pack}, $old_subloc) );
 
-        $offsets[$num] = $blist_tag->{offset};
+        $newloc[$num] = $blist_tag->{offset};
     }
 
     $self->_release_space(
-        $obj, $self->tag_size( $self->{index_size} ),
+        $obj, $self->tag_size( $self->{bucket_list_size} ),
         $tag->{offset} - SIG_SIZE - $self->{data_size},
     );
 
-    return;
+    return $newtag_loc;
 }
 
 sub read_from_loc {
@@ -664,6 +670,7 @@ sub delete_bucket {
     my ($obj, $tag, $md5) = @_;
 
     my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
+#XXX This needs _release_space()
     if ( $subloc ) {
         my $fh = $obj->_fh;
         seek($fh, $tag->{offset} + $offset + $obj->_root->{file_offset}, SEEK_SET);

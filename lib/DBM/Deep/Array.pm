@@ -389,7 +389,7 @@ sub SPLICE {
 #}
 
 sub _copy_node {
-    my $self = shift->_get_self;
+    my $self = shift;
     my ($db_temp) = @_;
 
     my $length = $self->length();

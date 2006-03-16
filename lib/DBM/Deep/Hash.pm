@@ -128,7 +128,7 @@ sub first_key { (shift)->FIRSTKEY(@_) }
 sub next_key { (shift)->NEXTKEY(@_) }
 
 sub _copy_node {
-    my $self = shift->_get_self;
+    my $self = shift;
     my ($db_temp) = @_;
 
     my $key = $self->first_key();

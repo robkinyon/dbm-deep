@@ -4,6 +4,7 @@
 use strict;
 use Test::More tests => 2;
 use File::Temp qw( tempfile tempdir );
+use Fcntl qw( :flock );
 
 use_ok( 'DBM::Deep' );
 
@@ -13,6 +14,7 @@ my ($before, $after);
 
 {
     my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    flock $fh, LOCK_UN;
     my $db = DBM::Deep->new(
         file => $filename,
         autoflush => 1
@@ -24,6 +26,7 @@ my ($before, $after);
 
 {
     my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    flock $fh, LOCK_UN;
     my $db = DBM::Deep->new(
         file => $filename,
         autoflush => 1

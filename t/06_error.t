@@ -6,11 +6,13 @@ use strict;
 use Test::More tests => 6;
 use Test::Exception;
 use File::Temp qw( tempfile tempdir );
+use Fcntl qw( :flock );
 
 use_ok( 'DBM::Deep' );
 
 my $dir = tempdir( CLEANUP => 1 );
 my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+flock $fh, LOCK_UN;
 
 ##
 # test a corrupted file
@@ -24,6 +26,7 @@ throws_ok {
 
 {
     my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    flock $fh, LOCK_UN;
     my %hash;
     tie %hash, 'DBM::Deep', $filename;
     undef %hash;
@@ -40,6 +43,7 @@ throws_ok {
 
 {
     my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    flock $fh, LOCK_UN;
     my @array;
     tie @array, 'DBM::Deep', $filename;
     undef @array;

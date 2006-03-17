@@ -4,6 +4,7 @@
 use strict;
 use Test::More tests => 3;
 use File::Temp qw( tempfile tempdir );
+use Fcntl qw( :flock );
 
 diag "Testing DBM::Deep against Perl $] located at $^X";
 
@@ -13,8 +14,12 @@ use_ok( 'DBM::Deep' );
 # basic file open
 ##
 my $dir = tempdir( CLEANUP => 1 );
-my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-my $db = eval { DBM::Deep->new( $filename ) };
+my ($fh, $filename) = tempfile( 'tmpXXXX', DIR => $dir );
+flock $fh, LOCK_UN;
+my $db = eval {
+    local $SIG{__DIE__};
+    DBM::Deep->new( $filename );
+};
 if ( $@ ) {
 	diag "ERROR: $@";
     Test::More->builder->BAIL_OUT( "Opening a new file fails" );

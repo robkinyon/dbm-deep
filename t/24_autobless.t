@@ -9,11 +9,13 @@ use strict;
 
 use Test::More tests => 64;
 use File::Temp qw( tempfile tempdir );
+use Fcntl qw( :flock );
 
 use_ok( 'DBM::Deep' );
 
 my $dir = tempdir( CLEANUP => 1 );
 my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+flock $fh, LOCK_UN;
 {
     my $db = DBM::Deep->new(
         file     => $filename,
@@ -149,6 +151,7 @@ my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
 }
 
 my ($fh2, $filename2) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+flock $fh2, LOCK_UN;
 {
     my $db = DBM::Deep->new(
         file     => $filename2,
@@ -180,6 +183,7 @@ my ($fh2, $filename2) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
 	# content after that point in file to check for corruption.
 	##
     my ($fh3, $filename3) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    flock $fh3, LOCK_UN;
     my $db = DBM::Deep->new(
         file     => $filename3,
         autobless => 1,

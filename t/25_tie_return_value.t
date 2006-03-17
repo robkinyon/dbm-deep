@@ -2,6 +2,7 @@ use strict;
 
 use Test::More tests => 5;
 use File::Temp qw( tempfile tempdir );
+use Fcntl qw( :flock );
 
 use_ok( 'DBM::Deep' );
 
@@ -11,6 +12,7 @@ use Scalar::Util qw( reftype );
 
 {
     my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    flock $fh, LOCK_UN;
 
     my %hash;
     my $obj = tie %hash, 'DBM::Deep', $filename;
@@ -20,6 +22,7 @@ use Scalar::Util qw( reftype );
 
 {
     my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    flock $fh, LOCK_UN;
 
     my @array;
     my $obj = tie @array, 'DBM::Deep', $filename;

@@ -3,11 +3,13 @@ use strict;
 use Test::More tests => 10;
 use Test::Exception;
 use File::Temp qw( tempfile tempdir );
+use Fcntl qw( :flock );
 
 use_ok( 'DBM::Deep' );
 
 my $dir = tempdir( CLEANUP => 1 );
 my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+flock $fh, LOCK_UN;
 
 my $x = 25;
 {

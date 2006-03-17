@@ -5,6 +5,7 @@ use strict;
 use Test::More tests => 11;
 use Test::Exception;
 use File::Temp qw( tempfile tempdir );
+use Fcntl qw( :flock );
 
 use_ok( 'DBM::Deep' );
 
@@ -15,6 +16,7 @@ my $dir = tempdir( CLEANUP => 1 );
 ##
 {
     my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    flock $fh, LOCK_UN;
     my %hash;
     my $db = tie %hash, 'DBM::Deep', $filename;
 
@@ -23,6 +25,7 @@ my $dir = tempdir( CLEANUP => 1 );
 
 {
     my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    flock $fh, LOCK_UN;
     my %hash;
     my $db = tie %hash, 'DBM::Deep', {
         file => $filename,
@@ -33,6 +36,7 @@ my $dir = tempdir( CLEANUP => 1 );
 
 {
     my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    flock $fh, LOCK_UN;
     my @array;
     my $db = tie @array, 'DBM::Deep', $filename;
 
@@ -43,6 +47,7 @@ my $dir = tempdir( CLEANUP => 1 );
 
 {
     my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    flock $fh, LOCK_UN;
     my @array;
     my $db = tie @array, 'DBM::Deep', {
         file => $filename,
@@ -54,6 +59,7 @@ my $dir = tempdir( CLEANUP => 1 );
 }
 
 my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+flock $fh, LOCK_UN;
 throws_ok {
     tie my %hash, 'DBM::Deep', [ file => $filename ];
 } qr/Not a hashref/, "Passing an arrayref to TIEHASH fails";

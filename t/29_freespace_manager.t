@@ -2,10 +2,12 @@ use strict;
 
 use Test::More tests => 3;
 use File::Temp qw( tempfile );
+use Fcntl qw( :flock );
 
 use_ok( 'DBM::Deep' );
 
 my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1 );
+flock $fh, LOCK_UN;
 my $db = DBM::Deep->new({
     file => $filename,
     autoflush => 1,

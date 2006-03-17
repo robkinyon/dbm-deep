@@ -109,7 +109,9 @@ sub setup_fh {
     $self->open( $obj ) if !defined $obj->_fh;
 
     my $fh = $obj->_fh;
+    print "1\n";
     flock $fh, LOCK_EX;
+    print "2\n";
 
     unless ( $obj->{base_offset} ) {
         seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);

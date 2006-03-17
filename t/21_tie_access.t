@@ -5,11 +5,13 @@ use strict;
 use Test::More tests => 7;
 use Test::Exception;
 use File::Temp qw( tempfile tempdir );
+use Fcntl qw( :flock );
 
 use_ok( 'DBM::Deep' );
 
 my $dir = tempdir();
 my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+flock $fh, LOCK_UN;
 
 {
     my %hash;
@@ -40,6 +42,7 @@ my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
 
 {
     my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
+    flock $fh, LOCK_UN;
     DBM::Deep->new( file => $filename, type => DBM::Deep->TYPE_ARRAY );
 
     throws_ok {

@@ -418,9 +418,15 @@ sub write_value {
         $self->write_tag( $obj, undef, SIG_INTERNAL,pack($self->{long_pack}, $value->_base_offset) );
     }
     elsif ($r eq 'HASH') {
+        if ( tied( %{$value} ) ) {
+            $obj->_throw_error( "Cannot store something that is tied" );
+        }
         $self->write_tag( $obj, undef, SIG_HASH, chr(0)x$self->{index_size} );
     }
     elsif ($r eq 'ARRAY') {
+        if ( tied( @{$value} ) ) {
+            $obj->_throw_error( "Cannot store something that is tied" );
+        }
         $self->write_tag( $obj, undef, SIG_ARRAY, chr(0)x$self->{index_size} );
     }
     elsif (!defined($value)) {

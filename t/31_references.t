@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 6;
+use Test::More tests => 15;
 use Test::Exception;
 use File::Temp qw( tempfile tempdir );
 use Fcntl qw( :flock );
@@ -29,3 +29,29 @@ is_deeply( $db->{hash}{baz}, { a => 42 } );
 
 $hash{foo} = 2;
 is( $db->{hash}{foo}, 2 );
+
+$hash{bar}[1] = 90;
+is( $db->{hash}{bar}[1], 90 );
+
+$hash{baz}{b} = 33;
+is( $db->{hash}{baz}{b}, 33 );
+
+my @array = (
+    1, [ 1 .. 3 ], { a => 42 },
+);
+
+$db->{array} = \@array;
+isa_ok( tied(@array), 'DBM::Deep::Array' );
+
+is( $db->{array}[0], 1 );
+is_deeply( $db->{array}[1], [ 1 .. 3 ] );
+is_deeply( $db->{array}[2], { a => 42 } );
+
+$array[0] = 2;
+is( $db->{array}[0], 2 );
+
+$array[1][2] = 9;
+is( $db->{array}[1][2], 9 );
+
+$array[2]{b} = 'floober';
+is( $db->{array}[2]{b}, 'floober' );

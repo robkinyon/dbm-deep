@@ -595,7 +595,8 @@ sub read_from_loc {
             seek($fh, $self->{data_size} + $self->{index_size}, SEEK_CUR);
 
             my $size;
-            read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
+            read( $fh, $size, $self->{data_size});
+            $size = unpack($self->{data_pack}, $size);
             if ($size) { seek($fh, $size, SEEK_CUR); }
 
             my $bless_bit;
@@ -605,7 +606,8 @@ sub read_from_loc {
                 # Yes, object needs to be re-blessed
                 ##
                 my $class_name;
-                read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
+                read( $fh, $size, $self->{data_size});
+                $size = unpack($self->{data_pack}, $size);
                 if ($size) { read( $fh, $class_name, $size); }
                 if ($class_name) { $new_obj = bless( $new_obj, $class_name ); }
             }

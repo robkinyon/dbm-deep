@@ -381,12 +381,12 @@ sub SPLICE {
 
 #XXX We don't need to define it, yet.
 #XXX It will be useful, though, when we split out HASH and ARRAY
-#sub EXTEND {
+sub EXTEND {
 	##
 	# Perl will call EXTEND() when the array is likely to grow.
 	# We don't care, but include it for compatibility.
 	##
-#}
+}
 
 sub _copy_node {
     my $self = shift;

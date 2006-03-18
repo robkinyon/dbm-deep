@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 5;
+use Test::More tests => 6;
 use Test::Exception;
 use File::Temp qw( tempfile tempdir );
 use Fcntl qw( :flock );
@@ -21,6 +21,7 @@ my %hash = (
 );
 
 $db->{hash} = \%hash;
+isa_ok( tied(%hash), 'DBM::Deep::Hash' );
 
 is( $db->{hash}{foo}, 1 );
 is_deeply( $db->{hash}{bar}, [ 1 .. 3 ] );

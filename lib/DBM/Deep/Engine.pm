@@ -418,13 +418,13 @@ sub write_value {
         $self->write_tag( $obj, undef, SIG_INTERNAL,pack($self->{long_pack}, $value->_base_offset) );
     }
     elsif ($r eq 'HASH') {
-        if ( tied( %{$value} ) ) {
+        if ( !$is_dbm_deep && tied %{$value} ) {
             $obj->_throw_error( "Cannot store something that is tied" );
         }
         $self->write_tag( $obj, undef, SIG_HASH, chr(0)x$self->{index_size} );
     }
     elsif ($r eq 'ARRAY') {
-        if ( tied( @{$value} ) ) {
+        if ( !$is_dbm_deep && tied @{$value} ) {
             $obj->_throw_error( "Cannot store something that is tied" );
         }
         $self->write_tag( $obj, undef, SIG_ARRAY, chr(0)x$self->{index_size} );
@@ -464,26 +464,20 @@ sub write_value {
     ##
     if ( !$is_internal_ref ) {
         if ($r eq 'HASH') {
-            my $branch = DBM::Deep->new(
-                type => DBM::Deep->TYPE_HASH,
+            my %x = %$value;
+            tie %$value, 'DBM::Deep', {
                 base_offset => $location,
                 root => $root,
-            );
-            foreach my $key (keys %{$value}) {
-                $branch->STORE( $key, $value->{$key} );
-            }
+            };
+            %$value = %x;
         }
         elsif ($r eq 'ARRAY') {
-            my $branch = DBM::Deep->new(
-                type => DBM::Deep->TYPE_ARRAY,
+            my @x = @$value;
+            tie @$value, 'DBM::Deep', {
                 base_offset => $location,
                 root => $root,
-            );
-            my $index = 0;
-            foreach my $element (@{$value}) {
-                $branch->STORE( $index, $element );
-                $index++;
-            }
+            };
+            @$value = @x;
         }
     }
 
@@ -587,13 +581,13 @@ sub read_from_loc {
     # If value is a hash or array, return new DBM::Deep object with correct offset
     ##
     if (($signature eq SIG_HASH) || ($signature eq SIG_ARRAY)) {
-        my $obj = DBM::Deep->new(
+        my $new_obj = DBM::Deep->new({
             type => $signature,
             base_offset => $subloc,
             root => $obj->_root,
-        );
+        });
 
-        if ($obj->_root->{autobless}) {
+        if ($new_obj->_root->{autobless}) {
             ##
             # Skip over value and plain key to see if object needs
             # to be re-blessed
@@ -613,11 +607,11 @@ sub read_from_loc {
                 my $class_name;
                 read( $fh, $size, $self->{data_size}); $size = unpack($self->{data_pack}, $size);
                 if ($size) { read( $fh, $class_name, $size); }
-                if ($class_name) { $obj = bless( $obj, $class_name ); }
+                if ($class_name) { $new_obj = bless( $new_obj, $class_name ); }
             }
         }
 
-        return $obj;
+        return $new_obj;
     }
     elsif ( $signature eq SIG_INTERNAL ) {
         my $size;

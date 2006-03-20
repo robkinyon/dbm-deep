@@ -73,9 +73,6 @@ my $db = DBM::Deep->new( $filename );
     tie $scalar, 'My::Tie::Scalar';
     isa_ok( tied($scalar), 'My::Tie::Scalar' );
 
-TODO: {
-    local $TODO = "Scalar refs are just broked";
-    throws_ok {
-        $db->{foo} = \$scalar;
-    } qr/Cannot store something that is tied/, "Cannot store tied scalars";
-}
+throws_ok {
+    $db->{foo} = \$scalar;
+} qr/Storage of variables of type 'SCALAR' is not supported/, "Cannot store scalar references, let alone tied scalars";

@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 15;
+use Test::More tests => 16;
 use Test::Exception;
 use File::Temp qw( tempfile tempdir );
 use Fcntl qw( :flock );
@@ -55,3 +55,9 @@ is( $db->{array}[1][2], 9 );
 
 $array[2]{b} = 'floober';
 is( $db->{array}[2]{b}, 'floober' );
+
+my %hash2 = ( abc => [ 1 .. 3 ] );
+$array[3] = \%hash2;
+$hash2{ def } = \%hash;
+
+is( $array[3]{def}{foo}, 2 );

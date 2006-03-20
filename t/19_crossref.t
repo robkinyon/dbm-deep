@@ -2,7 +2,8 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 5;
+use Test::More tests => 6;
+use Test::Exception;
 use File::Temp qw( tempfile tempdir );
 use Fcntl qw( :flock );
 
@@ -33,7 +34,10 @@ my $db2 = DBM::Deep->new( $filename2 );
     ##
     # Cross-ref nested hash accross DB objects
     ##
-    $db2->{copy} = $db->{hash1};
+    throws_ok {
+        $db2->{copy} = $db->{hash1};
+    } qr/Cannot cross-reference\. Use export\(\) instead/, "cross-ref fails";
+    $db2->{copy} = $db->{hash1}->export;
 }
 
 ##

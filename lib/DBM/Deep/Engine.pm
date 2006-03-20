@@ -393,6 +393,59 @@ sub add_bucket {
     return $result;
 }
 
+sub _get_tied {
+    my $item = shift;
+    my $r = Scalar::Util::reftype( $item ) || return;
+    if ( $r eq 'HASH' ) {
+        return tied(%$item);
+    }
+    elsif ( $r eq 'ARRAY' ) {
+        return tied(@$item);
+    }
+    else {
+        return;
+    };
+}
+
+sub _get_dbm_object {
+    my $item = shift;
+
+    my $obj = eval {
+        local $SIG{__DIE__};
+        if ($item->isa( 'DBM::Deep' )) {
+            return $item;
+        }
+        return;
+    };
+    return $obj if $obj;
+
+    my $r = Scalar::Util::reftype( $item ) || '';
+    if ( $r eq 'HASH' ) {
+        my $obj = eval {
+            local $SIG{__DIE__};
+            my $obj = tied(%$item);
+            if ($obj->isa( 'DBM::Deep' )) {
+                return $obj;
+            }
+            return;
+        };
+        return $obj if $obj;
+    }
+    elsif ( $r eq 'ARRAY' ) {
+        my $obj = eval {
+            local $SIG{__DIE__};
+            my $obj = tied(@$item);
+            if ($obj->isa( 'DBM::Deep' )) {
+                return $obj;
+            }
+            return;
+        };
+        return $obj if $obj;
+    }
+
+    return;
+}
+
 sub write_value {
     my $self = shift;
     my ($obj, $location, $key, $value) = @_;
@@ -400,12 +453,10 @@ sub write_value {
     my $fh = $obj->_fh;
     my $root = $obj->_root;
 
-    my $is_dbm_deep = eval {
-        local $SIG{'__DIE__'};
-        $value->isa( 'DBM::Deep' );
-    };
-
-    my $is_internal_ref = $is_dbm_deep && ($value->_root eq $root);
+    my $dbm_deep_obj = _get_dbm_object( $value );
+    if ( $dbm_deep_obj && $dbm_deep_obj->_root ne $obj->_root ) {
+        $obj->_throw_error( "Cannot cross-reference. Use export() instead" );
+    }
 
     seek($fh, $location + $root->{file_offset}, SEEK_SET);
 
@@ -413,18 +464,18 @@ sub write_value {
     # Write signature based on content type, set content length and write
     # actual value.
     ##
-    my $r = Scalar::Util::reftype($value) || '';
-    if ( $is_internal_ref ) {
-        $self->write_tag( $obj, undef, SIG_INTERNAL,pack($self->{long_pack}, $value->_base_offset) );
+    my $r = Scalar::Util::reftype( $value ) || '';
+    if ( $dbm_deep_obj ) {
+        $self->write_tag( $obj, undef, SIG_INTERNAL,pack($self->{long_pack}, $dbm_deep_obj->_base_offset) );
     }
     elsif ($r eq 'HASH') {
-        if ( !$is_dbm_deep && tied %{$value} ) {
+        if ( !$dbm_deep_obj && tied %{$value} ) {
             $obj->_throw_error( "Cannot store something that is tied" );
         }
         $self->write_tag( $obj, undef, SIG_HASH, chr(0)x$self->{index_size} );
     }
     elsif ($r eq 'ARRAY') {
-        if ( !$is_dbm_deep && tied @{$value} ) {
+        if ( !$dbm_deep_obj && tied @{$value} ) {
             $obj->_throw_error( "Cannot store something that is tied" );
         }
         $self->write_tag( $obj, undef, SIG_ARRAY, chr(0)x$self->{index_size} );
@@ -442,14 +493,14 @@ sub write_value {
     print( $fh pack($self->{data_pack}, length($key)) . $key );
 
     # Internal references don't care about autobless
-    return 1 if $is_internal_ref;
+    return 1 if $dbm_deep_obj;
 
     ##
     # If value is blessed, preserve class name
     ##
     if ( $root->{autobless} ) {
         my $value_class = Scalar::Util::blessed($value);
-        if ( defined $value_class && !$is_dbm_deep ) {
+        if ( defined $value_class && !$dbm_deep_obj ) {
             print( $fh chr(1) );
             print( $fh pack($self->{data_pack}, length($value_class)) . $value_class );
         }
@@ -462,23 +513,21 @@ sub write_value {
     # If content is a hash or array, create new child DBM::Deep object and
     # pass each key or element to it.
     ##
-    if ( !$is_internal_ref ) {
-        if ($r eq 'HASH') {
-            my %x = %$value;
-            tie %$value, 'DBM::Deep', {
-                base_offset => $location,
-                root => $root,
-            };
-            %$value = %x;
-        }
-        elsif ($r eq 'ARRAY') {
-            my @x = @$value;
-            tie @$value, 'DBM::Deep', {
-                base_offset => $location,
-                root => $root,
-            };
-            @$value = @x;
-        }
+    if ($r eq 'HASH') {
+        my %x = %$value;
+        tie %$value, 'DBM::Deep', {
+            base_offset => $location,
+            root => $root,
+        };
+        %$value = %x;
+    }
+    elsif ($r eq 'ARRAY') {
+        my @x = @$value;
+        tie @$value, 'DBM::Deep', {
+            base_offset => $location,
+            root => $root,
+        };
+        @$value = @x;
     }
 
     return 1;

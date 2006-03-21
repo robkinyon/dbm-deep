@@ -16,13 +16,15 @@ use DBM::Deep;
 sub setup_dir : Test(startup) {
     my $self = shift;
 
-    $self->{workdir} = File::Temp::tempdir();
+    $self->{workdir} ||= File::Temp::tempdir();
 
     return;
 }
 
 sub new_file {
     my $self = shift;
+
+    $self->setup_dir;
 
     my ($fh, $filename) = File::Temp::tempfile(
         'tmpXXXX', DIR => $self->{workdir}, CLEANUP => 1,

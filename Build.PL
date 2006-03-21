@@ -8,14 +8,17 @@ my $build = Module::Build->new(
     requires => {
         perl           => '5.6.0',
         'Digest::MD5'  => '1.00',
+        'Fcntl'        => '0.01',
         'Scalar::Util' => '1.14',
     },
     optional => {
     },
     build_requires => {
+        'File::Path'      => '0.01',
+        'File::Temp'      => '0.01',
+        'Temp::Class'     => '0.01',
         'Test::More'      => '0.47',
         'Test::Exception' => '0.21',
-        'File::Temp'      => '0.01',
     },
     create_makefile_pl => 'traditional',
     add_to_cleanup => [

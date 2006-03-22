@@ -304,6 +304,45 @@ sub load_tag {
     };
 }
 
+sub _get_dbm_object {
+    my $item = shift;
+
+    my $obj = eval {
+        local $SIG{__DIE__};
+        if ($item->isa( 'DBM::Deep' )) {
+            return $item;
+        }
+        return;
+    };
+    return $obj if $obj;
+
+    my $r = Scalar::Util::reftype( $item ) || '';
+    if ( $r eq 'HASH' ) {
+        my $obj = eval {
+            local $SIG{__DIE__};
+            my $obj = tied(%$item);
+            if ($obj->isa( 'DBM::Deep' )) {
+                return $obj;
+            }
+            return;
+        };
+        return $obj if $obj;
+    }
+    elsif ( $r eq 'ARRAY' ) {
+        my $obj = eval {
+            local $SIG{__DIE__};
+            my $obj = tied(@$item);
+            if ($obj->isa( 'DBM::Deep' )) {
+                return $obj;
+            }
+            return;
+        };
+        return $obj if $obj;
+    }
+
+    return;
+}
+
 sub _length_needed {
     my $self = shift;
     my ($obj, $value, $key) = @_;
@@ -338,9 +377,9 @@ sub _length_needed {
     # if autobless is enabled, must also take into consideration
     # the class name as it is stored after the key.
     if ( $obj->_root->{autobless} ) {
-        my $value_class = Scalar::Util::blessed($value);
-        if ( defined $value_class && !$is_dbm_deep ) {
-            $len += $self->{data_size} + length($value_class);
+        my $c = Scalar::Util::blessed($value);
+        if ( defined $c && !$is_dbm_deep ) {
+            $len += $self->{data_size} + length($c);
         }
     }
 
@@ -418,59 +457,6 @@ sub add_bucket {
     return $result;
 }
 
-sub _get_tied {
-    my $item = shift;
-    my $r = Scalar::Util::reftype( $item ) || return;
-    if ( $r eq 'HASH' ) {
-        return tied(%$item);
-    }
-    elsif ( $r eq 'ARRAY' ) {
-        return tied(@$item);
-    }
-    else {
-        return;
-    };
-}
-
-sub _get_dbm_object {
-    my $item = shift;
-
-    my $obj = eval {
-        local $SIG{__DIE__};
-        if ($item->isa( 'DBM::Deep' )) {
-            return $item;
-        }
-        return;
-    };
-    return $obj if $obj;
-
-    my $r = Scalar::Util::reftype( $item ) || '';
-    if ( $r eq 'HASH' ) {
-        my $obj = eval {
-            local $SIG{__DIE__};
-            my $obj = tied(%$item);
-            if ($obj->isa( 'DBM::Deep' )) {
-                return $obj;
-            }
-            return;
-        };
-        return $obj if $obj;
-    }
-    elsif ( $r eq 'ARRAY' ) {
-        my $obj = eval {
-            local $SIG{__DIE__};
-            my $obj = tied(@$item);
-            if ($obj->isa( 'DBM::Deep' )) {
-                return $obj;
-            }
-            return;
-        };
-        return $obj if $obj;
-    }
-
-    return;
-}
-
 sub write_value {
     my $self = shift;
     my ($obj, $location, $key, $value) = @_;
@@ -524,10 +510,10 @@ sub write_value {
     # If value is blessed, preserve class name
     ##
     if ( $root->{autobless} ) {
-        my $value_class = Scalar::Util::blessed($value);
-        if ( defined $value_class && !$dbm_deep_obj ) {
+        my $c = Scalar::Util::blessed($value);
+        if ( defined $c && !$dbm_deep_obj ) {
             print( $fh chr(1) );
-            print( $fh pack($self->{data_pack}, length($value_class)) . $value_class );
+            print( $fh pack($self->{data_pack}, length($c)) . $c );
         }
         else {
             print( $fh chr(0) );
@@ -535,8 +521,12 @@ sub write_value {
     }
 
     ##
-    # If content is a hash or array, create new child DBM::Deep object and
-    # pass each key or element to it.
+    # Tie the passed in reference so that changes to it are reflected in the
+    # datafile. The use of $location as the base_offset will act as the
+    # the linkage between parent and child.
+    #
+    # The overall assignment is a hack around the fact that just tying doesn't
+    # store the values. This may not be the wrong thing to do.
     ##
     if ($r eq 'HASH') {
         my %x = %$value;

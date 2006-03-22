@@ -10,32 +10,41 @@ use Test::Exception;
 
 use base 'TestBase';
 
-sub A_assignment : Test( no_plan ) {
+sub A_assignment : Test( 23 ) {
     my $self = shift;
     my $db = $self->{db};
 
-    my $rotate = 0;
+    my @keys = keys %{$self->{data}};
 
-    while ( my ($k,$v) = each %{$self->{data}} ) {
-        $rotate = ++$rotate % 3;
+    push @keys, $keys[0] while @keys < 3;
 
-        if ( $rotate == 0 ) {
-            $db->{$k} = $v;
-        }
-        elsif ( $rotate == 1 ) {
-            $db->put( $k => $v );
-        }
-        else {
-            $db->store( $k => $v );
-        }
+    #die "@keys\n";
 
+    cmp_ok( keys %$db, '==', 0 );
+
+    foreach my $k ( @keys[0..2] ) {
+        ok( !exists $db->{$k} );
+        ok( !$db->exists( $k ) );
+    }
+
+    $db->{$keys[0]} = $self->{data}{$keys[0]};
+    $db->put( $keys[1] => $self->{data}{$keys[1]} );
+    $db->store( $keys[2] => $self->{data}{$keys[2]} );
+
+    foreach my $k ( @keys[0..2] ) {
         ok( $db->exists( $k ) );
         ok( exists $db->{$k} );
 
-        is( $db->{$k}, $v );
-        is( $db->get($k), $v );
-        is( $db->fetch($k), $v );
+        is( $db->{$k}, $self->{data}{$k} );
+        is( $db->get($k), $self->{data}{$k} );
+        is( $db->fetch($k), $self->{data}{$k} );
     }
+
+    if ( @keys > 3 ) {
+        $db->{$_} = $self->{data}{$_} for @keys[3..$#keys];
+    }
+
+    cmp_ok( keys %$db, '==', @keys );
 }
 
 sub B_check_keys : Test( 1 ) {
@@ -79,7 +88,7 @@ sub E_delete : Test( 12 ) {
     my $db = $self->{db};
 
     my @keys = keys %{$self->{data}};
-    cmp_ok( scalar(keys %$db), '==', scalar(@keys) );
+    cmp_ok( keys %$db, '==', @keys );
 
     my $key1 = $keys[0];
     ok( exists $db->{$key1} );
@@ -97,7 +106,7 @@ sub E_delete : Test( 12 ) {
 
     @{$db}{ @keys[0,1] } = @{$self->{data}}{@keys[0,1]};
 
-    cmp_ok( scalar(keys %$db), '==', scalar(@keys) );
+    cmp_ok( keys %$db, '==', @keys );
 }
 
 sub F_clear : Test( 3 ) {
@@ -105,14 +114,14 @@ sub F_clear : Test( 3 ) {
     my $db = $self->{db};
 
     my @keys = keys %{$self->{data}};
-    cmp_ok( scalar(keys %$db), '==', scalar(@keys) );
+    cmp_ok( keys %$db, '==', @keys );
 
     %$db = ();
 
     cmp_ok( keys %$db, '==', 0 );
 
     %$db = %{$self->{data}};
-    cmp_ok( scalar(keys %$db), '==', scalar(@keys) );
+    cmp_ok( keys %$db, '==', @keys );
 }
 
 sub G_reassign_and_close : Test( 4 ) {

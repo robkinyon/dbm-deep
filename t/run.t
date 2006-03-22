@@ -9,7 +9,7 @@ use DBM::Deep;
 
 use Test1;
 
-my $test = Test1->new(
+my $test1 = Test1->new(
     data => {
         key1 => 'value1',
         key2 => undef,
@@ -17,4 +17,14 @@ my $test = Test1->new(
     },
 );
 
-$test->runtests;
+my %test2;
+$test2{"key $_"} = "value $_" for 1 .. 4000;
+
+my $test2 = Test1->new(
+    data => \%test2,
+);
+
+Test::Class->runtests(
+    $test1,
+#    $test2,
+);

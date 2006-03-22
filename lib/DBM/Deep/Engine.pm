@@ -115,6 +115,26 @@ sub write_file_signature {
     return;
 }
 
+sub read_file_signature {
+    my $self = shift;
+    my ($obj) = @_;
+
+    my $fh = $obj->_fh;
+
+    seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
+    my $signature;
+    my $bytes_read = read( $fh, $signature, length(SIG_FILE));
+
+    if ( $bytes_read ) {
+        unless ($signature eq SIG_FILE) {
+            $self->close_fh( $obj );
+            $obj->_throw_error("Signature not found -- file is not a Deep DB");
+        }
+    }
+
+    return $bytes_read;
+}
+
 sub setup_fh {
     my $self = shift;
     my ($obj) = @_;
@@ -125,9 +145,7 @@ sub setup_fh {
     flock $fh, LOCK_EX;
 
     unless ( $obj->{base_offset} ) {
-        seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
-        my $signature;
-        my $bytes_read = read( $fh, $signature, length(SIG_FILE));
+        my $bytes_read = $self->read_file_signature( $obj );
 
         ##
         # File is empty -- write signature and master index
@@ -151,14 +169,6 @@ sub setup_fh {
         }
         else {
             $obj->{base_offset} = $bytes_read;
-
-            ##
-            # Check signature was valid
-            ##
-            unless ($signature eq SIG_FILE) {
-                $self->close_fh( $obj );
-                $obj->_throw_error("Signature not found -- file is not a Deep DB");
-            }
 
             ##
             # Get our type from master index signature

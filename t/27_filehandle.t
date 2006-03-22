@@ -50,7 +50,7 @@ my $offset = tell(FILE);
 close(FILE);
 
 SKIP: {
-    skip "File format changed ... gah!", 5;
+    skip "File header and format changed ... gah!", 5;
     open(FILE, "t/28_DATA.t");
 
     my $db;

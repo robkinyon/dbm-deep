@@ -96,10 +96,9 @@ sub new {
     return bless $self, $class;
 }
 
+# This initializer is called from the various TIE* methods. new() calls tie(),
+# which allows for a single point of entry.
 sub _init {
-    ##
-    # Setup $self and bless into this class.
-    ##
     my $class = shift;
     my ($args) = @_;
 
@@ -110,6 +109,8 @@ sub _init {
         base_offset => undef,
     }, $class;
 
+    # Strip out the node-level parameters before passing $args to
+    # the root's constructor.
     foreach my $param ( keys %$self ) {
         next unless exists $args->{$param};
         $self->{$param} = delete $args->{$param}
@@ -122,6 +123,8 @@ sub _init {
         ? $args->{root}
         : DBM::Deep::_::Root->new( $args );
 
+    #XXX Right before this line, we have to set the physical parameters like
+    #XXX 2S vs. 4N vs. 8Q or max_buckets, etc.
     $self->{engine}->setup_fh( $self );
 
     return $self;

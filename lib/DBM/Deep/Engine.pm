@@ -102,6 +102,19 @@ sub new {
     return $self;
 }
 
+sub write_file_signature {
+    my $self = shift;
+    my ($obj) = @_;
+
+    my $fh = $obj->_fh;
+
+    my $loc = $self->_request_space( $obj, length( SIG_FILE ) );
+    seek($fh, $loc + $obj->_root->{file_offset}, SEEK_SET);
+    print( $fh SIG_FILE);
+
+    return;
+}
+
 sub setup_fh {
     my $self = shift;
     my ($obj) = @_;
@@ -120,9 +133,7 @@ sub setup_fh {
         # File is empty -- write signature and master index
         ##
         if (!$bytes_read) {
-            my $loc = $self->_request_space( $obj, length( SIG_FILE ) );
-            seek($fh, $loc + $obj->_root->{file_offset}, SEEK_SET);
-            print( $fh SIG_FILE);
+            $self->write_file_signature( $obj );
 
             $obj->{base_offset} = $self->_request_space(
                 $obj, $self->tag_size( $self->{index_size} ),

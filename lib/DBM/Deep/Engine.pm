@@ -108,9 +108,11 @@ sub write_file_signature {
 
     my $fh = $obj->_fh;
 
-    my $loc = $self->_request_space( $obj, length( SIG_FILE ) );
+    my $loc = $self->_request_space(
+        $obj, length( SIG_FILE ) + $self->{data_size},
+    );
     seek($fh, $loc + $obj->_root->{file_offset}, SEEK_SET);
-    print( $fh SIG_FILE);
+    print( $fh SIG_FILE, pack($self->{data_pack}, 0) );
 
     return;
 }
@@ -122,10 +124,13 @@ sub read_file_signature {
     my $fh = $obj->_fh;
 
     seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
-    my $signature;
-    my $bytes_read = read( $fh, $signature, length(SIG_FILE));
+    my $buffer;
+    my $bytes_read = read(
+        $fh, $buffer, length(SIG_FILE) + $self->{data_size},
+    );
 
     if ( $bytes_read ) {
+        my ($signature, $version) = unpack( "A4 $self->{data_pack}", $buffer );
         unless ($signature eq SIG_FILE) {
             $self->close_fh( $obj );
             $obj->_throw_error("Signature not found -- file is not a Deep DB");
@@ -212,9 +217,8 @@ sub open {
         or $obj->_throw_error("Cannot sysopen file '$filename': $!");
     $obj->_root->{fh} = $fh;
 
-    #XXX Can we remove this by using the right sysopen() flags?
-    # Maybe ... q.v. above
-    binmode $fh; # for win32
+    # Even though we use O_BINARY, better be safe than sorry.
+    binmode $fh;
 
     if ($obj->_root->{autoflush}) {
         my $old = select $fh;

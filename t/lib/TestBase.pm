@@ -5,13 +5,30 @@ use 5.6.0;
 use strict;
 use warnings;
 
+use Fcntl qw( :flock );
 use File::Path ();
 use File::Temp ();
-use Fcntl qw( :flock );
+use Scalar::Util ();
 
 use base 'Test::Class';
 
 use DBM::Deep;
+
+sub setup_db : Test(startup) {
+    my $self = shift;
+
+    my $data = ($self->{data} ||= {});
+
+    my $r = Scalar::Util::reftype( $data );
+    my $type = $r eq 'HASH' ? DBM::Deep->TYPE_HASH : DBM::Deep->TYPE_ARRAY;
+
+    $self->{db} = DBM::Deep->new({
+        file => $self->new_file,
+        type => $type,
+    });
+
+    return;
+}
 
 sub setup_dir : Test(startup) {
     my $self = shift;

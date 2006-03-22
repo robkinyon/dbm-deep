@@ -18,8 +18,6 @@ sub A_assignment : Test( 23 ) {
 
     push @keys, $keys[0] while @keys < 3;
 
-    #die "@keys\n";
-
     cmp_ok( keys %$db, '==', 0 );
 
     foreach my $k ( @keys[0..2] ) {

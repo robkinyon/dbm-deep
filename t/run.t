@@ -8,6 +8,7 @@ use lib 't/lib';
 use DBM::Deep;
 
 use Test1;
+use Test2;
 
 my $test1 = Test1->new(
     data => {
@@ -24,7 +25,13 @@ my $test2 = Test1->new(
     data => \%test2,
 );
 
+my $test3 = Test2->new(
+    data => [
+        1 .. 5,
+    ],
+);
+
 Test::Class->runtests(
     $test1,
-#    $test2,
+    $test3,
 );

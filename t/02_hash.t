@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 30;
+use Test::More tests => 32;
 use Test::Exception;
 use File::Temp qw( tempfile tempdir );
 use Fcntl qw( :flock );
@@ -119,3 +119,9 @@ ok(
 	($first_key ne $next_key)
     ,"keys() still works if you replace long values with shorter ones"
 );
+
+# Test autovivification
+
+$db->{unknown}{bar} = 1;
+ok( $db->{unknown} );
+cmp_ok( $db->{unknown}{bar}, '==', 1 );

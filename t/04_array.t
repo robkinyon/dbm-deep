@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 107;
+use Test::More tests => 109;
 use Test::Exception;
 use File::Temp qw( tempfile tempdir );
 use Fcntl qw( :flock );
@@ -208,3 +208,9 @@ $db->[0] = [ 1 .. 3 ];
 $db->[1] = { a => 'foo' };
 is( $db->[1]->fetch('a'), 'foo', "Reuse of same space with hash successful" );
 is( $db->[0]->length, 3, "Reuse of same space with array successful" );
+
+# Test autovivification
+
+$db->[9999]{bar} = 1;
+ok( $db->[9999] );
+cmp_ok( $db->[9999]{bar}, '==', 1 );

@@ -1,13 +1,11 @@
 use strict;
 
 use Test::More tests => 3;
-use File::Temp qw( tempfile );
-use Fcntl qw( :flock );
+use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
 
-my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1 );
-flock $fh, LOCK_UN;
+my ($fh, $filename) = new_fh();
 my $db = DBM::Deep->new({
     file => $filename,
     autoflush => 1,

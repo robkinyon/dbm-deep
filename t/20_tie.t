@@ -4,19 +4,15 @@
 use strict;
 use Test::More tests => 11;
 use Test::Exception;
-use File::Temp qw( tempfile tempdir );
-use Fcntl qw( :flock );
+use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
-
-my $dir = tempdir( CLEANUP => 1 );
 
 ##
 # testing the various modes of opening a file
 ##
 {
-    my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-    flock $fh, LOCK_UN;
+    my ($fh, $filename) = new_fh();
     my %hash;
     my $db = tie %hash, 'DBM::Deep', $filename;
 
@@ -24,8 +20,7 @@ my $dir = tempdir( CLEANUP => 1 );
 }
 
 {
-    my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-    flock $fh, LOCK_UN;
+    my ($fh, $filename) = new_fh();
     my %hash;
     my $db = tie %hash, 'DBM::Deep', {
         file => $filename,
@@ -35,8 +30,7 @@ my $dir = tempdir( CLEANUP => 1 );
 }
 
 {
-    my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-    flock $fh, LOCK_UN;
+    my ($fh, $filename) = new_fh();
     my @array;
     my $db = tie @array, 'DBM::Deep', $filename;
 
@@ -46,8 +40,7 @@ my $dir = tempdir( CLEANUP => 1 );
 }
 
 {
-    my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-    flock $fh, LOCK_UN;
+    my ($fh, $filename) = new_fh();
     my @array;
     my $db = tie @array, 'DBM::Deep', {
         file => $filename,
@@ -58,8 +51,7 @@ my $dir = tempdir( CLEANUP => 1 );
     is( $db->{type}, DBM::Deep->TYPE_ARRAY, "TIE_ARRAY sets the correct type" );
 }
 
-my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-flock $fh, LOCK_UN;
+my ($fh, $filename) = new_fh();
 throws_ok {
     tie my %hash, 'DBM::Deep', [ file => $filename ];
 } qr/Not a hashref/, "Passing an arrayref to TIEHASH fails";

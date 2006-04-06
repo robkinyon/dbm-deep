@@ -8,14 +8,11 @@ use strict;
 }
 
 use Test::More tests => 64;
-use File::Temp qw( tempfile tempdir );
-use Fcntl qw( :flock );
+use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
 
-my $dir = tempdir( CLEANUP => 1 );
-my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-flock $fh, LOCK_UN;
+my ($fh, $filename) = new_fh();
 {
     my $db = DBM::Deep->new(
         file     => $filename,
@@ -150,8 +147,7 @@ flock $fh, LOCK_UN;
     is( $db->{unblessed}{b}[2], 3 );
 }
 
-my ($fh2, $filename2) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-flock $fh2, LOCK_UN;
+my ($fh2, $filename2) = new_fh();
 {
     my $db = DBM::Deep->new(
         file     => $filename2,
@@ -182,8 +178,7 @@ flock $fh2, LOCK_UN;
 	# longer named class (FooFoo) and replacing key in db file, then validating
 	# content after that point in file to check for corruption.
 	##
-    my ($fh3, $filename3) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-    flock $fh3, LOCK_UN;
+    my ($fh3, $filename3) = new_fh();
     my $db = DBM::Deep->new(
         file     => $filename3,
         autobless => 1,

@@ -5,14 +5,11 @@ $|++;
 use strict;
 use Test::More tests => 6;
 use Test::Exception;
-use File::Temp qw( tempfile tempdir );
-use Fcntl qw( :flock );
+use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
 
-my $dir = tempdir( CLEANUP => 1 );
-my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-flock $fh, LOCK_UN;
+my ($fh, $filename) = new_fh();
 
 ##
 # test a corrupted file
@@ -25,8 +22,7 @@ throws_ok {
 } qr/DBM::Deep: Corrupted file, no master index record/, "Fail if there's no master index record";
 
 {
-    my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-    flock $fh, LOCK_UN;
+    my ($fh, $filename) = new_fh();
     my %hash;
     tie %hash, 'DBM::Deep', $filename;
     undef %hash;
@@ -42,8 +38,7 @@ throws_ok {
 }
 
 {
-    my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-    flock $fh, LOCK_UN;
+    my ($fh, $filename) = new_fh();
     my @array;
     tie @array, 'DBM::Deep', $filename;
     undef @array;

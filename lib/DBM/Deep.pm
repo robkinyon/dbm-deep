@@ -105,15 +105,14 @@ sub _init {
     # These are the defaults to be optionally overridden below
     my $self = bless {
         type        => TYPE_HASH,
-        engine      => DBM::Deep::Engine->new,
+        engine      => DBM::Deep::Engine->new( $args ),
         base_offset => undef,
     }, $class;
 
-    # Strip out the node-level parameters before passing $args to
-    # the root's constructor.
+    # Grab the parameters we want to use
     foreach my $param ( keys %$self ) {
         next unless exists $args->{$param};
-        $self->{$param} = delete $args->{$param}
+        $self->{$param} = $args->{$param}
     }
 
     # locking implicitly enables autoflush
@@ -632,8 +631,13 @@ sub new {
         filter_store_value => undef,
         filter_fetch_key   => undef,
         filter_fetch_value => undef,
-        %$args,
     }, $class;
+
+    # Grab the parameters we want to use
+    foreach my $param ( keys %$self ) {
+        next unless exists $args->{$param};
+        $self->{$param} = $args->{$param}
+    }
 
     if ( $self->{fh} && !$self->{file_offset} ) {
         $self->{file_offset} = tell( $self->{fh} );

@@ -4,19 +4,15 @@
 use strict;
 use Test::More tests => 6;
 use Test::Exception;
-use File::Temp qw( tempfile tempdir );
-use Fcntl qw( :flock );
+use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
 
-my $dir = tempdir( CLEANUP => 1 );
-my ($fh2, $filename2) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-flock $fh2, LOCK_UN;
+my ($fh2, $filename2) = new_fh();
 my $db2 = DBM::Deep->new( $filename2 );
 
 {
-    my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-    flock $fh, LOCK_UN;
+    my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new( $filename );
 
     ##

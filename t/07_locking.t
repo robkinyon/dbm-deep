@@ -3,14 +3,11 @@
 ##
 use strict;
 use Test::More tests => 4;
-use File::Temp qw( tempfile tempdir );
-use Fcntl qw( :flock );
+use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
 
-my $dir = tempdir( CLEANUP => 1 );
-my ($fh, $filename) = tempfile( 'tmpXXXX', UNLINK => 1, DIR => $dir );
-flock $fh, LOCK_UN;
+my ($fh, $filename) = new_fh();
 my $db = DBM::Deep->new(
 	file => $filename,
 	locking => 1,

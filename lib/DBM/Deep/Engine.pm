@@ -97,12 +97,18 @@ sub new {
         max_buckets => 16,
     }, $class;
 
+    # Grab the parameters we want to use
+    foreach my $param ( keys %$self ) {
+        next unless exists $args->{$param};
+        $self->{$param} = $args->{$param}
+    }
+
     $self->precalc_sizes;
 
     return $self;
 }
 
-sub write_file_signature {
+sub write_file_header {
     my $self = shift;
     my ($obj) = @_;
 
@@ -117,7 +123,7 @@ sub write_file_signature {
     return;
 }
 
-sub read_file_signature {
+sub read_file_header {
     my $self = shift;
     my ($obj) = @_;
 
@@ -150,13 +156,13 @@ sub setup_fh {
     flock $fh, LOCK_EX;
 
     unless ( $obj->{base_offset} ) {
-        my $bytes_read = $self->read_file_signature( $obj );
+        my $bytes_read = $self->read_file_header( $obj );
 
         ##
-        # File is empty -- write signature and master index
+        # File is empty -- write header and master index
         ##
         if (!$bytes_read) {
-            $self->write_file_signature( $obj );
+            $self->write_file_header( $obj );
 
             $obj->{base_offset} = $self->_request_space(
                 $obj, $self->tag_size( $self->{index_size} ),
@@ -176,7 +182,7 @@ sub setup_fh {
             $obj->{base_offset} = $bytes_read;
 
             ##
-            # Get our type from master index signature
+            # Get our type from master index header
             ##
             my $tag = $self->load_tag($obj, $obj->_base_offset)
             or $obj->_throw_error("Corrupted file, no master index record");

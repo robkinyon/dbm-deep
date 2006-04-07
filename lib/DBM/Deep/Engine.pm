@@ -18,62 +18,6 @@ sub SIG_BLIST    () { 'B'    }
 sub SIG_FREE     () { 'F'    }
 sub SIG_SIZE     () {  1     }
 
-sub precalc_sizes {
-    ##
-    # Precalculate index, bucket and bucket list sizes
-    ##
-    my $self = shift;
-
-    $self->{index_size}       = (2**8) * $self->{long_size};
-    $self->{bucket_size}      = $self->{hash_size} + $self->{long_size} * 2;
-    $self->{bucket_list_size} = $self->{max_buckets} * $self->{bucket_size};
-
-    return 1;
-}
-
-sub set_pack {
-    ##
-    # Set pack/unpack modes (see file header for more)
-    ##
-    my $self = shift;
-    my ($long_s, $long_p, $data_s, $data_p) = @_;
-
-    ##
-    # Set to 4 and 'N' for 32-bit offset tags (default).  Theoretical limit of 4
-    # GB per file.
-    #    (Perl must be compiled with largefile support for files > 2 GB)
-    #
-    # Set to 8 and 'Q' for 64-bit offsets.  Theoretical limit of 16 XB per file.
-    #    (Perl must be compiled with largefile and 64-bit long support)
-    ##
-    $self->{long_size} = $long_s ? $long_s : 4;
-    $self->{long_pack} = $long_p ? $long_p : 'N';
-
-    ##
-    # Set to 4 and 'N' for 32-bit data length prefixes.  Limit of 4 GB for each
-    # key/value. Upgrading this is possible (see above) but probably not
-    # necessary. If you need more than 4 GB for a single key or value, this
-    # module is really not for you :-)
-    ##
-    $self->{data_size} = $data_s ? $data_s : 4;
-    $self->{data_pack} = $data_p ? $data_p : 'N';
-
-    return $self->precalc_sizes();
-}
-
-sub set_digest {
-    ##
-    # Set key digest function (default is MD5)
-    ##
-    my $self = shift;
-    my ($digest_func, $hash_size) = @_;
-
-    $self->{digest} = $digest_func ? $digest_func : \&Digest::MD5::md5;
-    $self->{hash_size} = $hash_size ? $hash_size : 16;
-
-    return $self->precalc_sizes();
-}
-
 sub new {
     my $class = shift;
     my ($args) = @_;
@@ -89,13 +33,30 @@ sub new {
 
         ##
         # Maximum number of buckets per list before another level of indexing is
-        # done.
-        # Increase this value for slightly greater speed, but larger database
+        # done. Increase this value for slightly greater speed, but larger database
         # files. DO NOT decrease this value below 16, due to risk of recursive
         # reindex overrun.
         ##
         max_buckets => 16,
     }, $class;
+
+    if ( defined $args->{pack_size} ) {
+        if ( lc $args->{pack_size} eq 'small' ) {
+            $args->{long_size} = 2;
+            $args->{long_pack} = 'S';
+        }
+        elsif ( lc $args->{pack_size} eq 'medium' ) {
+            $args->{long_size} = 4;
+            $args->{long_pack} = 'N';
+        }
+        elsif ( lc $args->{pack_size} eq 'large' ) {
+            $args->{long_size} = 8;
+            $args->{long_pack} = 'Q';
+        }
+        else {
+            die "Unknown pack_size value: '$args->{pack_size}'\n";
+        }
+    }
 
     # Grab the parameters we want to use
     foreach my $param ( keys %$self ) {
@@ -103,7 +64,14 @@ sub new {
         $self->{$param} = $args->{$param};
     }
 
-    $self->precalc_sizes;
+    if ( $self->{max_buckets} < 16 ) {
+        warn "Floor of max_buckets is 16. Setting it to 16 from '$self->{max_buckets}'\n";
+        $self->{max_buckets} = 16;
+    }
+
+    $self->{index_size}       = (2**8) * $self->{long_size};
+    $self->{bucket_size}      = $self->{hash_size} + $self->{long_size} * 2;
+    $self->{bucket_list_size} = $self->{max_buckets} * $self->{bucket_size};
 
     return $self;
 }

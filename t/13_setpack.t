@@ -13,7 +13,7 @@ my ($before, $after);
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new(
         file => $filename,
-        autoflush => 1
+        autoflush => 1,
     );
     $db->{key1} = "value1";
     $db->{key2} = "value2";
@@ -24,13 +24,9 @@ my ($before, $after);
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new(
         file => $filename,
-        autoflush => 1
+        autoflush => 1,
+        pack_size => 'small',
     );
-
-    ##
-    # set pack to 2-byte (16-bit) words
-    ##
-    $db->_get_self->{engine}->set_pack( 2, 'S' );
 
     $db->{key1} = "value1";
     $db->{key2} = "value2";

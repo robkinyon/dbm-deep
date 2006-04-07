@@ -13,12 +13,9 @@ my $salt = 38473827;
 
 my $db = new DBM::Deep(
 	file => $filename,
+    digest => \&my_digest,
+    hash_size => 8,
 );
-
-##
-# Set digest handler
-##
-$db->_get_self->{engine}->set_digest( \&my_digest, 8 );
 
 ##
 # put/get key

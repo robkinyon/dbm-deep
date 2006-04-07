@@ -94,7 +94,7 @@ sub write_file_header {
     seek($fh, $loc + $obj->_root->{file_offset}, SEEK_SET);
     print( $fh
         SIG_FILE,
-        pack('N', 0),
+        pack('S', 1),
         pack('S', $self->{long_size}),
         pack('A', $self->{long_pack}),
         pack('S', $self->{data_size}),
@@ -124,8 +124,7 @@ sub read_file_header {
             $obj->_throw_error("Signature not found -- file is not a Deep DB");
         }
 
-        $#values = 4;
-        if ( grep { !defined } @values ) {
+        if ( if @values < 5 || grep { !defined } @values ) {
             die "DBM::Deep: Corrupted file - bad header\n";
         }
         @{$self}{qw( long_size long_pack data_size data_pack max_buckets )} = @values;

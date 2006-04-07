@@ -112,7 +112,7 @@ sub _init {
     # Grab the parameters we want to use
     foreach my $param ( keys %$self ) {
         next unless exists $args->{$param};
-        $self->{$param} = $args->{$param}
+        $self->{$param} = $args->{$param};
     }
 
     # locking implicitly enables autoflush
@@ -636,7 +636,7 @@ sub new {
     # Grab the parameters we want to use
     foreach my $param ( keys %$self ) {
         next unless exists $args->{$param};
-        $self->{$param} = $args->{$param}
+        $self->{$param} = $args->{$param};
     }
 
     if ( $self->{fh} && !$self->{file_offset} ) {

@@ -100,7 +100,7 @@ sub new {
     # Grab the parameters we want to use
     foreach my $param ( keys %$self ) {
         next unless exists $args->{$param};
-        $self->{$param} = $args->{$param}
+        $self->{$param} = $args->{$param};
     }
 
     $self->precalc_sizes;
@@ -118,7 +118,7 @@ sub write_file_header {
         $obj, length( SIG_FILE ) + $self->{data_size},
     );
     seek($fh, $loc + $obj->_root->{file_offset}, SEEK_SET);
-    print( $fh SIG_FILE, pack($self->{data_pack}, 0) );
+    print( $fh SIG_FILE, pack('N', 0) );
 
     return;
 }
@@ -136,7 +136,7 @@ sub read_file_header {
     );
 
     if ( $bytes_read ) {
-        my ($signature, $version) = unpack( "A4 $self->{data_pack}", $buffer );
+        my ($signature, $version) = unpack( 'A4 N', $buffer );
         unless ($signature eq SIG_FILE) {
             $self->close_fh( $obj );
             $obj->_throw_error("Signature not found -- file is not a Deep DB");

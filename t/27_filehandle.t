@@ -2,65 +2,101 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 11;
+use Test::More tests => 14;
 use Test::Exception;
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
 
-my ($fh, $filename) = new_fh();
-
-# Create the datafile to be used
 {
-    my $db = DBM::Deep->new( $filename );
-    $db->{hash} = { foo => [ 'a' .. 'c' ] };
-}
+    my ($fh, $filename) = new_fh();
 
-{
-    open(FILE, $filename) || die("Can't open '$filename' for reading: $!\n");
+    # Create the datafile to be used
+    {
+        my $db = DBM::Deep->new( $filename );
+        $db->{hash} = { foo => [ 'a' .. 'c' ] };
+    }
 
-    my $db;
+    {
+        open(my $fh, '<', $filename) || die("Can't open '$filename' for reading: $!\n");
 
-    # test if we can open and read a db using its filehandle
+        my $db;
 
-    ok(($db = DBM::Deep->new(fh => *FILE)), "open db in filehandle");
-    ok($db->{hash}->{foo}->[1] eq 'b', "and get at stuff in the database");
-    throws_ok {
-        $db->{foo} = 1;
-    } qr/Cannot write to a readonly filehandle/,
-      "Can't write to a read-only filehandle";
-    ok( !$db->exists( 'foo' ), "foo doesn't exist" );
+        # test if we can open and read a db using its filehandle
 
-    my $db_obj = $db->_get_self;
-    ok( $db_obj->_root->{inode}, "The inode has been set" );
+        ok(($db = DBM::Deep->new(fh => $fh)), "open db in filehandle");
+        ok($db->{hash}->{foo}->[1] eq 'b', "and get at stuff in the database");
+        throws_ok {
+            $db->{foo} = 1;
+        } qr/Cannot write to a readonly filehandle/,
+        "Can't write to a read-only filehandle";
+        ok( !$db->exists( 'foo' ), "foo doesn't exist" );
 
-    close(FILE);
+        my $db_obj = $db->_get_self;
+        ok( $db_obj->_root->{inode}, "The inode has been set" );
+
+        close($fh);
+    }
 }
 
 # now the same, but with an offset into the file.  Use the database that's
 # embedded in the test for the DATA filehandle.  First, find the database ...
-open(FILE, "t/28_DATA.t") || die("Can't open t/28_DATA.t\n");
-while(my $line = <FILE>) {
-    last if($line =~ /^__DATA__/);
-}
-my $offset = tell(FILE);
-close(FILE);
+{
+    my ($fh,$filename) = new_fh();
 
-SKIP: {
-    skip "File header and format changed ... gah!", 5;
-    open(FILE, "t/28_DATA.t");
+    print $fh "#!$^X\n";
+    print $fh <<'__END_FH__';
+use strict;
+use Test::More no_plan => 1;
+Test::More->builder->no_ending(1);
+Test::More->builder->{Curr_Test} = 12;
 
-    my $db;
+use_ok( 'DBM::Deep' );
 
-    ok(($db = DBM::Deep->new(fh => *FILE, file_offset => $offset)), "open db in filehandle with offset");
+my $db = DBM::Deep->new({
+    fh => *DATA,
+});
+is($db->{x}, 'b', "and get at stuff in the database");
+__END_FH__
+    print $fh "__DATA__\n";
+    close $fh;
 
-    ok($db->{hash}->{foo}->[1] eq 'b', "and get at stuff in the database");
+    my $offset = do {
+        open my $fh, '<', $filename;
+        while(my $line = <$fh>) {
+            last if($line =~ /^__DATA__/);
+        }
+        tell($fh);
+    };
 
-    ok( !$db->exists( 'foo' ), "foo doesn't exist yet" );
-    throws_ok {
-        $db->{foo} = 1;
-    } qr/Cannot write to a readonly filehandle/, "Can't write to a read-only filehandle";
-    ok( !$db->exists( 'foo' ), "foo doesn't exist" );
+    {
+        my $db = DBM::Deep->new({
+            file        => $filename,
+            file_offset => $offset,
+        });
 
-    close FILE;
+        $db->{x} = 'b';
+        is( $db->{x}, 'b', 'and it was stored' );
+    }
+
+
+    {
+        open my $fh, '<', $filename;
+        my $db = DBM::Deep->new({
+            fh          => $fh,
+            file_offset => $offset,
+        });
+
+        is($db->{x}, 'b', "and get at stuff in the database");
+
+        ok( !$db->exists( 'foo' ), "foo doesn't exist yet" );
+        throws_ok {
+            $db->{foo} = 1;
+        } qr/Cannot write to a readonly filehandle/, "Can't write to a read-only filehandle";
+        ok( !$db->exists( 'foo' ), "foo still doesn't exist" );
+
+        is( $db->{x}, 'b' );
+    }
+
+    exec( "$^X -Ilib $filename" );
 }

@@ -122,8 +122,6 @@ sub _init {
         ? $args->{root}
         : DBM::Deep::_::Root->new( $args );
 
-    #XXX Right before this line, we have to set the physical parameters like
-    #XXX 2S vs. 4N vs. 8Q or max_buckets, etc.
     $self->{engine}->setup_fh( $self );
 
     return $self;
@@ -1460,6 +1458,9 @@ L<http://search.cpan.org/search?module=Digest::SHA256> for more information.
 
 B<Note:> Your returned digest strings must be B<EXACTLY> the number
 of bytes you specify in the hash_size parameter (in this case 32).
+
+B<Note:> If you do choose to use a custom digest algorithm, you must set it
+every time you access this file. Otherwise, the default (MD5) will be used.
 
 =head1 CIRCULAR REFERENCES
 

@@ -69,11 +69,17 @@ sub new {
         $self->{max_buckets} = 16;
     }
 
+    return $self;
+}
+
+sub calculate_sizes {
+    my $self = shift;
+
     $self->{index_size}       = (2**8) * $self->{long_size};
     $self->{bucket_size}      = $self->{hash_size} + $self->{long_size} * 2;
     $self->{bucket_list_size} = $self->{max_buckets} * $self->{bucket_size};
 
-    return $self;
+    return;
 }
 
 sub write_file_header {
@@ -83,10 +89,18 @@ sub write_file_header {
     my $fh = $obj->_fh;
 
     my $loc = $self->_request_space(
-        $obj, length( SIG_FILE ) + $self->{data_size},
+        $obj, length( SIG_FILE ) + 12,
     );
     seek($fh, $loc + $obj->_root->{file_offset}, SEEK_SET);
-    print( $fh SIG_FILE, pack('N', 0) );
+    print( $fh
+        SIG_FILE,
+        pack('N', 0),
+        pack('S', $self->{long_size}),
+        pack('A', $self->{long_pack}),
+        pack('S', $self->{data_size}),
+        pack('A', $self->{data_pack}),
+        pack('S', $self->{max_buckets}),
+    );
 
     return;
 }
@@ -100,15 +114,21 @@ sub read_file_header {
     seek($fh, 0 + $obj->_root->{file_offset}, SEEK_SET);
     my $buffer;
     my $bytes_read = read(
-        $fh, $buffer, length(SIG_FILE) + $self->{data_size},
+        $fh, $buffer, length(SIG_FILE) + 12,
     );
 
     if ( $bytes_read ) {
-        my ($signature, $version) = unpack( 'A4 N', $buffer );
+        my ($signature, $version, @values) = unpack( 'A4 N S A S A S', $buffer );
         unless ($signature eq SIG_FILE) {
             $self->close_fh( $obj );
             $obj->_throw_error("Signature not found -- file is not a Deep DB");
         }
+
+        $#values = 4;
+        if ( grep { !defined } @values ) {
+            die "DBM::Deep: Corrupted file - bad header\n";
+        }
+        @{$self}{qw( long_size long_pack data_size data_pack max_buckets )} = @values;
     }
 
     return $bytes_read;
@@ -123,8 +143,11 @@ sub setup_fh {
     my $fh = $obj->_fh;
     flock $fh, LOCK_EX;
 
+    #XXX The duplication of calculate_sizes needs to go away
     unless ( $obj->{base_offset} ) {
         my $bytes_read = $self->read_file_header( $obj );
+
+        $self->calculate_sizes;
 
         ##
         # File is empty -- write header and master index
@@ -159,6 +182,9 @@ sub setup_fh {
                 $obj->_throw_error("File type mismatch");
             }
         }
+    }
+    else {
+        $self->calculate_sizes;
     }
 
     #XXX We have to make sure we don't mess up when autoflush isn't turned on

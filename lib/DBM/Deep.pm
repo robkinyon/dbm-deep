@@ -1509,26 +1509,6 @@ B<WARNING:> Only call optimize() on the top-level node of the database, and
 make sure there are no child references lying around.  DBM::Deep keeps a reference
 counter, and if it is greater than 1, optimize() will abort and return undef.
 
-=head2 AUTOVIVIFICATION
-
-Unfortunately, autovivification doesn't work with tied hashes.  This appears to
-be a bug in Perl's tie() system, as I<Jakob Schmidt> encountered the very same
-issue with his I<DWH_FIle> module (see L<http://search.cpan.org/search?module=DWH_File>),
-and it is also mentioned in the BUGS section for the I<MLDBM> module <see
-L<http://search.cpan.org/search?module=MLDBM>).  Basically, on a new db file,
-this does not work:
-
-    $db->{foo}->{bar} = "hello";
-
-Since "foo" doesn't exist, you cannot add "bar" to it.  You end up with "foo"
-being an empty hash.  Try this instead, which works fine:
-
-    $db->{foo} = { bar => "hello" };
-
-As of Perl 5.8.7, this bug still exists.  I have walked very carefully through
-the execution path, and Perl indeed passes an empty hash to the STORE() method.
-Probably a bug in Perl.
-
 =head2 REFERENCES
 
 (The reasons given assume a high level of Perl understanding, specifically of

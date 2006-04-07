@@ -1,11 +1,19 @@
 Revision history for DBM::Deep.
 
 0.99_01 ??? ?? ??;??:?? 2006 Pacific
-    - Provided explicit dependency on Perl 5.6.0
+    - Added explicit dependency on Perl 5.6.0
       - Digest::MD5 requires 5.6.0
       - Sub::Uplevel (dep of Test::Exception) requires 5.6.0
     - Removed error()/clear_error()
+      - All error-handling is done with die()
     - Broke out DBM::Deep's code into DBM::Deep::Engine
+    - Tied variables can no longer be assigned to a DBM::Deep object.
+      - This includes cross-file assignments.
+    - Autovivification now works
+      - This is a consequence of the fact that all assignments are tied.
+    - set_pack() and set_digest() have been removed.
+      - Instead, you will now pass the appropriate values into new()
+      - A pack_size parameter has been added to make 64-bit files easier
 
 0.98  Feb 28 11:00:00 2006 Pacific
     - Added in patch by David Cantrell to allow use of DATA filehandle

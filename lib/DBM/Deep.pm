@@ -993,10 +993,6 @@ Recover lost disk space.
 
 Data going in and out.
 
-=item * set_digest() / set_pack() / set_filter()
-
-q.v. adjusting the interal parameters.
-
 =back
 
 =head2 HASHES
@@ -1380,23 +1376,29 @@ failure.  You can wrap calls in an eval block to catch the die.
 If you have a 64-bit system, and your Perl is compiled with both LARGEFILE
 and 64-bit support, you I<may> be able to create databases larger than 2 GB.
 DBM::Deep by default uses 32-bit file offset tags, but these can be changed
-by calling the static C<set_pack()> method before you do anything else.
+by specifying the 'pack_size' parameter when constructing the file.
 
-    DBM::Deep::set_pack(8, 'Q');
+    DBM::Deep->new(
+        filename => $filename,
+        pack_size => 'large',
+    );
 
 This tells DBM::Deep to pack all file offsets with 8-byte (64-bit) quad words
 instead of 32-bit longs.  After setting these values your DB files have a
 theoretical maximum size of 16 XB (exabytes).
 
-B<Note:> Changing these values will B<NOT> work for existing database files.
-Only change this for new files, and make sure it stays set consistently
-throughout the file's life.  If you do set these values, you can no longer
-access 32-bit DB files.  You can, however, call C<set_pack(4, 'N')> to change
-back to 32-bit mode.
+You can also use C<pack_size =E<gt> 'small'> in order to use 16-bit file
+offsets.
 
-B<Note:> I have not personally tested files > 2 GB -- all my systems have
-only a 32-bit Perl.  However, I have received user reports that this does
-indeed work!
+B<Note:> Changing these values will B<NOT> work for existing database files.
+Only change this for new files. Once the value has been set, it is stored in
+the file's header and cannot be changed for the life of the file. These
+parameters are per-file, meaning you can access 32-bit and 64-bit files, as
+you chose.
+
+B<Note:> We have not personally tested files larger than 2 GB -- all my
+systems have only a 32-bit Perl.  However, I have received user reports that
+this does indeed work!
 
 =head1 LOW-LEVEL ACCESS
 
@@ -1423,26 +1425,26 @@ any child hash or array.
 DBM::Deep by default uses the I<Message Digest 5> (MD5) algorithm for hashing
 keys.  However you can override this, and use another algorithm (such as SHA-256)
 or even write your own.  But please note that DBM::Deep currently expects zero
-collisions, so your algorithm has to be I<perfect>, so to speak.
-Collision detection may be introduced in a later version.
+collisions, so your algorithm has to be I<perfect>, so to speak. Collision
+detection may be introduced in a later version.
 
-
-
-You can specify a custom digest algorithm by calling the static C<set_digest()>
-function, passing a reference to a subroutine, and the length of the algorithm's
-hashes (in bytes).  This is a global static function, which affects ALL DBM::Deep
-objects.  Here is a working example that uses a 256-bit hash from the
+You can specify a custom digest algorithm by passing it into the parameter
+list for new(), passing a reference to a subroutine as the 'digest' parameter,
+and the length of the algorithm's hashes (in bytes) as the 'hash_size'
+parameter. Here is a working example that uses a 256-bit hash from the
 I<Digest::SHA256> module.  Please see
-L<http://search.cpan.org/search?module=Digest::SHA256> for more.
+L<http://search.cpan.org/search?module=Digest::SHA256> for more information.
 
     use DBM::Deep;
     use Digest::SHA256;
 
     my $context = Digest::SHA256::new(256);
 
-    DBM::Deep::set_digest( \&my_digest, 32 );
-
-    my $db = DBM::Deep->new( "foo-sha.db" );
+    my $db = DBM::Deep->new(
+        filename => "foo-sha.db",
+        digest => \&my_digest,
+        hash_size => 32,
+    );
 
     $db->{key1} = "value1";
     $db->{key2} = "value2";
@@ -1457,7 +1459,7 @@ L<http://search.cpan.org/search?module=Digest::SHA256> for more.
     }
 
 B<Note:> Your returned digest strings must be B<EXACTLY> the number
-of bytes you specify in the C<set_digest()> function (in this case 32).
+of bytes you specify in the hash_size parameter (in this case 32).
 
 =head1 CIRCULAR REFERENCES
 

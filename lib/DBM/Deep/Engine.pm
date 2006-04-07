@@ -118,15 +118,17 @@ sub read_file_header {
     );
 
     if ( $bytes_read ) {
-        my ($signature, $version, @values) = unpack( 'A4 N S A S A S', $buffer );
+        my ($signature, $version, @values) = unpack( 'A4 S S A S A S', $buffer );
         unless ($signature eq SIG_FILE) {
             $self->close_fh( $obj );
             $obj->_throw_error("Signature not found -- file is not a Deep DB");
         }
 
-        if ( if @values < 5 || grep { !defined } @values ) {
+        if ( @values < 5 || grep { !defined } @values ) {
             die "DBM::Deep: Corrupted file - bad header\n";
         }
+
+        #XXX Add warnings if values weren't set right
         @{$self}{qw( long_size long_pack data_size data_pack max_buckets )} = @values;
     }
 

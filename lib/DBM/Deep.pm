@@ -362,6 +362,18 @@ sub clone {
     }
 }
 
+sub begin_work {
+    my $self = shift->_get_self;
+}
+
+sub rollback {
+    my $self = shift->_get_self;
+}
+
+#sub commit {
+#    my $self = shift->_get_self;
+#}
+
 ##
 # Accessor methods
 ##

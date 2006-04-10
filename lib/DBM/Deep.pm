@@ -370,10 +370,14 @@ sub clone {
 
 sub begin_work {
     my $self = shift->_get_self;
+    $self->_fileobj->begin_transaction;
+    return 1;
 }
 
 sub rollback {
     my $self = shift->_get_self;
+    $self->_fileobj->end_transaction;
+    return 1;
 }
 
 #sub commit {

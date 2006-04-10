@@ -26,6 +26,8 @@ sub new {
         filter_store_value => undef,
         filter_fetch_key   => undef,
         filter_fetch_value => undef,
+
+        transaction_id     => 0,
     }, $class;
 
     # Grab the parameters we want to use
@@ -87,6 +89,27 @@ sub DESTROY {
 
     return;
 }
+
+sub begin_transaction {
+    my $self = shift;
+
+    $self->{transaction_id}++;
+}
+
+sub end_transaction {
+    my $self = shift;
+
+    $self->{transaction_id} = 0;
+}
+
+sub transaction_id {
+    my $self = shift;
+
+    return $self->{transaction_id};
+}
+
+#sub commit {
+#}
 
 1;
 __END__

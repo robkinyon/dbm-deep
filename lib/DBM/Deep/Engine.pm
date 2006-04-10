@@ -84,8 +84,10 @@ sub _fh      { return $_[0]->_fileobj->{fh} }
 sub calculate_sizes {
     my $self = shift;
 
+    #XXX Does this need to be updated with different hashing algorithms?
     $self->{index_size}       = (2**8) * $self->{long_size};
-    $self->{bucket_size}      = $self->{hash_size} + $self->{long_size} * 2;
+#ACID This needs modified - DONE
+    $self->{bucket_size}      = $self->{hash_size} + $self->{long_size} * 3;
     $self->{bucket_list_size} = $self->{max_buckets} * $self->{bucket_size};
 
     return;
@@ -390,6 +392,7 @@ sub add_bucket {
 
     my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
 
+    print "$subloc - $offset - $size\n";
 #    $self->_release_space( $size, $subloc );
     # Updating a known md5
 #XXX This needs updating to use _release_space
@@ -409,6 +412,7 @@ sub add_bucket {
             );
             print( $fh pack($self->{long_pack}, $location ) );
             print( $fh pack($self->{long_pack}, $actual_length ) );
+            print( $fh pack($self->{long_pack}, $root->transaction_id ) );
         }
     }
     # Adding a new md5
@@ -418,6 +422,7 @@ sub add_bucket {
         seek( $fh, $tag->{offset} + $offset + $root->{file_offset}, SEEK_SET );
         print( $fh $md5 . pack($self->{long_pack}, $location ) );
         print( $fh pack($self->{long_pack}, $actual_length ) );
+        print( $fh pack($self->{long_pack}, $root->transaction_id ) );
     }
     # If bucket didn't fit into list, split into a new index level
     # split_index() will do the _request_space() call
@@ -546,7 +551,8 @@ sub split_index {
 
     my $keys = $tag->{content}
              . $md5 . pack($self->{long_pack}, $newtag_loc)
-                    . pack($self->{long_pack}, 0);
+                    . pack($self->{long_pack}, 0)  # size
+                    . pack($self->{long_pack}, 0); # transaction #
 
     my @newloc = ();
     BUCKET:
@@ -913,12 +919,15 @@ sub get_next_key {
 
 # Utilities
 
+#ACID This needs modified - DONE
 sub _get_key_subloc {
     my $self = shift;
     my ($keys, $idx) = @_;
 
-    my ($key, $subloc, $size) = unpack(
-        "a$self->{hash_size} $self->{long_pack} $self->{long_pack}",
+    my ($key, $subloc, $size, $transaction) = unpack(
+        # This is 'a', not 'A'. Please read the pack() documentation for the
+        # difference between the two and why it's important.
+        "a$self->{hash_size} $self->{long_pack} $self->{long_pack} $self->{long_pack}",
         substr(
             $keys,
             ($idx * $self->{bucket_size}),
@@ -926,22 +935,24 @@ sub _get_key_subloc {
         ),
     );
 
-    return ($key, $subloc, $size);
+    return ($key, $subloc, $size, $transaction);
 }
 
 sub _find_in_buckets {
     my $self = shift;
     my ($tag, $md5) = @_;
 
+    my $trans_id = $self->_fileobj->transaction_id;
+
     BUCKET:
     for ( my $i = 0; $i < $self->{max_buckets}; $i++ ) {
-        my ($key, $subloc, $size) = $self->_get_key_subloc(
+        my ($key, $subloc, $size, $transaction_id) = $self->_get_key_subloc(
             $tag->{content}, $i,
         );
 
         return ($subloc, $i * $self->{bucket_size}, $size) unless $subloc;
 
-        next BUCKET if $key ne $md5;
+        next BUCKET if $key ne $md5 || $transaction_id != $trans_id;
 
         return ($subloc, $i * $self->{bucket_size}, $size);
     }

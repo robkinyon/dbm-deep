@@ -6,6 +6,7 @@ MANIFEST
 META.yml
 lib/DBM/Deep.pm
 lib/DBM/Deep/Engine.pm
+lib/DBM/Deep/File.pm
 lib/DBM/Deep/Array.pm
 lib/DBM/Deep/Hash.pm
 t/01_basic.t

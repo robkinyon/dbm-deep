@@ -19,7 +19,7 @@ print FH 'DPDB';
 close FH;
 throws_ok {
     DBM::Deep->new( $filename );
-} qr/DBM::Deep: Corrupted file - bad header/, "Fail if there's a bad header";
+} qr/DBM::Deep: Old file version found/, "Fail if there's a bad header";
 
 {
     my ($fh, $filename) = new_fh();

@@ -29,13 +29,17 @@ package DBM::Deep;
 #    modify it under the same terms as Perl itself.
 ##
 
+use 5.6.0;
+
 use strict;
+use warnings;
 
 use Fcntl qw( :DEFAULT :flock :seek );
 use Digest::MD5 ();
 use Scalar::Util ();
 
 use DBM::Deep::Engine;
+use DBM::Deep::File;
 
 use vars qw( $VERSION );
 $VERSION = q(0.99_01);
@@ -102,11 +106,18 @@ sub _init {
     my $class = shift;
     my ($args) = @_;
 
+    $args->{fileobj} = DBM::Deep::File->new( $args )
+        unless exists $args->{fileobj};
+
+    # locking implicitly enables autoflush
+    if ($args->{locking}) { $args->{autoflush} = 1; }
+
     # These are the defaults to be optionally overridden below
     my $self = bless {
         type        => TYPE_HASH,
         engine      => DBM::Deep::Engine->new( $args ),
         base_offset => undef,
+        fileobj     => undef,
     }, $class;
 
     # Grab the parameters we want to use
@@ -114,13 +125,6 @@ sub _init {
         next unless exists $args->{$param};
         $self->{$param} = $args->{$param};
     }
-
-    # locking implicitly enables autoflush
-    if ($args->{locking}) { $args->{autoflush} = 1; }
-
-    $self->{root} = exists $args->{root}
-        ? $args->{root}
-        : DBM::Deep::_::Root->new( $args );
 
     $self->{engine}->setup_fh( $self );
 
@@ -155,26 +159,27 @@ sub lock {
 
     if (!defined($self->_fh)) { return; }
 
-    if ($self->_root->{locking}) {
-        if (!$self->_root->{locked}) {
+    if ($self->_fileobj->{locking}) {
+        if (!$self->_fileobj->{locked}) {
             flock($self->_fh, $type);
 
             # refresh end counter in case file has changed size
             my @stats = stat($self->_fh);
-            $self->_root->{end} = $stats[7];
+            $self->_fileobj->{end} = $stats[7];
 
             # double-check file inode, in case another process
             # has optimize()d our file while we were waiting.
-            if ($stats[1] != $self->_root->{inode}) {
-                $self->{engine}->close_fh( $self );
+            if ($stats[1] != $self->_fileobj->{inode}) {
+                $self->_fileobj->close;
+                $self->_fileobj->open;
                 $self->{engine}->setup_fh( $self );
                 flock($self->_fh, $type); # re-lock
 
                 # This may not be necessary after re-opening
-                $self->_root->{end} = (stat($self->_fh))[7]; # re-end
+                $self->_fileobj->{end} = (stat($self->_fh))[7]; # re-end
             }
         }
-        $self->_root->{locked}++;
+        $self->_fileobj->{locked}++;
 
         return 1;
     }
@@ -191,9 +196,9 @@ sub unlock {
 
     if (!defined($self->_fh)) { return; }
 
-    if ($self->_root->{locking} && $self->_root->{locked} > 0) {
-        $self->_root->{locked}--;
-        if (!$self->_root->{locked}) { flock($self->_fh, LOCK_UN); }
+    if ($self->_fileobj->{locking} && $self->_fileobj->{locked} > 0) {
+        $self->_fileobj->{locked}--;
+        if (!$self->_fileobj->{locked}) { flock($self->_fh, LOCK_UN); }
 
         return 1;
     }
@@ -276,12 +281,12 @@ sub optimize {
     my $self = shift->_get_self;
 
 #XXX Need to create a new test for this
-#    if ($self->_root->{links} > 1) {
+#    if ($self->_fileobj->{links} > 1) {
 #        $self->_throw_error("Cannot optimize: reference count is greater than 1");
 #    }
 
     my $db_temp = DBM::Deep->new(
-        file => $self->_root->{file} . '.tmp',
+        file => $self->_fileobj->{file} . '.tmp',
         type => $self->_type
     );
 
@@ -296,8 +301,8 @@ sub optimize {
     my $perms = $stats[2] & 07777;
     my $uid = $stats[4];
     my $gid = $stats[5];
-    chown( $uid, $gid, $self->_root->{file} . '.tmp' );
-    chmod( $perms, $self->_root->{file} . '.tmp' );
+    chown( $uid, $gid, $self->_fileobj->{file} . '.tmp' );
+    chmod( $perms, $self->_fileobj->{file} . '.tmp' );
 
     # q.v. perlport for more information on this variable
     if ( $^O eq 'MSWin32' || $^O eq 'cygwin' ) {
@@ -308,17 +313,18 @@ sub optimize {
         # with a soft copy.
         ##
         $self->unlock();
-        $self->{engine}->close_fh( $self );
+        $self->_fileobj->close;
     }
 
-    if (!rename $self->_root->{file} . '.tmp', $self->_root->{file}) {
-        unlink $self->_root->{file} . '.tmp';
+    if (!rename $self->_fileobj->{file} . '.tmp', $self->_fileobj->{file}) {
+        unlink $self->_fileobj->{file} . '.tmp';
         $self->unlock();
         $self->_throw_error("Optimize failed: Cannot copy temp file over original: $!");
     }
 
     $self->unlock();
-    $self->{engine}->close_fh( $self );
+    $self->_fileobj->close;
+    $self->_fileobj->open;
     $self->{engine}->setup_fh( $self );
 
     return 1;
@@ -333,7 +339,7 @@ sub clone {
     return DBM::Deep->new(
         type => $self->_type,
         base_offset => $self->_base_offset,
-        root => $self->_root
+        fileobj => $self->_fileobj,
     );
 }
 
@@ -354,7 +360,7 @@ sub clone {
         my $func = shift;
 
         if ( $is_legal_filter{$type} ) {
-            $self->_root->{"filter_$type"} = $func;
+            $self->_fileobj->{"filter_$type"} = $func;
             return 1;
         }
 
@@ -378,12 +384,12 @@ sub rollback {
 # Accessor methods
 ##
 
-sub _root {
+sub _fileobj {
     ##
     # Get access to the root structure
     ##
     my $self = $_[0]->_get_self;
-    return $self->{root};
+    return $self->{fileobj};
 }
 
 sub _type {
@@ -407,7 +413,7 @@ sub _fh {
     # Get access to the raw fh
     ##
     my $self = $_[0]->_get_self;
-    return $self->_root->{fh};
+    return $self->_fileobj->{fh};
 }
 
 ##
@@ -450,8 +456,8 @@ sub STORE {
 
     # User may be storing a hash, in which case we do not want it run
     # through the filtering system
-    if ( !ref($value) && $self->_root->{filter_store_value} ) {
-        $value = $self->_root->{filter_store_value}->( $value );
+    if ( !ref($value) && $self->_fileobj->{filter_store_value} ) {
+        $value = $self->_fileobj->{filter_store_value}->( $value );
     }
 
     ##
@@ -493,8 +499,8 @@ sub FETCH {
 
     # Filters only apply to scalar values, so the ref check is making
     # sure the fetched bucket is a scalar, not a child hash or array.
-    return ($result && !ref($result) && $self->_root->{filter_fetch_value})
-        ? $self->_root->{filter_fetch_value}->($result)
+    return ($result && !ref($result) && $self->_fileobj->{filter_fetch_value})
+        ? $self->_fileobj->{filter_fetch_value}->($result)
         : $result;
 }
 
@@ -527,8 +533,8 @@ sub DELETE {
     ##
     my $value = $self->{engine}->get_bucket_value($self,  $tag, $md5 );
 
-    if (defined $value && !ref($value) && $self->_root->{filter_fetch_value}) {
-        $value = $self->_root->{filter_fetch_value}->($value);
+    if (defined $value && !ref($value) && $self->_fileobj->{filter_fetch_value}) {
+        $value = $self->_fileobj->{filter_fetch_value}->($value);
     }
 
     my $result = $self->{engine}->delete_bucket( $self, $tag, $md5 );
@@ -594,7 +600,7 @@ sub CLEAR {
 
     my $fh = $self->_fh;
 
-    seek($fh, $self->_base_offset + $self->_root->{file_offset}, SEEK_SET);
+    seek($fh, $self->_base_offset + $self->_fileobj->{file_offset}, SEEK_SET);
     if (eof $fh) {
         $self->unlock();
         return;
@@ -621,49 +627,6 @@ sub fetch { (shift)->FETCH( @_ ) }
 sub delete { (shift)->DELETE( @_ ) }
 sub exists { (shift)->EXISTS( @_ ) }
 sub clear { (shift)->CLEAR( @_ ) }
-
-package DBM::Deep::_::Root;
-
-sub new {
-    my $class = shift;
-    my ($args) = @_;
-
-    my $self = bless {
-        autobless          => undef,
-        autoflush          => undef,
-        end                => 0,
-        fh                 => undef,
-        file               => undef,
-        file_offset        => 0,
-        locking            => undef,
-        locked             => 0,
-        filter_store_key   => undef,
-        filter_store_value => undef,
-        filter_fetch_key   => undef,
-        filter_fetch_value => undef,
-    }, $class;
-
-    # Grab the parameters we want to use
-    foreach my $param ( keys %$self ) {
-        next unless exists $args->{$param};
-        $self->{$param} = $args->{$param};
-    }
-
-    if ( $self->{fh} && !$self->{file_offset} ) {
-        $self->{file_offset} = tell( $self->{fh} );
-    }
-
-    return $self;
-}
-
-sub DESTROY {
-    my $self = shift;
-    return unless $self;
-
-    close $self->{fh} if $self->{fh};
-
-    return;
-}
 
 1;
 __END__
@@ -1420,10 +1383,10 @@ you can call the C<_fh()> method, which returns the handle:
 This method can be called on the root level of the datbase, or any child
 hashes or arrays.  All levels share a I<root> structure, which contains things
 like the filehandle, a reference counter, and all the options specified
-when you created the object.  You can get access to this root structure by
-calling the C<root()> method.
+when you created the object.  You can get access to this file object by
+calling the C<_fileobj()> method.
 
-    my $root = $db->_root();
+    my $file_obj = $db->_fileobj();
 
 This is useful for changing options after the object has already been created,
 such as enabling/disabling locking.  You can also store your own temporary user

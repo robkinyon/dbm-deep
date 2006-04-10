@@ -33,7 +33,7 @@ use_ok( 'DBM::Deep' );
         ok( !$db->exists( 'foo' ), "foo doesn't exist" );
 
         my $db_obj = $db->_get_self;
-        ok( $db_obj->_root->{inode}, "The inode has been set" );
+        ok( $db_obj->_fileobj->{inode}, "The inode has been set" );
 
         close($fh);
     }

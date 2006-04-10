@@ -1,6 +1,9 @@
 package DBM::Deep::Hash;
 
+use 5.6.0;
+
 use strict;
+use warnings;
 
 use base 'DBM::Deep';
 
@@ -40,8 +43,8 @@ sub TIEHASH {
 
 sub FETCH {
     my $self = shift->_get_self;
-    my $key = ($self->_root->{filter_store_key})
-        ? $self->_root->{filter_store_key}->($_[0])
+    my $key = ($self->_fileobj->{filter_store_key})
+        ? $self->_fileobj->{filter_store_key}->($_[0])
         : $_[0];
 
     return $self->SUPER::FETCH( $key );
@@ -49,8 +52,8 @@ sub FETCH {
 
 sub STORE {
     my $self = shift->_get_self;
-	my $key = ($self->_root->{filter_store_key})
-        ? $self->_root->{filter_store_key}->($_[0])
+	my $key = ($self->_fileobj->{filter_store_key})
+        ? $self->_fileobj->{filter_store_key}->($_[0])
         : $_[0];
     my $value = $_[1];
 
@@ -59,8 +62,8 @@ sub STORE {
 
 sub EXISTS {
     my $self = shift->_get_self;
-	my $key = ($self->_root->{filter_store_key})
-        ? $self->_root->{filter_store_key}->($_[0])
+	my $key = ($self->_fileobj->{filter_store_key})
+        ? $self->_fileobj->{filter_store_key}->($_[0])
         : $_[0];
 
     return $self->SUPER::EXISTS( $key );
@@ -68,8 +71,8 @@ sub EXISTS {
 
 sub DELETE {
     my $self = shift->_get_self;
-	my $key = ($self->_root->{filter_store_key})
-        ? $self->_root->{filter_store_key}->($_[0])
+	my $key = ($self->_fileobj->{filter_store_key})
+        ? $self->_fileobj->{filter_store_key}->($_[0])
         : $_[0];
 
     return $self->SUPER::DELETE( $key );
@@ -90,8 +93,8 @@ sub FIRSTKEY {
 	
 	$self->unlock();
 	
-	return ($result && $self->_root->{filter_fetch_key})
-        ? $self->_root->{filter_fetch_key}->($result)
+	return ($result && $self->_fileobj->{filter_fetch_key})
+        ? $self->_fileobj->{filter_fetch_key}->($result)
         : $result;
 }
 
@@ -101,8 +104,8 @@ sub NEXTKEY {
 	##
     my $self = shift->_get_self;
 
-	my $prev_key = ($self->_root->{filter_store_key})
-        ? $self->_root->{filter_store_key}->($_[0])
+	my $prev_key = ($self->_fileobj->{filter_store_key})
+        ? $self->_fileobj->{filter_store_key}->($_[0])
         : $_[0];
 
 	my $prev_md5 = $self->{engine}{digest}->($prev_key);
@@ -116,8 +119,8 @@ sub NEXTKEY {
 	
 	$self->unlock();
 	
-	return ($result && $self->_root->{filter_fetch_key})
-        ? $self->_root->{filter_fetch_key}->($result)
+	return ($result && $self->_fileobj->{filter_fetch_key})
+        ? $self->_fileobj->{filter_fetch_key}->($result)
         : $result;
 }
 

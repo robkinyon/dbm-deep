@@ -1,12 +1,14 @@
 package DBM::Deep::Array;
 
+use 5.6.0;
+
 use strict;
+use warnings;
 
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative
 # indices for us. This was causing bugs for negative index handling.
-use vars qw( $NEGATIVE_INDICES );
-$NEGATIVE_INDICES = 1;
+our $NEGATIVE_INDICES = 1;
 
 use base 'DBM::Deep';
 
@@ -32,9 +34,6 @@ sub _import {
     return 1;
 }
 sub TIEARRAY {
-##
-# Tied array constructor method, called by Perl's tie() function.
-##
     my $class = shift;
     my $args = $class->_get_args( @_ );
 	
@@ -163,19 +162,16 @@ sub DELETE {
 }
 
 sub FETCHSIZE {
-	##
-	# Return the length of the array
-	##
     my $self = shift->_get_self;
 
     $self->lock( $self->LOCK_SH );
 
-	my $SAVE_FILTER = $self->_root->{filter_fetch_value};
-	$self->_root->{filter_fetch_value} = undef;
+	my $SAVE_FILTER = $self->_fileobj->{filter_fetch_value};
+	$self->_fileobj->{filter_fetch_value} = undef;
 	
 	my $packed_size = $self->FETCH('length');
 	
-	$self->_root->{filter_fetch_value} = $SAVE_FILTER;
+	$self->_fileobj->{filter_fetch_value} = $SAVE_FILTER;
 	
     $self->unlock;
 
@@ -187,20 +183,17 @@ sub FETCHSIZE {
 }
 
 sub STORESIZE {
-	##
-	# Set the length of the array
-	##
     my $self = shift->_get_self;
 	my ($new_length) = @_;
 	
     $self->lock( $self->LOCK_EX );
 
-	my $SAVE_FILTER = $self->_root->{filter_store_value};
-	$self->_root->{filter_store_value} = undef;
+	my $SAVE_FILTER = $self->_fileobj->{filter_store_value};
+	$self->_fileobj->{filter_store_value} = undef;
 	
 	my $result = $self->STORE('length', pack($self->{engine}{long_pack}, $new_length));
 	
-	$self->_root->{filter_store_value} = $SAVE_FILTER;
+	$self->_fileobj->{filter_store_value} = $SAVE_FILTER;
 	
     $self->unlock;
 
@@ -208,9 +201,6 @@ sub STORESIZE {
 }
 
 sub POP {
-	##
-	# Remove and return the last element on the array
-	##
     my $self = shift->_get_self;
 
     $self->lock( $self->LOCK_EX );
@@ -232,9 +222,6 @@ sub POP {
 }
 
 sub PUSH {
-	##
-	# Add new element(s) to the end of the array
-	##
     my $self = shift->_get_self;
 	
     $self->lock( $self->LOCK_EX );
@@ -252,10 +239,6 @@ sub PUSH {
 }
 
 sub SHIFT {
-	##
-	# Remove and return first element on the array.
-	# Shift over remaining elements to take up space.
-	##
     my $self = shift->_get_self;
 
     $self->lock( $self->LOCK_EX );
@@ -265,9 +248,6 @@ sub SHIFT {
 	if ($length) {
 		my $content = $self->FETCH( 0 );
 		
-		##
-		# Shift elements over and remove last one.
-		##
 		for (my $i = 0; $i < $length - 1; $i++) {
 			$self->STORE( $i, $self->FETCH($i + 1) );
 		}
@@ -284,10 +264,6 @@ sub SHIFT {
 }
 
 sub UNSHIFT {
-	##
-	# Insert new element(s) at beginning of array.
-	# Shift over other elements to make space.
-	##
     my $self = shift->_get_self;
 	my @new_elements = @_;
 
@@ -312,10 +288,6 @@ sub UNSHIFT {
 }
 
 sub SPLICE {
-	##
-	# Splices section of array with optional new section.
-	# Returns deleted section, or last element deleted in scalar context.
-	##
     my $self = shift->_get_self;
 
     $self->lock( $self->LOCK_EX );
@@ -379,12 +351,12 @@ sub SPLICE {
 	return wantarray ? @old_elements : $old_elements[-1];
 }
 
-#XXX We don't need to define it, yet.
-#XXX It will be useful, though, when we split out HASH and ARRAY
+# We don't need to define it, yet.
+# It will be useful, though, when we split out HASH and ARRAY
 sub EXTEND {
 	##
 	# Perl will call EXTEND() when the array is likely to grow.
-	# We don't care, but include it for compatibility.
+	# We don't care, but include it because it gets called at times.
 	##
 }
 

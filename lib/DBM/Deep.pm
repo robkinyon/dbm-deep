@@ -452,7 +452,7 @@ sub STORE {
 
     my $md5 = $self->{engine}{digest}->($key);
 
-    my $tag = $self->{engine}->find_bucket_list( $self, $md5, { create => 1 } );
+    my $tag = $self->{engine}->find_bucket_list( $self->_base_offset, $md5, { create => 1 } );
 
     # User may be storing a hash, in which case we do not want it run
     # through the filtering system
@@ -463,7 +463,7 @@ sub STORE {
     ##
     # Add key/value to bucket list
     ##
-    my $result = $self->{engine}->add_bucket( $self, $tag, $md5, $key, $value );
+    my $result = $self->{engine}->add_bucket( $tag, $md5, $key, $value );
 
     $self->unlock();
 
@@ -484,7 +484,7 @@ sub FETCH {
     ##
     $self->lock( LOCK_SH );
 
-    my $tag = $self->{engine}->find_bucket_list( $self, $md5 );
+    my $tag = $self->{engine}->find_bucket_list( $self->_base_offset, $md5 );
     if (!$tag) {
         $self->unlock();
         return;
@@ -493,7 +493,7 @@ sub FETCH {
     ##
     # Get value from bucket list
     ##
-    my $result = $self->{engine}->get_bucket_value( $self, $tag, $md5 );
+    my $result = $self->{engine}->get_bucket_value( $tag, $md5 );
 
     $self->unlock();
 
@@ -522,7 +522,7 @@ sub DELETE {
 
     my $md5 = $self->{engine}{digest}->($key);
 
-    my $tag = $self->{engine}->find_bucket_list( $self, $md5 );
+    my $tag = $self->{engine}->find_bucket_list( $self->_base_offset, $md5 );
     if (!$tag) {
         $self->unlock();
         return;
@@ -531,13 +531,13 @@ sub DELETE {
     ##
     # Delete bucket
     ##
-    my $value = $self->{engine}->get_bucket_value($self,  $tag, $md5 );
+    my $value = $self->{engine}->get_bucket_value( $tag, $md5 );
 
     if (defined $value && !ref($value) && $self->_fileobj->{filter_fetch_value}) {
         $value = $self->_fileobj->{filter_fetch_value}->($value);
     }
 
-    my $result = $self->{engine}->delete_bucket( $self, $tag, $md5 );
+    my $result = $self->{engine}->delete_bucket( $tag, $md5 );
 
     ##
     # If this object is an array and the key deleted was on the end of the stack,
@@ -563,7 +563,7 @@ sub EXISTS {
     ##
     $self->lock( LOCK_SH );
 
-    my $tag = $self->{engine}->find_bucket_list( $self, $md5 );
+    my $tag = $self->{engine}->find_bucket_list( $self->_base_offset, $md5 );
     if (!$tag) {
         $self->unlock();
 
@@ -576,7 +576,7 @@ sub EXISTS {
     ##
     # Check if bucket exists and return 1 or ''
     ##
-    my $result = $self->{engine}->bucket_exists( $self, $tag, $md5 ) || '';
+    my $result = $self->{engine}->bucket_exists( $tag, $md5 ) || '';
 
     $self->unlock();
 
@@ -608,7 +608,7 @@ sub CLEAR {
 
 #XXX This needs updating to use _release_space
     $self->{engine}->write_tag(
-        $self, $self->_base_offset, $self->_type,
+        $self->_base_offset, $self->_type,
         chr(0)x$self->{engine}{index_size},
     );
 

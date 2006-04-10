@@ -93,13 +93,10 @@ sub calculate_sizes {
 
 sub write_file_header {
     my $self = shift;
-#    my ($obj) = @_;
 
     my $fh = $self->_fh;
 
-    my $loc = $self->_request_space(
-        undef, length( SIG_FILE ) + 21,
-    );
+    my $loc = $self->_request_space( length( SIG_FILE ) + 21 );
     seek($fh, $loc + $self->_fileobj->{file_offset}, SEEK_SET);
     print( $fh
         SIG_FILE,
@@ -119,11 +116,10 @@ sub write_file_header {
 
 sub read_file_header {
     my $self = shift;
-    my ($obj) = @_;
 
-    my $fh = $obj->_fh;
+    my $fh = $self->_fh;
 
-    seek($fh, 0 + $obj->_fileobj->{file_offset}, SEEK_SET);
+    seek($fh, 0 + $self->_fileobj->{file_offset}, SEEK_SET);
     my $buffer;
     my $bytes_read = read( $fh, $buffer, length(SIG_FILE) + 9 );
 
@@ -135,12 +131,12 @@ sub read_file_header {
 
     unless ( $file_signature eq SIG_FILE ) {
         $self->{fileobj}->close;
-        $obj->_throw_error( "Signature not found -- file is not a Deep DB" );
+        $self->_throw_error( "Signature not found -- file is not a Deep DB" );
     }
 
     unless ( $sig_header eq SIG_HEADER ) {
         $self->{fileobj}->close;
-        $obj->_throw_error( "Old file version found." );
+        $self->_throw_error( "Old file version found." );
     }
 
     my $buffer2;
@@ -148,7 +144,7 @@ sub read_file_header {
     my ($file_version, @values) = unpack( 'N S A S A S', $buffer2 );
     if ( @values < 5 || grep { !defined } @values ) {
         $self->{fileobj}->close;
-        $obj->_throw_error("Corrupted file - bad header");
+        $self->_throw_error("Corrupted file - bad header");
     }
 
     #XXX Add warnings if values weren't set right
@@ -157,44 +153,16 @@ sub read_file_header {
     return $bytes_read;
 }
 
-sub get_file_version {
-    my $self = shift;
-    my ($obj) = @_;
-
-    my $fh = $obj->_fh;
-
-    seek( $fh, 13 + $obj->_fileobj->{file_offset}, SEEK_SET );
-    my $buffer;
-    my $bytes_read = read( $fh, $buffer, 4 );
-    unless ( $bytes_read == 4 ) {
-        $obj->_throw_error( "Cannot read file version" );
-    }
-
-    return unpack( 'N', $buffer );
-}
-
-sub write_file_version {
-    my $self = shift;
-    my ($obj, $new_version) = @_;
-
-    my $fh = $obj->_fh;
-
-    seek( $fh, 13 + $obj->_fileobj->{file_offset}, SEEK_SET );
-    print( $fh pack( 'N', $new_version ) );
-
-    return;
-}
-
 sub setup_fh {
     my $self = shift;
     my ($obj) = @_;
 
-    my $fh = $obj->_fh;
+    my $fh = $self->_fh;
     flock $fh, LOCK_EX;
 
     #XXX The duplication of calculate_sizes needs to go away
     unless ( $obj->{base_offset} ) {
-        my $bytes_read = $self->read_file_header( $obj );
+        my $bytes_read = $self->read_file_header;
 
         $self->calculate_sizes;
 
@@ -202,14 +170,12 @@ sub setup_fh {
         # File is empty -- write header and master index
         ##
         if (!$bytes_read) {
-            $self->write_file_header( $obj );
+            $self->write_file_header;
 
-            $obj->{base_offset} = $self->_request_space(
-                $obj, $self->tag_size( $self->{index_size} ),
-            );
+            $obj->{base_offset} = $self->_request_space( $self->tag_size( $self->{index_size} ) );
 
             $self->write_tag(
-                $obj, $obj->_base_offset, $obj->_type,
+                $obj->_base_offset, $obj->_type,
                 chr(0)x$self->{index_size},
             );
 
@@ -224,11 +190,11 @@ sub setup_fh {
             ##
             # Get our type from master index header
             ##
-            my $tag = $self->load_tag($obj, $obj->_base_offset)
-            or $obj->_throw_error("Corrupted file, no master index record");
+            my $tag = $self->load_tag($obj->_base_offset)
+                or $self->_throw_error("Corrupted file, no master index record");
 
-            unless ($obj->{type} eq $tag->{signature}) {
-                $obj->_throw_error("File type mismatch");
+            unless ($obj->_type eq $tag->{signature}) {
+                $self->_throw_error("File type mismatch");
             }
         }
     }
@@ -237,10 +203,10 @@ sub setup_fh {
     }
 
     #XXX We have to make sure we don't mess up when autoflush isn't turned on
-    unless ( $obj->_fileobj->{inode} ) {
-        my @stats = stat($obj->_fh);
-        $obj->_fileobj->{inode} = $stats[1];
-        $obj->_fileobj->{end} = $stats[7];
+    unless ( $self->_fileobj->{inode} ) {
+        my @stats = stat($fh);
+        $self->_fileobj->{inode} = $stats[1];
+        $self->_fileobj->{end} = $stats[7];
     }
 
     flock $fh, LOCK_UN;
@@ -259,13 +225,13 @@ sub write_tag {
     # Given offset, signature and content, create tag and write to disk
     ##
     my $self = shift;
-    my ($obj, $offset, $sig, $content) = @_;
+    my ($offset, $sig, $content) = @_;
     my $size = length( $content );
 
-    my $fh = $obj->_fh;
+    my $fh = $self->_fh;
 
     if ( defined $offset ) {
-        seek($fh, $offset + $obj->_fileobj->{file_offset}, SEEK_SET);
+        seek($fh, $offset + $self->_fileobj->{file_offset}, SEEK_SET);
     }
 
     print( $fh $sig . pack($self->{data_pack}, $size) . $content );
@@ -285,13 +251,13 @@ sub load_tag {
     # Given offset, load single tag and return signature, size and data
     ##
     my $self = shift;
-    my ($obj, $offset) = @_;
+    my ($offset) = @_;
 
 #    print join(':',map{$_||''}caller(1)), $/;
 
-    my $fh = $obj->_fh;
+    my $fh = $self->_fh;
 
-    seek($fh, $offset + $obj->_fileobj->{file_offset}, SEEK_SET);
+    seek($fh, $offset + $self->_fileobj->{file_offset}, SEEK_SET);
 
     #XXX I'm not sure this check will work if autoflush isn't enabled ...
     return if eof $fh;
@@ -352,7 +318,7 @@ sub _get_dbm_object {
 
 sub _length_needed {
     my $self = shift;
-    my ($obj, $value, $key) = @_;
+    my ($value, $key) = @_;
 
     my $is_dbm_deep = eval {
         local $SIG{'__DIE__'};
@@ -362,12 +328,12 @@ sub _length_needed {
     my $len = SIG_SIZE + $self->{data_size}
             + $self->{data_size} + length( $key );
 
-    if ( $is_dbm_deep && $value->_fileobj eq $obj->_fileobj ) {
+    if ( $is_dbm_deep && $value->_fileobj eq $self->_fileobj ) {
         return $len + $self->{long_size};
     }
 
     my $r = Scalar::Util::reftype( $value ) || '';
-    if ( $obj->_fileobj->{autobless} ) {
+    if ( $self->_fileobj->{autobless} ) {
         # This is for the bit saying whether or not this thing is blessed.
         $len += 1;
     }
@@ -383,7 +349,7 @@ sub _length_needed {
 
     # if autobless is enabled, must also take into consideration
     # the class name as it is stored after the key.
-    if ( $obj->_fileobj->{autobless} ) {
+    if ( $self->_fileobj->{autobless} ) {
         my $c = Scalar::Util::blessed($value);
         if ( defined $c && !$is_dbm_deep ) {
             $len += $self->{data_size} + length($c);
@@ -399,7 +365,7 @@ sub add_bucket {
     # plain (undigested) key and value.
     ##
     my $self = shift;
-    my ($obj, $tag, $md5, $plain_key, $value) = @_;
+    my ($tag, $md5, $plain_key, $value) = @_;
 
     # This verifies that only supported values will be stored.
     {
@@ -409,7 +375,7 @@ sub add_bucket {
         last if $r eq 'HASH';
         last if $r eq 'ARRAY';
 
-        $obj->_throw_error(
+        $self->_throw_error(
             "Storage of variables of type '$r' is not supported."
         );
     }
@@ -417,14 +383,14 @@ sub add_bucket {
     my $location = 0;
     my $result = 2;
 
-    my $root = $obj->_fileobj;
-    my $fh   = $obj->_fh;
+    my $root = $self->_fileobj;
+    my $fh   = $self->_fh;
 
-    my $actual_length = $self->_length_needed( $obj, $value, $plain_key );
+    my $actual_length = $self->_length_needed( $value, $plain_key );
 
     my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
 
-#    $self->_release_space( $obj, $size, $subloc );
+#    $self->_release_space( $size, $subloc );
     # Updating a known md5
 #XXX This needs updating to use _release_space
     if ( $subloc ) {
@@ -434,7 +400,7 @@ sub add_bucket {
             $location = $subloc;
         }
         else {
-            $location = $self->_request_space( $obj, $actual_length );
+            $location = $self->_request_space( $actual_length );
             seek(
                 $fh,
                 $tag->{offset} + $offset
@@ -447,7 +413,7 @@ sub add_bucket {
     }
     # Adding a new md5
     elsif ( defined $offset ) {
-        $location = $self->_request_space( $obj, $actual_length );
+        $location = $self->_request_space( $actual_length );
 
         seek( $fh, $tag->{offset} + $offset + $root->{file_offset}, SEEK_SET );
         print( $fh $md5 . pack($self->{long_pack}, $location ) );
@@ -456,24 +422,24 @@ sub add_bucket {
     # If bucket didn't fit into list, split into a new index level
     # split_index() will do the _request_space() call
     else {
-        $location = $self->split_index( $obj, $md5, $tag );
+        $location = $self->split_index( $md5, $tag );
     }
 
-    $self->write_value( $obj, $location, $plain_key, $value );
+    $self->write_value( $location, $plain_key, $value );
 
     return $result;
 }
 
 sub write_value {
     my $self = shift;
-    my ($obj, $location, $key, $value) = @_;
+    my ($location, $key, $value) = @_;
 
-    my $fh = $obj->_fh;
-    my $root = $obj->_fileobj;
+    my $fh = $self->_fh;
+    my $root = $self->_fileobj;
 
     my $dbm_deep_obj = _get_dbm_object( $value );
-    if ( $dbm_deep_obj && $dbm_deep_obj->_fileobj ne $obj->_fileobj ) {
-        $obj->_throw_error( "Cannot cross-reference. Use export() instead" );
+    if ( $dbm_deep_obj && $dbm_deep_obj->_fileobj ne $self->_fileobj ) {
+        $self->_throw_error( "Cannot cross-reference. Use export() instead" );
     }
 
     seek($fh, $location + $root->{file_offset}, SEEK_SET);
@@ -484,25 +450,25 @@ sub write_value {
     ##
     my $r = Scalar::Util::reftype( $value ) || '';
     if ( $dbm_deep_obj ) {
-        $self->write_tag( $obj, undef, SIG_INTERNAL,pack($self->{long_pack}, $dbm_deep_obj->_base_offset) );
+        $self->write_tag( undef, SIG_INTERNAL,pack($self->{long_pack}, $dbm_deep_obj->_base_offset) );
     }
     elsif ($r eq 'HASH') {
         if ( !$dbm_deep_obj && tied %{$value} ) {
-            $obj->_throw_error( "Cannot store something that is tied" );
+            $self->_throw_error( "Cannot store something that is tied" );
         }
-        $self->write_tag( $obj, undef, SIG_HASH, chr(0)x$self->{index_size} );
+        $self->write_tag( undef, SIG_HASH, chr(0)x$self->{index_size} );
     }
     elsif ($r eq 'ARRAY') {
         if ( !$dbm_deep_obj && tied @{$value} ) {
-            $obj->_throw_error( "Cannot store something that is tied" );
+            $self->_throw_error( "Cannot store something that is tied" );
         }
-        $self->write_tag( $obj, undef, SIG_ARRAY, chr(0)x$self->{index_size} );
+        $self->write_tag( undef, SIG_ARRAY, chr(0)x$self->{index_size} );
     }
     elsif (!defined($value)) {
-        $self->write_tag( $obj, undef, SIG_NULL, '' );
+        $self->write_tag( undef, SIG_NULL, '' );
     }
     else {
-        $self->write_tag( $obj, undef, SIG_DATA, $value );
+        $self->write_tag( undef, SIG_DATA, $value );
     }
 
     ##
@@ -557,25 +523,25 @@ sub write_value {
 
 sub split_index {
     my $self = shift;
-    my ($obj, $md5, $tag) = @_;
+    my ($md5, $tag) = @_;
 
-    my $fh = $obj->_fh;
-    my $root = $obj->_fileobj;
+    my $fh = $self->_fh;
+    my $root = $self->_fileobj;
 
     my $loc = $self->_request_space(
-        $obj, $self->tag_size( $self->{index_size} ),
+        $self->tag_size( $self->{index_size} ),
     );
 
     seek($fh, $tag->{ref_loc} + $root->{file_offset}, SEEK_SET);
     print( $fh pack($self->{long_pack}, $loc) );
 
     my $index_tag = $self->write_tag(
-        $obj, $loc, SIG_INDEX,
+        $loc, SIG_INDEX,
         chr(0)x$self->{index_size},
     );
 
     my $newtag_loc = $self->_request_space(
-        $obj, $self->tag_size( $self->{bucket_list_size} ),
+        $self->tag_size( $self->{bucket_list_size} ),
     );
 
     my $keys = $tag->{content}
@@ -611,13 +577,13 @@ sub split_index {
         seek($fh, $index_tag->{offset} + ($num * $self->{long_size}) + $root->{file_offset}, SEEK_SET);
 
         my $loc = $self->_request_space(
-            $obj, $self->tag_size( $self->{bucket_list_size} ),
+            $self->tag_size( $self->{bucket_list_size} ),
         );
 
         print( $fh pack($self->{long_pack}, $loc) );
 
         my $blist_tag = $self->write_tag(
-            $obj, $loc, SIG_BLIST,
+            $loc, SIG_BLIST,
             chr(0)x$self->{bucket_list_size},
         );
 
@@ -628,7 +594,7 @@ sub split_index {
     }
 
     $self->_release_space(
-        $obj, $self->tag_size( $self->{bucket_list_size} ),
+        $self->tag_size( $self->{bucket_list_size} ),
         $tag->{offset} - SIG_SIZE - $self->{data_size},
     );
 
@@ -637,15 +603,15 @@ sub split_index {
 
 sub read_from_loc {
     my $self = shift;
-    my ($obj, $subloc) = @_;
+    my ($subloc) = @_;
 
-    my $fh = $obj->_fh;
+    my $fh = $self->_fh;
 
     ##
     # Found match -- seek to offset and read signature
     ##
     my $signature;
-    seek($fh, $subloc + $obj->_fileobj->{file_offset}, SEEK_SET);
+    seek($fh, $subloc + $self->_fileobj->{file_offset}, SEEK_SET);
     read( $fh, $signature, SIG_SIZE);
 
     ##
@@ -655,7 +621,7 @@ sub read_from_loc {
         my $new_obj = DBM::Deep->new({
             type => $signature,
             base_offset => $subloc,
-            fileobj     => $obj->_fileobj,
+            fileobj     => $self->_fileobj,
         });
 
         if ($new_obj->_fileobj->{autobless}) {
@@ -696,7 +662,7 @@ sub read_from_loc {
             read( $fh, $new_loc, $size );
             $new_loc = unpack( $self->{long_pack}, $new_loc );
 
-            return $self->read_from_loc( $obj, $new_loc );
+            return $self->read_from_loc( $new_loc );
         }
         else {
             return;
@@ -726,11 +692,11 @@ sub get_bucket_value {
     # Fetch single value given tag and MD5 digested key.
     ##
     my $self = shift;
-    my ($obj, $tag, $md5) = @_;
+    my ($tag, $md5) = @_;
 
     my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
     if ( $subloc ) {
-        return $self->read_from_loc( $obj, $subloc );
+        return $self->read_from_loc( $subloc );
     }
     return;
 }
@@ -740,13 +706,13 @@ sub delete_bucket {
     # Delete single key/value pair given tag and MD5 digested key.
     ##
     my $self = shift;
-    my ($obj, $tag, $md5) = @_;
+    my ($tag, $md5) = @_;
 
     my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
 #XXX This needs _release_space()
     if ( $subloc ) {
-        my $fh = $obj->_fh;
-        seek($fh, $tag->{offset} + $offset + $obj->_fileobj->{file_offset}, SEEK_SET);
+        my $fh = $self->_fh;
+        seek($fh, $tag->{offset} + $offset + $self->_fileobj->{file_offset}, SEEK_SET);
         print( $fh substr($tag->{content}, $offset + $self->{bucket_size} ) );
         print( $fh chr(0) x $self->{bucket_size} );
 
@@ -760,7 +726,7 @@ sub bucket_exists {
     # Check existence of single key given tag and MD5 digested key.
     ##
     my $self = shift;
-    my ($obj, $tag, $md5) = @_;
+    my ($tag, $md5) = @_;
 
     my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
     return $subloc && 1;
@@ -771,35 +737,35 @@ sub find_bucket_list {
     # Locate offset for bucket list, given digested key
     ##
     my $self = shift;
-    my ($obj, $md5, $args) = @_;
+    my ($offset, $md5, $args) = @_;
     $args = {} unless $args;
 
     ##
     # Locate offset for bucket list using digest index system
     ##
-    my $tag = $self->load_tag($obj, $obj->_base_offset)
-        or $obj->_throw_error( "INTERNAL ERROR - Cannot find tag" );
+    my $tag = $self->load_tag( $offset )
+        or $self->_throw_error( "INTERNAL ERROR - Cannot find tag" );
 
     my $ch = 0;
     while ($tag->{signature} ne SIG_BLIST) {
         my $num = ord substr($md5, $ch, 1);
 
         my $ref_loc = $tag->{offset} + ($num * $self->{long_size});
-        $tag = $self->index_lookup( $obj, $tag, $num );
+        $tag = $self->index_lookup( $tag, $num );
 
         if (!$tag) {
             return if !$args->{create};
 
             my $loc = $self->_request_space(
-                $obj, $self->tag_size( $self->{bucket_list_size} ),
+                $self->tag_size( $self->{bucket_list_size} ),
             );
 
-            my $fh = $obj->_fh;
-            seek($fh, $ref_loc + $obj->_fileobj->{file_offset}, SEEK_SET);
+            my $fh = $self->_fh;
+            seek($fh, $ref_loc + $self->_fileobj->{file_offset}, SEEK_SET);
             print( $fh pack($self->{long_pack}, $loc) );
 
             $tag = $self->write_tag(
-                $obj, $loc, SIG_BLIST,
+                $loc, SIG_BLIST,
                 chr(0)x$self->{bucket_list_size},
             );
 
@@ -821,7 +787,7 @@ sub index_lookup {
     # Given index tag, lookup single entry in index and return .
     ##
     my $self = shift;
-    my ($obj, $tag, $index) = @_;
+    my ($tag, $index) = @_;
 
     my $location = unpack(
         $self->{long_pack},
@@ -834,7 +800,7 @@ sub index_lookup {
 
     if (!$location) { return; }
 
-    return $self->load_tag( $obj, $location );
+    return $self->load_tag( $location );
 }
 
 sub traverse_index {
@@ -844,9 +810,9 @@ sub traverse_index {
     my $self = shift;
     my ($obj, $offset, $ch, $force_return_next) = @_;
 
-    my $tag = $self->load_tag($obj, $offset );
+    my $tag = $self->load_tag( $offset );
 
-    my $fh = $obj->_fh;
+    my $fh = $self->_fh;
 
     if ($tag->{signature} ne SIG_BLIST) {
         my $content = $tag->{content};
@@ -896,7 +862,7 @@ sub traverse_index {
             }
             # Seek to bucket location and skip over signature
             elsif ($obj->{return_next}) {
-                seek($fh, $subloc + $obj->_fileobj->{file_offset}, SEEK_SET);
+                seek($fh, $subloc + $self->_fileobj->{file_offset}, SEEK_SET);
 
                 # Skip over value to get to plain key
                 my $sig;
@@ -983,20 +949,9 @@ sub _find_in_buckets {
     return;
 }
 
-#sub _print_at {
-#    my $self = shift;
-#    my ($obj, $spot, $data) = @_;
-#
-#    my $fh = $obj->_fh;
-#    seek( $fh, $spot, SEEK_SET );
-#    print( $fh $data );
-#
-#    return;
-#}
-
 sub _request_space {
     my $self = shift;
-    my ($obj, $size) = @_;
+    my ($size) = @_;
 
     my $loc = $self->_fileobj->{end};
     $self->_fileobj->{end} += $size;
@@ -1006,18 +961,22 @@ sub _request_space {
 
 sub _release_space {
     my $self = shift;
-    my ($obj, $size, $loc) = @_;
+    my ($size, $loc) = @_;
 
     my $next_loc = 0;
 
-    my $fh = $obj->_fh;
-    seek( $fh, $loc + $obj->_fileobj->{file_offset}, SEEK_SET );
+    my $fh = $self->_fh;
+    seek( $fh, $loc + $self->_fileobj->{file_offset}, SEEK_SET );
     print( $fh SIG_FREE
         . pack($self->{long_pack}, $size )
         . pack($self->{long_pack}, $next_loc )
     );
 
     return;
+}
+
+sub _throw_error {
+    die "DBM::Deep: $_[1]\n";
 }
 
 1;
@@ -1027,10 +986,10 @@ __END__
 # attempt at refactoring on the physical level instead of the virtual level.
 sub _read_at {
     my $self = shift;
-    my ($obj, $spot, $amount, $unpack) = @_;
+    my ($spot, $amount, $unpack) = @_;
 
-    my $fh = $obj->_fh;
-    seek( $fh, $spot + $obj->_fileobj->{file_offset}, SEEK_SET );
+    my $fh = $self->_fh;
+    seek( $fh, $spot + $self->_fileobj->{file_offset}, SEEK_SET );
 
     my $buffer;
     my $bytes_read = read( $fh, $buffer, $amount );
@@ -1046,3 +1005,42 @@ sub _read_at {
         return $buffer;
     }
 }
+
+sub _print_at {
+    my $self = shift;
+    my ($spot, $data) = @_;
+
+    my $fh = $self->_fh;
+    seek( $fh, $spot, SEEK_SET );
+    print( $fh $data );
+
+    return;
+}
+
+sub get_file_version {
+    my $self = shift;
+
+    my $fh = $self->_fh;
+
+    seek( $fh, 13 + $self->_fileobj->{file_offset}, SEEK_SET );
+    my $buffer;
+    my $bytes_read = read( $fh, $buffer, 4 );
+    unless ( $bytes_read == 4 ) {
+        $self->_throw_error( "Cannot read file version" );
+    }
+
+    return unpack( 'N', $buffer );
+}
+
+sub write_file_version {
+    my $self = shift;
+    my ($new_version) = @_;
+
+    my $fh = $self->_fh;
+
+    seek( $fh, 13 + $self->_fileobj->{file_offset}, SEEK_SET );
+    print( $fh pack( 'N', $new_version ) );
+
+    return;
+}
+

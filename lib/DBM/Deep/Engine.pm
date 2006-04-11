@@ -56,7 +56,7 @@ sub new {
     if ( defined $args->{pack_size} ) {
         if ( lc $args->{pack_size} eq 'small' ) {
             $args->{long_size} = 2;
-            $args->{long_pack} = 'S';
+            $args->{long_pack} = 'n';
         }
         elsif ( lc $args->{pack_size} eq 'medium' ) {
             $args->{long_size} = 4;
@@ -114,11 +114,11 @@ sub write_file_header {
         pack('N', 1),  # header version
         pack('N', 12), # header size
         pack('N', 0),  # currently running transaction IDs
-        pack('S', $self->{long_size}),
+        pack('n', $self->{long_size}),
         pack('A', $self->{long_pack}),
-        pack('S', $self->{data_size}),
+        pack('n', $self->{data_size}),
         pack('A', $self->{data_pack}),
-        pack('S', $self->{max_buckets}),
+        pack('n', $self->{max_buckets}),
     );
 
     $self->_fileobj->set_transaction_offset( 13 );
@@ -155,7 +155,7 @@ sub read_file_header {
 
     my $buffer2;
     $bytes_read += read( $fh, $buffer2, $size );
-    my ($running_transactions, @values) = unpack( 'N S A S A S', $buffer2 );
+    my ($running_transactions, @values) = unpack( 'N n A n A n', $buffer2 );
 
     $self->_fileobj->set_transaction_offset( 13 );
 
@@ -386,7 +386,8 @@ sub add_bucket {
     # plain (undigested) key and value.
     ##
     my $self = shift;
-    my ($tag, $md5, $plain_key, $value) = @_;
+    my ($tag, $md5, $plain_key, $value, $deleted) = @_;
+    $deleted ||= 0;
 
     local($/,$\);
 
@@ -412,7 +413,12 @@ sub add_bucket {
     my $actual_length = $self->_length_needed( $value, $plain_key );
 
     #ACID - This is a mutation. Must only find the exact transaction
-    my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5, 1 );
+    my ($subloc, $offset, $size,$is_deleted) = $self->_find_in_buckets( $tag, $md5, 1 );
+
+    my @transactions;
+    if ( $self->_fileobj->transaction_id == 0 ) {
+        @transactions = $self->_fileobj->current_transactions;
+    }
 
 #    $self->_release_space( $size, $subloc );
     # Updating a known md5
@@ -433,7 +439,7 @@ sub add_bucket {
             );
             print( $fh pack($self->{long_pack}, $location ) );
             print( $fh pack($self->{long_pack}, $actual_length ) );
-            print( $fh pack($self->{long_pack}, $root->transaction_id ) );
+            print( $fh pack('n n', $root->transaction_id, $deleted ) );
         }
     }
     # Adding a new md5
@@ -443,7 +449,14 @@ sub add_bucket {
         seek( $fh, $tag->{offset} + $offset + $root->{file_offset}, SEEK_SET );
         print( $fh $md5 . pack($self->{long_pack}, $location ) );
         print( $fh pack($self->{long_pack}, $actual_length ) );
-        print( $fh pack($self->{long_pack}, $root->transaction_id ) );
+        print( $fh pack('n n', $root->transaction_id, $deleted ) );
+
+        for ( @transactions ) {
+            my $tag2 = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
+            $self->_fileobj->{transaction_id} = $_;
+            $self->add_bucket( $tag2, $md5, '', '', 1 );
+            $self->_fileobj->{transaction_id} = 0;
+        }
     }
     # If bucket didn't fit into list, split into a new index level
     # split_index() will do the _request_space() call
@@ -728,8 +741,8 @@ sub get_bucket_value {
     my ($tag, $md5) = @_;
 
     #ACID - This is a read. Can find exact or HEAD
-    my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
-    if ( $subloc ) {
+    my ($subloc, $offset, $size,$is_deleted) = $self->_find_in_buckets( $tag, $md5 );
+    if ( $subloc && !$is_deleted ) {
         return $self->read_from_loc( $subloc );
     }
     return;
@@ -766,8 +779,8 @@ sub bucket_exists {
     my ($tag, $md5) = @_;
 
     #ACID - This is a read. Can find exact or HEAD
-    my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
-    return $subloc && 1;
+    my ($subloc, $offset, $size, $is_deleted) = $self->_find_in_buckets( $tag, $md5 );
+    return ($subloc && !$is_deleted) && 1;
 }
 
 sub find_bucket_list {
@@ -959,10 +972,10 @@ sub _get_key_subloc {
     my $self = shift;
     my ($keys, $idx) = @_;
 
-    my ($key, $subloc, $size, $transaction) = unpack(
+    my ($key, $subloc, $size, $transaction_id, $is_deleted) = unpack(
         # This is 'a', not 'A'. Please read the pack() documentation for the
         # difference between the two and why it's important.
-        "a$self->{hash_size} $self->{long_pack}3",
+        "a$self->{hash_size} $self->{long_pack}2 n2",
         substr(
             $keys,
             ($idx * $self->{bucket_size}),
@@ -970,7 +983,7 @@ sub _get_key_subloc {
         ),
     );
 
-    return ($key, $subloc, $size, $transaction);
+    return ($key, $subloc, $size, $transaction_id, $is_deleted);
 }
 
 sub _find_in_buckets {
@@ -983,15 +996,15 @@ sub _find_in_buckets {
 
     BUCKET:
     for ( my $i = 0; $i < $self->{max_buckets}; $i++ ) {
-        my ($key, $subloc, $size, $transaction_id) = $self->_get_key_subloc(
+        my ($key, $subloc, $size, $transaction_id, $is_deleted) = $self->_get_key_subloc(
             $tag->{content}, $i,
         );
 
-        my @rv = ($subloc, $i * $self->{bucket_size}, $size);
+        my @rv = ($subloc, $i * $self->{bucket_size}, $size, $is_deleted);
 
         unless ( $subloc ) {
             if ( !$exact && @zero and $trans_id ) {
-                @rv = ($zero[2], $zero[0] * $self->{bucket_size}, $zero[3]);
+                @rv = ($zero[2], $zero[0] * $self->{bucket_size},$zero[3],$is_deleted);
             }
             return @rv;
         }
@@ -999,7 +1012,7 @@ sub _find_in_buckets {
         next BUCKET if $key ne $md5;
 
         # Save off the HEAD in case we need it.
-        @zero = ($i,$key,$subloc,$size,$transaction_id) if $transaction_id == 0;
+        @zero = ($i,$key,$subloc,$size,$transaction_id,$is_deleted) if $transaction_id == 0;
 
         next BUCKET if $transaction_id != $trans_id;
 

@@ -9,11 +9,13 @@ my ($fh, $filename) = new_fh();
 my $db1 = DBM::Deep->new(
     file => $filename,
     locking => 1,
+    autoflush => 1,
 );
 
 my $db2 = DBM::Deep->new(
     file => $filename,
     locking => 1,
+    autoflush => 1,
 );
 
 $db1->{x} = 'y';
@@ -30,7 +32,7 @@ is( $db1->{x}, 'z', "Within DB1 transaction, DB1's X is Z" );
 is( $db2->{x}, 'y', "Within DB1 transaction, DB2's X is still Y" );
 
 $db2->{other_x} = 'foo';
-is( $db2->{other_x}, 'foo', "Set other_x within DB1's transaction, so DB2 can see it" );
+is( $db2->{other_x}, 'foo', "DB2 set other_x within DB1's transaction, so DB2 can see it" );
 is( $db1->{other_x}, undef, "Since other_x was added after the transaction began, DB1 doesn't see it." );
 
 $db1->rollback;

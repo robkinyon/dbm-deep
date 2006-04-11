@@ -173,7 +173,7 @@ sub begin_transaction {
     for ( 1 .. 32 ) {
         next if $buffer & (1 << ($_ - 1));
         $self->{transaction_id} = $_;
-        $buffer &= (1 << $_);
+        $buffer |= (1 << $_-1 );
         last;
     }
 
@@ -228,7 +228,7 @@ sub current_transactions {
         }
     }
 
-    return @transactions;
+    return grep { $_ != $self->{transaction_id} } @transactions;
 }
 
 sub transaction_id { return $_[0]->{transaction_id} }

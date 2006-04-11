@@ -48,6 +48,12 @@ is( $db2->{other_x}, 'foo', "After DB1 transaction is over, DB2 can still see ot
 # Should the transaction be in the Root and not the Engine? How would that
 # work?
 
+# What about the following:
+#   $db->{foo} = {};
+#   $db2 = $db->{foo};
+#   $db2->begin_work;
+#   $db->{foo} = 3;
+
 __END__
 
 Plan for transactions:

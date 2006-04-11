@@ -28,6 +28,7 @@ sub new {
         filter_fetch_value => undef,
 
         transaction_id     => 0,
+        transaction_offset => 0,
     }, $class;
 
     # Grab the parameters we want to use
@@ -90,14 +91,87 @@ sub DESTROY {
     return;
 }
 
+##
+# If db locking is set, flock() the db file.  If called multiple
+# times before unlock(), then the same number of unlocks() must
+# be called before the lock is released.
+##
+sub lock {
+    my $self = shift;
+    my ($obj, $type) = @_;
+    $type = LOCK_EX unless defined $type;
+
+    if (!defined($self->{fh})) { return; }
+
+    if ($self->{locking}) {
+        if (!$self->{locked}) {
+            flock($self->{fh}, $type);
+
+            # refresh end counter in case file has changed size
+            my @stats = stat($self->{fh});
+            $self->{end} = $stats[7];
+
+            # double-check file inode, in case another process
+            # has optimize()d our file while we were waiting.
+            if ($stats[1] != $self->{inode}) {
+                $self->close;
+                $self->open;
+
+                #XXX This needs work
+                $obj->{engine}->setup_fh( $obj );
+
+                flock($self->{fh}, $type); # re-lock
+
+                # This may not be necessary after re-opening
+                $self->{end} = (stat($self->{fh}))[7]; # re-end
+            }
+        }
+        $self->{locked}++;
+
+        return 1;
+    }
+
+    return;
+}
+
+##
+# If db locking is set, unlock the db file.  See note in lock()
+# regarding calling lock() multiple times.
+##
+sub unlock {
+    my $self = shift;
+
+    if (!defined($self->{fh})) { return; }
+
+    if ($self->{locking} && $self->{locked} > 0) {
+        $self->{locked}--;
+        if (!$self->{locked}) { flock($self->{fh}, LOCK_UN); }
+
+        return 1;
+    }
+
+    return;
+}
+
+sub set_transaction_offset {
+    my $self = shift;
+    $self->{transaction_offset} = shift;
+}
+
 sub begin_transaction {
     my $self = shift;
+
+    my $fh = $self->{fh};
+
+    seek( $fh, $self->{transaction_offset}, SEEK_SET );
 
     $self->{transaction_id}++;
 }
 
 sub end_transaction {
     my $self = shift;
+
+#    seek( $fh, $self->{transaction_offset}, SEEK_SET );
 
     $self->{transaction_id} = 0;
 }

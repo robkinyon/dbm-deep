@@ -109,7 +109,7 @@ sub write_file_header {
         SIG_HEADER,
         pack('N', 1),  # header version
         pack('N', 12), # header size
-        pack('N', 0),  # file version
+        pack('N', 0),  # currently running transaction IDs
         pack('S', $self->{long_size}),
         pack('A', $self->{long_pack}),
         pack('S', $self->{data_size}),
@@ -138,20 +138,23 @@ sub read_file_header {
     );
 
     unless ( $file_signature eq SIG_FILE ) {
-        $self->{fileobj}->close;
+        $self->_fileobj->close;
         $self->_throw_error( "Signature not found -- file is not a Deep DB" );
     }
 
     unless ( $sig_header eq SIG_HEADER ) {
-        $self->{fileobj}->close;
+        $self->_fileobj->close;
         $self->_throw_error( "Old file version found." );
     }
 
     my $buffer2;
     $bytes_read += read( $fh, $buffer2, $size );
-    my ($file_version, @values) = unpack( 'N S A S A S', $buffer2 );
+    my ($running_transactions, @values) = unpack( 'N S A S A S', $buffer2 );
+
+    $self->_fileobj->set_transaction_offset( 13 );
+
     if ( @values < 5 || grep { !defined } @values ) {
-        $self->{fileobj}->close;
+        $self->_fileobj->close;
         $self->_throw_error("Corrupted file - bad header");
     }
 

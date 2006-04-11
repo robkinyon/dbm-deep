@@ -143,67 +143,14 @@ sub TIEARRAY {
     return DBM::Deep::Array->TIEARRAY( @_ );
 }
 
-#XXX Unneeded now ...
-#sub DESTROY {
-#}
-
 sub lock {
-    ##
-    # If db locking is set, flock() the db file.  If called multiple
-    # times before unlock(), then the same number of unlocks() must
-    # be called before the lock is released.
-    ##
     my $self = shift->_get_self;
-    my ($type) = @_;
-    $type = LOCK_EX unless defined $type;
-
-    if (!defined($self->_fh)) { return; }
-
-    if ($self->_fileobj->{locking}) {
-        if (!$self->_fileobj->{locked}) {
-            flock($self->_fh, $type);
-
-            # refresh end counter in case file has changed size
-            my @stats = stat($self->_fh);
-            $self->_fileobj->{end} = $stats[7];
-
-            # double-check file inode, in case another process
-            # has optimize()d our file while we were waiting.
-            if ($stats[1] != $self->_fileobj->{inode}) {
-                $self->_fileobj->close;
-                $self->_fileobj->open;
-                $self->{engine}->setup_fh( $self );
-                flock($self->_fh, $type); # re-lock
-
-                # This may not be necessary after re-opening
-                $self->_fileobj->{end} = (stat($self->_fh))[7]; # re-end
-            }
-        }
-        $self->_fileobj->{locked}++;
-
-        return 1;
-    }
-
-    return;
+    return $self->_fileobj->lock( $self, @_ );
 }
 
 sub unlock {
-    ##
-    # If db locking is set, unlock the db file.  See note in lock()
-    # regarding calling lock() multiple times.
-    ##
     my $self = shift->_get_self;
-
-    if (!defined($self->_fh)) { return; }
-
-    if ($self->_fileobj->{locking} && $self->_fileobj->{locked} > 0) {
-        $self->_fileobj->{locked}--;
-        if (!$self->_fileobj->{locked}) { flock($self->_fh, LOCK_UN); }
-
-        return 1;
-    }
-
-    return;
+    return $self->_fileobj->unlock( $self, @_ );
 }
 
 sub _copy_value {

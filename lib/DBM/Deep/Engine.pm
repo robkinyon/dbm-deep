@@ -7,6 +7,9 @@ use warnings;
 
 use Fcntl qw( :DEFAULT :flock :seek );
 
+# File-wide notes:
+# * All the local($/,$\); are to protect read() and print() from -l.
+
 ##
 # Setup file and tag signatures.  These should never change.
 ##
@@ -86,7 +89,6 @@ sub calculate_sizes {
 
     #XXX Does this need to be updated with different hashing algorithms?
     $self->{index_size}       = (2**8) * $self->{long_size};
-#ACID This needs modified - DONE
     $self->{bucket_size}      = $self->{hash_size} + $self->{long_size} * 3;
     $self->{bucket_list_size} = $self->{max_buckets} * $self->{bucket_size};
 
@@ -95,6 +97,8 @@ sub calculate_sizes {
 
 sub write_file_header {
     my $self = shift;
+
+    local($/,$\);
 
     my $fh = $self->_fh;
 
@@ -118,6 +122,8 @@ sub write_file_header {
 
 sub read_file_header {
     my $self = shift;
+
+    local($/,$\);
 
     my $fh = $self->_fh;
 
@@ -230,6 +236,8 @@ sub write_tag {
     my ($offset, $sig, $content) = @_;
     my $size = length( $content );
 
+    local($/,$\);
+
     my $fh = $self->_fh;
 
     if ( defined $offset ) {
@@ -254,6 +262,8 @@ sub load_tag {
     ##
     my $self = shift;
     my ($offset) = @_;
+
+    local($/,$\);
 
 #    print join(':',map{$_||''}caller(1)), $/;
 
@@ -369,6 +379,8 @@ sub add_bucket {
     my $self = shift;
     my ($tag, $md5, $plain_key, $value) = @_;
 
+    local($/,$\);
+
     # This verifies that only supported values will be stored.
     {
         my $r = Scalar::Util::reftype( $value );
@@ -390,9 +402,9 @@ sub add_bucket {
 
     my $actual_length = $self->_length_needed( $value, $plain_key );
 
-    my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
+    #ACID - This is a mutation. Must only find the exact transaction
+    my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5, 1 );
 
-    print "$subloc - $offset - $size\n";
 #    $self->_release_space( $size, $subloc );
     # Updating a known md5
 #XXX This needs updating to use _release_space
@@ -438,6 +450,8 @@ sub add_bucket {
 sub write_value {
     my $self = shift;
     my ($location, $key, $value) = @_;
+
+    local($/,$\);
 
     my $fh = $self->_fh;
     my $root = $self->_fileobj;
@@ -530,6 +544,8 @@ sub split_index {
     my $self = shift;
     my ($md5, $tag) = @_;
 
+    local($/,$\);
+
     my $fh = $self->_fh;
     my $root = $self->_fileobj;
 
@@ -610,6 +626,8 @@ sub split_index {
 sub read_from_loc {
     my $self = shift;
     my ($subloc) = @_;
+
+    local($/,$\);
 
     my $fh = $self->_fh;
 
@@ -700,6 +718,7 @@ sub get_bucket_value {
     my $self = shift;
     my ($tag, $md5) = @_;
 
+    #ACID - This is a read. Can find exact or HEAD
     my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
     if ( $subloc ) {
         return $self->read_from_loc( $subloc );
@@ -714,7 +733,10 @@ sub delete_bucket {
     my $self = shift;
     my ($tag, $md5) = @_;
 
-    my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
+    local($/,$\);
+
+    #ACID - This is a mutation. Must only find the exact transaction
+    my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5, 1 );
 #XXX This needs _release_space()
     if ( $subloc ) {
         my $fh = $self->_fh;
@@ -734,6 +756,7 @@ sub bucket_exists {
     my $self = shift;
     my ($tag, $md5) = @_;
 
+    #ACID - This is a read. Can find exact or HEAD
     my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5 );
     return $subloc && 1;
 }
@@ -745,6 +768,8 @@ sub find_bucket_list {
     my $self = shift;
     my ($offset, $md5, $args) = @_;
     $args = {} unless $args;
+
+    local($/,$\);
 
     ##
     # Locate offset for bucket list using digest index system
@@ -815,6 +840,8 @@ sub traverse_index {
     ##
     my $self = shift;
     my ($obj, $offset, $ch, $force_return_next) = @_;
+
+    local($/,$\);
 
     my $tag = $self->load_tag( $offset );
 
@@ -919,7 +946,6 @@ sub get_next_key {
 
 # Utilities
 
-#ACID This needs modified - DONE
 sub _get_key_subloc {
     my $self = shift;
     my ($keys, $idx) = @_;
@@ -940,9 +966,11 @@ sub _get_key_subloc {
 
 sub _find_in_buckets {
     my $self = shift;
-    my ($tag, $md5) = @_;
+    my ($tag, $md5, $exact) = @_;
 
     my $trans_id = $self->_fileobj->transaction_id;
+
+    my @zero;
 
     BUCKET:
     for ( my $i = 0; $i < $self->{max_buckets}; $i++ ) {
@@ -950,11 +978,21 @@ sub _find_in_buckets {
             $tag->{content}, $i,
         );
 
-        return ($subloc, $i * $self->{bucket_size}, $size) unless $subloc;
+        my @rv = ($subloc, $i * $self->{bucket_size}, $size);
 
-        next BUCKET if $key ne $md5 || $transaction_id != $trans_id;
+        unless ( $subloc ) {
+            return @zero if !$exact && @zero and $trans_id;
+            return @rv;
+        }
 
-        return ($subloc, $i * $self->{bucket_size}, $size);
+        next BUCKET if $key ne $md5;
+
+        # Save off the HEAD in case we need it.
+        @zero = @rv if $transaction_id == 0;
+
+        next BUCKET if $transaction_id != $trans_id;
+
+        return @rv;
     }
 
     return;
@@ -973,6 +1011,8 @@ sub _request_space {
 sub _release_space {
     my $self = shift;
     my ($size, $loc) = @_;
+
+    local($/,$\);
 
     my $next_loc = 0;
 
@@ -999,6 +1039,8 @@ sub _read_at {
     my $self = shift;
     my ($spot, $amount, $unpack) = @_;
 
+    local($/,$\);
+
     my $fh = $self->_fh;
     seek( $fh, $spot + $self->_fileobj->{file_offset}, SEEK_SET );
 
@@ -1021,6 +1063,8 @@ sub _print_at {
     my $self = shift;
     my ($spot, $data) = @_;
 
+    local($/,$\);
+
     my $fh = $self->_fh;
     seek( $fh, $spot, SEEK_SET );
     print( $fh $data );
@@ -1030,6 +1074,8 @@ sub _print_at {
 
 sub get_file_version {
     my $self = shift;
+
+    local($/,$\);
 
     my $fh = $self->_fh;
 
@@ -1046,6 +1092,8 @@ sub get_file_version {
 sub write_file_version {
     my $self = shift;
     my ($new_version) = @_;
+
+    local($/,$\);
 
     my $fh = $self->_fh;
 

@@ -9,6 +9,10 @@ use Fcntl qw( :DEFAULT :flock :seek );
 
 # File-wide notes:
 # * All the local($/,$\); are to protect read() and print() from -l.
+# * To add to bucket_size, make sure you modify the following:
+#   - calculate_sizes()
+#   - _get_key_subloc()
+#   - add_bucket() - where the buckets are printed
 
 ##
 # Setup file and tag signatures.  These should never change.
@@ -116,6 +120,8 @@ sub write_file_header {
         pack('A', $self->{data_pack}),
         pack('S', $self->{max_buckets}),
     );
+
+    $self->_fileobj->set_transaction_offset( 13 );
 
     return;
 }
@@ -571,7 +577,7 @@ sub split_index {
     my $keys = $tag->{content}
              . $md5 . pack($self->{long_pack}, $newtag_loc)
                     . pack($self->{long_pack}, 0)  # size
-                    . pack($self->{long_pack}, 0); # transaction #
+                    . pack($self->{long_pack}, 0); # transaction ID
 
     my @newloc = ();
     BUCKET:
@@ -956,7 +962,7 @@ sub _get_key_subloc {
     my ($key, $subloc, $size, $transaction) = unpack(
         # This is 'a', not 'A'. Please read the pack() documentation for the
         # difference between the two and why it's important.
-        "a$self->{hash_size} $self->{long_pack} $self->{long_pack} $self->{long_pack}",
+        "a$self->{hash_size} $self->{long_pack}3",
         substr(
             $keys,
             ($idx * $self->{bucket_size}),
@@ -984,14 +990,16 @@ sub _find_in_buckets {
         my @rv = ($subloc, $i * $self->{bucket_size}, $size);
 
         unless ( $subloc ) {
-            return @zero if !$exact && @zero and $trans_id;
+            if ( !$exact && @zero and $trans_id ) {
+                @rv = ($zero[2], $zero[0] * $self->{bucket_size}, $zero[3]);
+            }
             return @rv;
         }
 
         next BUCKET if $key ne $md5;
 
         # Save off the HEAD in case we need it.
-        @zero = @rv if $transaction_id == 0;
+        @zero = ($i,$key,$subloc,$size,$transaction_id) if $transaction_id == 0;
 
         next BUCKET if $transaction_id != $trans_id;
 

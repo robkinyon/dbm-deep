@@ -27,8 +27,8 @@ sub new {
         filter_fetch_key   => undef,
         filter_fetch_value => undef,
 
-        transaction_id     => 0,
-        transaction_offset => 0,
+        transaction_id        => 0,
+        transaction_offset    => 0,
     }, $class;
 
     # Grab the parameters we want to use
@@ -163,24 +163,75 @@ sub begin_transaction {
 
     my $fh = $self->{fh};
 
-    seek( $fh, $self->{transaction_offset}, SEEK_SET );
+    $self->lock;
 
-    $self->{transaction_id}++;
+    seek( $fh, $self->{transaction_offset}, SEEK_SET );
+    my $buffer;
+    read( $fh, $buffer, 4 );
+    $buffer = unpack( 'N', $buffer );
+
+    for ( 1 .. 32 ) {
+        next if $buffer & (1 << ($_ - 1));
+        $self->{transaction_id} = $_;
+        $buffer &= (1 << $_);
+        last;
+    }
+
+    seek( $fh, $self->{transaction_offset}, SEEK_SET );
+    print( $fh pack( 'N', $buffer ) );
+
+    $self->unlock;
+
+    return $self->{transaction_id};
 }
 
 sub end_transaction {
     my $self = shift;
 
-#    seek( $fh, $self->{transaction_offset}, SEEK_SET );
+    my $fh = $self->{fh};
+
+    $self->lock;
+
+    seek( $fh, $self->{transaction_offset}, SEEK_SET );
+    my $buffer;
+    read( $fh, $buffer, 4 );
+    $buffer = unpack( 'N', $buffer );
+
+    # Unset $self->{transaction_id} bit
+
+    seek( $fh, $self->{transaction_offset}, SEEK_SET );
+    print( $fh pack( 'N', $buffer ) );
+
+    $self->unlock;
 
     $self->{transaction_id} = 0;
 }
 
-sub transaction_id {
+sub current_transactions {
     my $self = shift;
 
-    return $self->{transaction_id};
+    my $fh = $self->{fh};
+
+    $self->lock;
+
+    seek( $fh, $self->{transaction_offset}, SEEK_SET );
+    my $buffer;
+    read( $fh, $buffer, 4 );
+    $buffer = unpack( 'N', $buffer );
+
+    $self->unlock;
+
+    my @transactions;
+    for ( 1 .. 32 ) {
+        if ( $buffer & (1 << ($_ - 1)) ) {
+            push @transactions, $_;
+        }
+    }
+
+    return @transactions;
 }
+
+sub transaction_id { return $_[0]->{transaction_id} }
 
 #sub commit {
 #}

@@ -121,6 +121,7 @@ my ($fh, $filename) = new_fh();
 {
     my $db = DBM::Deep->new(
         file     => $filename,
+        autobless => 0,
     );
 
     my $obj = $db->{blessed};

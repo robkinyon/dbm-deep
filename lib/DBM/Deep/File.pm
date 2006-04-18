@@ -14,7 +14,9 @@ sub new {
     my ($args) = @_;
 
     my $self = bless {
-        autobless          => undef,
+        audit_fh           => undef,
+        audit_file         => undef,
+        autobless          => 1,
         autoflush          => undef,
         end                => 0,
         fh                 => undef,
@@ -27,8 +29,11 @@ sub new {
         filter_fetch_key   => undef,
         filter_fetch_value => undef,
 
-        transaction_id        => 0,
-        transaction_offset    => 0,
+        # These are values that are not expected to be passed in through
+        # $args. They are here for documentation purposes.
+        transaction_id     => 0,
+        transaction_offset => 0,
+        base_db_obj        => undef,
     }, $class;
 
     # Grab the parameters we want to use
@@ -43,7 +48,30 @@ sub new {
 
     $self->open unless $self->{fh};
 
+    if ( $self->{audit_file} && !$self->{audit_fh} ) {
+        my $flags = O_WRONLY | O_APPEND | O_CREAT;
+
+        my $fh;
+        sysopen( $fh, $self->{audit_file}, $flags )
+            or die "Cannot open audit file '$self->{audit_file}' for read/write: $!";
+
+        # Set the audit_fh to autoflush
+        my $old = select $fh;
+        $|=1;
+        select $old;
+
+        $self->{audit_fh} = $fh;
+    }
+
+
     return $self;
+}
+
+sub set_db {
+    unless ( $_[0]{base_db_obj} ) {
+        $_[0]{base_db_obj} = $_[1];
+        Scalar::Util::weaken( $_[0]{base_db_obj} );
+    }
 }
 
 sub open {

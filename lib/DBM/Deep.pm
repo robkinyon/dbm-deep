@@ -115,10 +115,14 @@ sub _init {
     # These are the defaults to be optionally overridden below
     my $self = bless {
         type        => TYPE_HASH,
-        engine      => DBM::Deep::Engine->new( $args ),
         base_offset => undef,
+
+        parent      => undef,
+        parent_key  => undef,
+
         fileobj     => undef,
     }, $class;
+    $self->{engine} = DBM::Deep::Engine->new( { %{$args}, obj => $self } );
 
     # Grab the parameters we want to use
     foreach my $param ( keys %$self ) {
@@ -127,6 +131,8 @@ sub _init {
     }
 
     $self->{engine}->setup_fh( $self );
+
+    $self->{fileobj}->set_db( $self );
 
     return $self;
 }
@@ -327,42 +333,33 @@ sub rollback {
     return 1;
 }
 
-#sub commit {
-#    my $self = shift->_get_self;
-#}
+sub commit {
+    my $self = shift->_get_self;
+    # At this point, we need to replay the actions taken
+    $self->_fileobj->end_transaction;
+    return 1;
+}
 
 ##
 # Accessor methods
 ##
 
 sub _fileobj {
-    ##
-    # Get access to the root structure
-    ##
     my $self = $_[0]->_get_self;
     return $self->{fileobj};
 }
 
 sub _type {
-    ##
-    # Get type of current node (TYPE_HASH or TYPE_ARRAY)
-    ##
     my $self = $_[0]->_get_self;
     return $self->{type};
 }
 
 sub _base_offset {
-    ##
-    # Get base_offset of current node (TYPE_HASH or TYPE_ARRAY)
-    ##
     my $self = $_[0]->_get_self;
     return $self->{base_offset};
 }
 
 sub _fh {
-    ##
-    # Get access to the raw fh
-    ##
     my $self = $_[0]->_get_self;
     return $self->_fileobj->{fh};
 }
@@ -385,15 +382,60 @@ sub _is_writable {
 #    (O_RDONLY | O_RDWR) & fcntl( $fh, F_GETFL, my $slush = 0);
 #}
 
+sub _find_parent {
+    my $self = shift;
+    if ( $self->{parent} ) {
+        my $base = $self->{parent}->_find_parent();
+        if ( $self->{parent}->_type eq TYPE_HASH ) {
+            return $base . "\{$self->{parent_key}\}";
+        }
+        return $base . "\[$self->{parent_key}\]";
+    }
+    return '$db->';
+}
+
 sub STORE {
     ##
     # Store single hash key/value or array element in database.
     ##
     my $self = shift->_get_self;
-    my ($key, $value) = @_;
+    my ($key, $value, $orig_key) = @_;
 
     if ( $^O ne 'MSWin32' && !_is_writable( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
+    }
+
+    if ( my $afh = $self->_fileobj->{audit_fh} ) {
+        unless ( $self->_type eq TYPE_ARRAY && $orig_key eq 'length' ) {
+            my $lhs = $self->_find_parent;
+            if ( $self->_type eq TYPE_HASH ) {
+                $lhs .= "\{$orig_key\}";
+            }
+            else {
+                $lhs .= "\[$orig_key\]";
+            }
+
+            my $rhs;
+
+            my $r = Scalar::Util::reftype( $value ) || '';
+            if ( $r eq 'HASH' ) {
+                $rhs = '{}';
+            }
+            elsif ( $r eq 'ARRAY' ) {
+                $rhs = '[]';
+            }
+            else {
+                $rhs = "'$value'";
+            }
+
+            if ( my $c = Scalar::Util::blessed( $value ) ) {
+                $rhs = "bless $rhs, '$c'";
+            }
+
+            flock( $afh, LOCK_EX );
+            print( $afh "$lhs = $rhs; # " . localtime(time) . "\n" );
+            flock( $afh, LOCK_UN );
+        }
     }
 
     ##
@@ -414,7 +456,7 @@ sub STORE {
     ##
     # Add key/value to bucket list
     ##
-    my $result = $self->{engine}->add_bucket( $tag, $md5, $key, $value );
+    my $result = $self->{engine}->add_bucket( $tag, $md5, $key, $value, undef, $orig_key ); 
 
     $self->unlock();
 
@@ -735,7 +777,16 @@ If you pass in fh and do not set this, it will be set appropriately.
 =item * type
 
 This parameter specifies what type of object to create, a hash or array.  Use
-one of these two constants: C<DBM::Deep-E<gt>TYPE_HASH> or C<DBM::Deep-E<gt>TYPE_ARRAY>.
+one of these two constants:
+
+=over 4
+
+=item * C<DBM::Deep-E<gt>TYPE_HASH>
+
+=item * C<DBM::Deep-E<gt>TYPE_ARRAY>.
+
+=back
+
 This only takes effect when beginning a new file.  This is an optional
 parameter, and defaults to C<DBM::Deep-E<gt>TYPE_HASH>.
 
@@ -757,16 +808,15 @@ Pass any true value to enable.  This is an optional parameter, and defaults to 0
 
 =item * autobless
 
-If I<autobless> mode is enabled, DBM::Deep will preserve blessed hashes, and
-restore them when fetched.  This is an B<experimental> feature, and does have
-side-effects.  Basically, when hashes are re-blessed into their original
-classes, they are no longer blessed into the DBM::Deep class!  So you won't be
-able to call any DBM::Deep methods on them.  You have been warned.
-This is an optional parameter, and defaults to 0 (disabled).
+If I<autobless> mode is enabled, DBM::Deep will preserve the class something
+is blessed into, and restores it when fetched.  This is an optional parameter, and defaults to 1 (enabled).
+
+B<Note:> If you use the OO-interface, you will not be able to call any methods
+of DBM::Deep on the blessed item. This is considered to be a feature.
 
 =item * filter_*
 
-See L<FILTERS> below.
+See L</FILTERS> below.
 
 =back
 

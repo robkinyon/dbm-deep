@@ -73,7 +73,7 @@ sub STORE {
 
     $self->lock( $self->LOCK_EX );
 
-    my $orig = $key;
+    my $orig = $key eq 'length' ? undef : $key;
 
     my $size;
     my $numeric_idx;
@@ -90,7 +90,7 @@ sub STORE {
         $key = pack($self->{engine}{long_pack}, $key);
     }
 
-    my $rv = $self->SUPER::STORE( $key, $value );
+    my $rv = $self->SUPER::STORE( $key, $value, $orig );
 
     if ( $numeric_idx && $rv == 2 ) {
         $size = $self->FETCHSIZE unless defined $size;

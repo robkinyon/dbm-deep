@@ -6,6 +6,7 @@ use strict;
 use warnings;
 
 use Fcntl qw( :DEFAULT :flock :seek );
+use Scalar::Util ();
 
 # File-wide notes:
 # * All the local($/,$\); are to protect read() and print() from -l.
@@ -51,6 +52,7 @@ sub new {
         max_buckets => 16,
 
         fileobj => undef,
+        obj     => undef,
     }, $class;
 
     if ( defined $args->{pack_size} ) {
@@ -76,6 +78,7 @@ sub new {
         next unless exists $args->{$param};
         $self->{$param} = $args->{$param};
     }
+    Scalar::Util::weaken( $self->{obj} ) if $self->{obj};
 
     if ( $self->{max_buckets} < 16 ) {
         warn "Floor of max_buckets is 16. Setting it to 16 from '$self->{max_buckets}'\n";
@@ -174,6 +177,8 @@ sub setup_fh {
     my $self = shift;
     my ($obj) = @_;
 
+    local($/,$\);
+
     my $fh = $self->_fh;
     flock $fh, LOCK_EX;
 
@@ -187,6 +192,12 @@ sub setup_fh {
         # File is empty -- write header and master index
         ##
         if (!$bytes_read) {
+            if ( my $afh = $self->_fileobj->{audit_fh} ) {
+                flock( $afh, LOCK_EX );
+                print( $afh "# Database created on " . localtime(time) . "\n" );
+                flock( $afh, LOCK_UN );
+            }
+
             $self->write_file_header;
 
             $obj->{base_offset} = $self->_request_space( $self->tag_size( $self->{index_size} ) );
@@ -207,10 +218,14 @@ sub setup_fh {
             ##
             # Get our type from master index header
             ##
-            my $tag = $self->load_tag($obj->_base_offset)
-                or $self->_throw_error("Corrupted file, no master index record");
+            my $tag = $self->load_tag($obj->_base_offset);
+            unless ( $tag ) {
+                flock $fh, LOCK_UN;
+                $self->_throw_error("Corrupted file, no master index record");
+            }
 
             unless ($obj->_type eq $tag->{signature}) {
+                flock $fh, LOCK_UN;
                 $self->_throw_error("File type mismatch");
             }
         }
@@ -386,7 +401,7 @@ sub add_bucket {
     # plain (undigested) key and value.
     ##
     my $self = shift;
-    my ($tag, $md5, $plain_key, $value, $deleted) = @_;
+    my ($tag, $md5, $plain_key, $value, $deleted, $orig_key) = @_;
     $deleted ||= 0;
 
     local($/,$\);
@@ -454,7 +469,7 @@ sub add_bucket {
         for ( @transactions ) {
             my $tag2 = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
             $self->_fileobj->{transaction_id} = $_;
-            $self->add_bucket( $tag2, $md5, '', '', 1 );
+            $self->add_bucket( $tag2, $md5, '', '', 1, $orig_key );
             $self->_fileobj->{transaction_id} = 0;
         }
     }
@@ -464,14 +479,14 @@ sub add_bucket {
         $location = $self->split_index( $md5, $tag );
     }
 
-    $self->write_value( $location, $plain_key, $value );
+    $self->write_value( $location, $plain_key, $value, $orig_key );
 
     return $result;
 }
 
 sub write_value {
     my $self = shift;
-    my ($location, $key, $value) = @_;
+    my ($location, $key, $value, $orig_key) = @_;
 
     local($/,$\);
 
@@ -547,6 +562,8 @@ sub write_value {
         tie %$value, 'DBM::Deep', {
             base_offset => $location,
             fileobj     => $root,
+            parent      => $self->{obj},
+            parent_key  => $orig_key,
         };
         %$value = %x;
     }
@@ -555,6 +572,8 @@ sub write_value {
         tie @$value, 'DBM::Deep', {
             base_offset => $location,
             fileobj     => $root,
+            parent      => $self->{obj},
+            parent_key  => $orig_key,
         };
         @$value = @x;
     }
@@ -647,7 +666,7 @@ sub split_index {
 
 sub read_from_loc {
     my $self = shift;
-    my ($subloc) = @_;
+    my ($subloc, $orig_key) = @_;
 
     local($/,$\);
 
@@ -665,9 +684,11 @@ sub read_from_loc {
     ##
     if (($signature eq SIG_HASH) || ($signature eq SIG_ARRAY)) {
         my $new_obj = DBM::Deep->new({
-            type => $signature,
+            type        => $signature,
             base_offset => $subloc,
             fileobj     => $self->_fileobj,
+            parent      => $self->{obj},
+            parent_key  => $orig_key,
         });
 
         if ($new_obj->_fileobj->{autobless}) {
@@ -708,7 +729,7 @@ sub read_from_loc {
             read( $fh, $new_loc, $size );
             $new_loc = unpack( $self->{long_pack}, $new_loc );
 
-            return $self->read_from_loc( $new_loc );
+            return $self->read_from_loc( $new_loc, $orig_key );
         }
         else {
             return;
@@ -738,12 +759,12 @@ sub get_bucket_value {
     # Fetch single value given tag and MD5 digested key.
     ##
     my $self = shift;
-    my ($tag, $md5) = @_;
+    my ($tag, $md5, $orig_key) = @_;
 
     #ACID - This is a read. Can find exact or HEAD
     my ($subloc, $offset, $size,$is_deleted) = $self->_find_in_buckets( $tag, $md5 );
     if ( $subloc && !$is_deleted ) {
-        return $self->read_from_loc( $subloc );
+        return $self->read_from_loc( $subloc, $orig_key );
     }
     return;
 }

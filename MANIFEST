@@ -41,3 +41,4 @@ t/29_freespace_manager.t
 t/30_already_tied.t
 t/31_references.t
 t/32_dash_ell.t
+t/33_transaction_commit.t

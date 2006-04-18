@@ -47,7 +47,7 @@ sub FETCH {
         ? $self->_fileobj->{filter_store_key}->($_[0])
         : $_[0];
 
-    return $self->SUPER::FETCH( $key );
+    return $self->SUPER::FETCH( $key, $_[0] );
 }
 
 sub STORE {
@@ -57,7 +57,7 @@ sub STORE {
         : $_[0];
     my $value = $_[1];
 
-    return $self->SUPER::STORE( $key, $value );
+    return $self->SUPER::STORE( $key, $value, $_[0] );
 }
 
 sub EXISTS {
@@ -75,7 +75,7 @@ sub DELETE {
         ? $self->_fileobj->{filter_store_key}->($_[0])
         : $_[0];
 
-    return $self->SUPER::DELETE( $key );
+    return $self->SUPER::DELETE( $key, $_[0] );
 }
 
 sub FIRSTKEY {

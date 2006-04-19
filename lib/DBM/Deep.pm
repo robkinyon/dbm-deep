@@ -401,6 +401,7 @@ sub STORE {
     my $self = shift->_get_self;
     my ($key, $value, $orig_key) = @_;
 
+
     if ( $^O ne 'MSWin32' && !_is_writable( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
@@ -432,9 +433,10 @@ sub STORE {
                 $rhs = "bless $rhs, '$c'";
             }
 
-            flock( $afh, LOCK_EX );
-            print( $afh "$lhs = $rhs; # STORE " . localtime(time) . "\n" );
-            flock( $afh, LOCK_UN );
+            $self->_fileobj->audit( "$lhs = $rhs;" );
+#            flock( $afh, LOCK_EX );
+#            print( $afh "$lhs = $rhs; # " . localtime(time) . "\n" );
+#            flock( $afh, LOCK_UN );
         }
     }
 

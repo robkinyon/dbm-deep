@@ -16,7 +16,7 @@ my $build = Module::Build->new(
     build_requires => {
         'File::Path'      => '0.01',
         'File::Temp'      => '0.01',
-        'Test::Deep'      => '0.94',
+        'Test::Deep'      => '0.094',
         'Test::More'      => '0.47',
         'Test::Exception' => '0.21',
     },

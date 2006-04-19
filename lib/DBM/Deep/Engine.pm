@@ -192,11 +192,7 @@ sub setup_fh {
         # File is empty -- write header and master index
         ##
         if (!$bytes_read) {
-            if ( my $afh = $self->_fileobj->{audit_fh} ) {
-                flock( $afh, LOCK_EX );
-                print( $afh "# Database created on " . localtime(time) . "\n" );
-                flock( $afh, LOCK_UN );
-            }
+            $self->_fileobj->audit( "# Database created on" );
 
             $self->write_file_header;
 

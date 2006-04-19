@@ -186,6 +186,27 @@ sub set_transaction_offset {
     $self->{transaction_offset} = shift;
 }
 
+sub audit {
+    my $self = shift;
+
+    if ( my $afh = $self->{audit_fh} ) {
+        my ($string) = @_;
+
+        flock( $afh, LOCK_EX );
+
+        if ( $string =~ /^#/ ) {
+            print( $afh "$string " . localtime(time) . "\n" );
+        }
+        else {
+            print( $afh "$string # " . localtime(time) . "\n" );
+        }
+
+        flock( $afh, LOCK_UN );
+    }
+
+    return 1;
+}
+
 sub begin_transaction {
     my $self = shift;
 
@@ -193,7 +214,7 @@ sub begin_transaction {
 
     $self->lock;
 
-    seek( $fh, $self->{transaction_offset}, SEEK_SET );
+    seek( $fh, $self->{transaction_offset} + $self->{file_offset}, SEEK_SET );
     my $buffer;
     read( $fh, $buffer, 4 );
     $buffer = unpack( 'N', $buffer );
@@ -205,7 +226,7 @@ sub begin_transaction {
         last;
     }
 
-    seek( $fh, $self->{transaction_offset}, SEEK_SET );
+    seek( $fh, $self->{transaction_offset} + $self->{file_offset}, SEEK_SET );
     print( $fh pack( 'N', $buffer ) );
 
     $self->unlock;
@@ -220,14 +241,14 @@ sub end_transaction {
 
     $self->lock;
 
-    seek( $fh, $self->{transaction_offset}, SEEK_SET );
+    seek( $fh, $self->{transaction_offset} + $self->{file_offset}, SEEK_SET );
     my $buffer;
     read( $fh, $buffer, 4 );
     $buffer = unpack( 'N', $buffer );
 
     # Unset $self->{transaction_id} bit
 
-    seek( $fh, $self->{transaction_offset}, SEEK_SET );
+    seek( $fh, $self->{transaction_offset} + $self->{file_offset}, SEEK_SET );
     print( $fh pack( 'N', $buffer ) );
 
     $self->unlock;
@@ -242,7 +263,7 @@ sub current_transactions {
 
     $self->lock;
 
-    seek( $fh, $self->{transaction_offset}, SEEK_SET );
+    seek( $fh, $self->{transaction_offset} + $self->{file_offset}, SEEK_SET );
     my $buffer;
     read( $fh, $buffer, 4 );
     $buffer = unpack( 'N', $buffer );

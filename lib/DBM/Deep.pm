@@ -610,7 +610,6 @@ sub CLEAR {
     {
         my $lhs = $self->_find_parent;
 
-        my $rhs = '()';
         if ( $self->_type eq TYPE_HASH ) {
             $lhs = '%{' . $lhs . '}';
         }
@@ -618,21 +617,13 @@ sub CLEAR {
             $lhs = '@{' . $lhs . '}';
         }
 
-        $self->_fileobj->audit( "$lhs = $rhs;" );
+        $self->_fileobj->audit( "$lhs = ();" );
     }
 
     ##
     # Request exclusive lock for writing
     ##
     $self->lock( LOCK_EX );
-
-    #my $fh = $self->_fh;
-    #
-    #seek($fh, $self->_base_offset + $self->_fileobj->{file_offset}, SEEK_SET);
-    #if (eof $fh) {
-    #    $self->unlock();
-    #    return;
-    #}
 
 #XXX This needs updating to use _release_space
     $self->{engine}->write_tag(

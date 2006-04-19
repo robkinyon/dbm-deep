@@ -415,44 +415,37 @@ sub STORE {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
-#    if ( my $afh = $self->_fileobj->{audit_fh} ) {
-        if ( defined $orig_key ) {
-            my $lhs = $self->_find_parent;
-            if ( $self->_type eq TYPE_HASH ) {
-                $lhs .= "\{$orig_key\}";
-            }
-            else {
-                $lhs .= "\[$orig_key\]";
-            }
-
-            my $rhs;
-
-            my $r = Scalar::Util::reftype( $value ) || '';
-            if ( $r eq 'HASH' ) {
-                $rhs = '{}';
-            }
-            elsif ( $r eq 'ARRAY' ) {
-                $rhs = '[]';
-            }
-            else {
-                if ( defined $value ) {
-                    $rhs = "'$value'";
-                }
-                else {
-                    $rhs = "undef";
-                }
-            }
-
-            if ( my $c = Scalar::Util::blessed( $value ) ) {
-                $rhs = "bless $rhs, '$c'";
-            }
-
-            $self->_fileobj->audit( "$lhs = $rhs;" );
-#            flock( $afh, LOCK_EX );
-#            print( $afh "$lhs = $rhs; # " . localtime(time) . "\n" );
-#            flock( $afh, LOCK_UN );
+    if ( defined $orig_key ) {
+        my $lhs = $self->_find_parent;
+        if ( $self->_type eq TYPE_HASH ) {
+            $lhs .= "\{$orig_key\}";
         }
-#    }
+        else {
+            $lhs .= "\[$orig_key\]";
+        }
+
+        my $rhs;
+
+        my $r = Scalar::Util::reftype( $value ) || '';
+        if ( $r eq 'HASH' ) {
+            $rhs = '{}';
+        }
+        elsif ( $r eq 'ARRAY' ) {
+            $rhs = '[]';
+        }
+        elsif ( defined $value ) {
+            $rhs = "'$value'";
+        }
+        else {
+            $rhs = "undef";
+        }
+
+        if ( my $c = Scalar::Util::blessed( $value ) ) {
+            $rhs = "bless $rhs, '$c'";
+        }
+
+        $self->_fileobj->audit( "$lhs = $rhs;" );
+    }
 
     ##
     # Request exclusive lock for writing
@@ -524,20 +517,16 @@ sub DELETE {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
-    if ( my $afh = $self->_fileobj->{audit_fh} ) {
-        if ( defined $orig_key ) {
-            my $lhs = $self->_find_parent;
-            if ( $self->_type eq TYPE_HASH ) {
-                $lhs .= "\{$orig_key\}";
-            }
-            else {
-                $lhs .= "\[$orig_key]\]";
-            }
-
-            flock( $afh, LOCK_EX );
-            print( $afh "delete $lhs; # " . localtime(time) . "\n" );
-            flock( $afh, LOCK_UN );
+    if ( defined $orig_key ) {
+        my $lhs = $self->_find_parent;
+        if ( $self->_type eq TYPE_HASH ) {
+            $lhs .= "\{$orig_key\}";
         }
+        else {
+            $lhs .= "\[$orig_key]\]";
+        }
+
+        $self->_fileobj->audit( "delete $lhs;" );
     }
 
     ##
@@ -618,7 +607,7 @@ sub CLEAR {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
-    if ( my $afh = $self->_fileobj->{audit_fh} ) {
+    {
         my $lhs = $self->_find_parent;
 
         my $rhs = '()';
@@ -629,9 +618,7 @@ sub CLEAR {
             $lhs = '@{' . $lhs . '}';
         }
 
-        flock( $afh, LOCK_EX );
-        print( $afh "$lhs = $rhs; # " . localtime(time) . "\n" );
-        flock( $afh, LOCK_UN );
+        $self->_fileobj->audit( "$lhs = $rhs;" );
     }
 
     ##

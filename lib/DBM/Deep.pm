@@ -384,14 +384,23 @@ sub _is_writable {
 
 sub _find_parent {
     my $self = shift;
-    if ( $self->{parent} ) {
-        my $base = $self->{parent}->_find_parent();
-        if ( $self->{parent}->_type eq TYPE_HASH ) {
-            return $base . "\{$self->{parent_key}\}";
+
+    my $base = '';
+    if ( my $parent = $self->{parent} ) {
+        my $child = $self;
+        while ( 1 ) {
+            $base = (
+                $parent->_type eq TYPE_HASH
+                    ? "\{$child->{parent_key}\}"
+                    : "\[$child->{parent_key}\]"
+            ) . $base;
+
+            $child = $parent;
+            $parent = $parent->{parent};
+            last unless $parent;
         }
-        return $base . "\[$self->{parent_key}\]";
     }
-    return '$db->';
+    return '$db->' . $base;
 }
 
 sub STORE {
@@ -406,7 +415,7 @@ sub STORE {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
-    if ( my $afh = $self->_fileobj->{audit_fh} ) {
+#    if ( my $afh = $self->_fileobj->{audit_fh} ) {
         if ( defined $orig_key ) {
             my $lhs = $self->_find_parent;
             if ( $self->_type eq TYPE_HASH ) {
@@ -426,7 +435,12 @@ sub STORE {
                 $rhs = '[]';
             }
             else {
-                $rhs = "'$value'";
+                if ( defined $value ) {
+                    $rhs = "'$value'";
+                }
+                else {
+                    $rhs = "undef";
+                }
             }
 
             if ( my $c = Scalar::Util::blessed( $value ) ) {
@@ -438,7 +452,7 @@ sub STORE {
 #            print( $afh "$lhs = $rhs; # " . localtime(time) . "\n" );
 #            flock( $afh, LOCK_UN );
         }
-    }
+#    }
 
     ##
     # Request exclusive lock for writing

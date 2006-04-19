@@ -48,6 +48,7 @@ sub FETCH {
 
 	$self->lock( $self->LOCK_SH );
 
+    my $orig_key = $key eq 'length' ? undef : $key;
     if ( $key =~ /^-?\d+$/ ) {
         if ( $key < 0 ) {
             $key += $self->FETCHSIZE;
@@ -60,7 +61,7 @@ sub FETCH {
         $key = pack($self->{engine}{long_pack}, $key);
     }
 
-    my $rv = $self->SUPER::FETCH( $key );
+    my $rv = $self->SUPER::FETCH( $key, $orig_key );
 
     $self->unlock;
 

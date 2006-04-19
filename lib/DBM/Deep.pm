@@ -406,7 +406,7 @@ sub STORE {
     }
 
     if ( my $afh = $self->_fileobj->{audit_fh} ) {
-        unless ( $self->_type eq TYPE_ARRAY && $orig_key eq 'length' ) {
+        if ( defined $orig_key ) {
             my $lhs = $self->_find_parent;
             if ( $self->_type eq TYPE_HASH ) {
                 $lhs .= "\{$orig_key\}";
@@ -468,7 +468,7 @@ sub FETCH {
     # Fetch single value or element given plain key or array index
     ##
     my $self = shift->_get_self;
-    my ($key) = @_;
+    my ($key, $orig_key) = @_;
 
     my $md5 = $self->{engine}{digest}->($key);
 
@@ -486,7 +486,7 @@ sub FETCH {
     ##
     # Get value from bucket list
     ##
-    my $result = $self->{engine}->get_bucket_value( $tag, $md5 );
+    my $result = $self->{engine}->get_bucket_value( $tag, $md5, $orig_key );
 
     $self->unlock();
 
@@ -501,11 +501,27 @@ sub DELETE {
     ##
     # Delete single key/value pair or element given plain key or array index
     ##
-    my $self = $_[0]->_get_self;
-    my $key = $_[1];
+    my $self = shift->_get_self;
+    my ($key, $orig_key) = @_;
 
     if ( $^O ne 'MSWin32' && !_is_writable( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
+    }
+
+    if ( my $afh = $self->_fileobj->{audit_fh} ) {
+        if ( defined $orig_key ) {
+            my $lhs = $self->_find_parent;
+            if ( $self->_type eq TYPE_HASH ) {
+                $lhs .= "\{$orig_key\}";
+            }
+            else {
+                $lhs .= "\[$orig_key]\]";
+            }
+
+            flock( $afh, LOCK_EX );
+            print( $afh "delete $lhs; # " . localtime(time) . "\n" );
+            flock( $afh, LOCK_UN );
+        }
     }
 
     ##
@@ -530,7 +546,7 @@ sub DELETE {
         $value = $self->_fileobj->{filter_fetch_value}->($value);
     }
 
-    my $result = $self->{engine}->delete_bucket( $tag, $md5 );
+    my $result = $self->{engine}->delete_bucket( $tag, $md5, $orig_key );
 
     ##
     # If this object is an array and the key deleted was on the end of the stack,
@@ -546,8 +562,8 @@ sub EXISTS {
     ##
     # Check if a single key or element exists given plain key or array index
     ##
-    my $self = $_[0]->_get_self;
-    my $key = $_[1];
+    my $self = shift->_get_self;
+    my ($key) = @_;
 
     my $md5 = $self->{engine}{digest}->($key);
 
@@ -580,10 +596,26 @@ sub CLEAR {
     ##
     # Clear all keys from hash, or all elements from array.
     ##
-    my $self = $_[0]->_get_self;
+    my $self = shift->_get_self;
 
     if ( $^O ne 'MSWin32' && !_is_writable( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
+    }
+
+    if ( my $afh = $self->_fileobj->{audit_fh} && 0 ) {
+        my $lhs = $self->_find_parent;
+
+        my $rhs;
+        if ( $self->_type eq TYPE_HASH ) {
+            $rhs = '{}';
+        }
+        else {
+            $rhs = '[]';
+        }
+
+        flock( $afh, LOCK_EX );
+        print( $afh "$lhs = $rhs; # " . localtime(time) . "\n" );
+        flock( $afh, LOCK_UN );
     }
 
     ##

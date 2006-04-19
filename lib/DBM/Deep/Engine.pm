@@ -774,7 +774,7 @@ sub delete_bucket {
     # Delete single key/value pair given tag and MD5 digested key.
     ##
     my $self = shift;
-    my ($tag, $md5) = @_;
+    my ($tag, $md5, $orig_key) = @_;
 
     local($/,$\);
 

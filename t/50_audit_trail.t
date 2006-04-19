@@ -64,8 +64,6 @@ like(
 $db->{foo} = 'bar';
 like( $audit[1], qr{^\$db->{foo} = 'bar';}, "Basic assignment correct" );
 
-SKIP: {
-    skip 'Not done yet', 20;
 $db->{foo} = 'baz';
 like( $audit[2], qr{^\$db->{foo} = 'baz';}, "Basic update correct" );
 
@@ -142,7 +140,8 @@ undef $db;
     is_deeply( $export2, $export, "And recovery works" );
 }
 
-{
+SKIP: {
+    skip 'Not done yet', 1;
     $db = DBM::Deep->new({
         file => $filename,
         audit_file => $audit_file,
@@ -169,7 +168,8 @@ undef $db;
     is_deeply( $export2, $export, "And recovery works" );
 }
 
-{
+SKIP: {
+    skip "Not working", 3;
     $db = DBM::Deep->new({
         file => $filename,
         audit_file => $audit_file,
@@ -197,5 +197,4 @@ undef $db;
     my $export2 = $db->export;
 
     is_deeply( $export2, $export, "And recovery works" );
-}
 }

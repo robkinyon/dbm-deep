@@ -134,6 +134,7 @@ sub DELETE {
     my ($key) = @_;
 
     my $unpacked_key = $key;
+    my $orig = $key eq 'length' ? undef : $key;
 
     $self->lock( $self->LOCK_EX );
 
@@ -150,7 +151,7 @@ sub DELETE {
         $key = pack($self->{engine}{long_pack}, $key);
     }
 
-    my $rv = $self->SUPER::DELETE( $key );
+    my $rv = $self->SUPER::DELETE( $key, $orig );
 
 	if ($rv && $unpacked_key == $size - 1) {
 		$self->STORESIZE( $unpacked_key );

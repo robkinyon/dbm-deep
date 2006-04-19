@@ -433,7 +433,7 @@ sub STORE {
             }
 
             flock( $afh, LOCK_EX );
-            print( $afh "$lhs = $rhs; # " . localtime(time) . "\n" );
+            print( $afh "$lhs = $rhs; # STORE " . localtime(time) . "\n" );
             flock( $afh, LOCK_UN );
         }
     }
@@ -602,15 +602,15 @@ sub CLEAR {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
-    if ( my $afh = $self->_fileobj->{audit_fh} && 0 ) {
+    if ( my $afh = $self->_fileobj->{audit_fh} ) {
         my $lhs = $self->_find_parent;
 
-        my $rhs;
+        my $rhs = '()';
         if ( $self->_type eq TYPE_HASH ) {
-            $rhs = '{}';
+            $lhs = '%{' . $lhs . '}';
         }
         else {
-            $rhs = '[]';
+            $lhs = '@{' . $lhs . '}';
         }
 
         flock( $afh, LOCK_EX );

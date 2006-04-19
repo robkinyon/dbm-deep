@@ -626,13 +626,13 @@ sub CLEAR {
     ##
     $self->lock( LOCK_EX );
 
-    my $fh = $self->_fh;
-
-    seek($fh, $self->_base_offset + $self->_fileobj->{file_offset}, SEEK_SET);
-    if (eof $fh) {
-        $self->unlock();
-        return;
-    }
+    #my $fh = $self->_fh;
+    #
+    #seek($fh, $self->_base_offset + $self->_fileobj->{file_offset}, SEEK_SET);
+    #if (eof $fh) {
+    #    $self->unlock();
+    #    return;
+    #}
 
 #XXX This needs updating to use _release_space
     $self->{engine}->write_tag(

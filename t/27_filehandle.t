@@ -98,5 +98,5 @@ __END_FH__
         is( $db->{x}, 'b' );
     }
 
-    exec( "$^X -Ilib $filename" );
+    exec( "$^X -Iblib/lib $filename" );
 }

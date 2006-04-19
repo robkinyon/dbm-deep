@@ -105,13 +105,9 @@ sub calculate_sizes {
 sub write_file_header {
     my $self = shift;
 
-    local($/,$\);
+    my $loc = $self->_fileobj->request_space( length( SIG_FILE ) + 21 );
 
-    my $fh = $self->_fh;
-
-    my $loc = $self->_request_space( length( SIG_FILE ) + 21 );
-    seek($fh, $loc + $self->_fileobj->{file_offset}, SEEK_SET);
-    print( $fh
+    $self->_fileobj->print_at( $loc,
         SIG_FILE,
         SIG_HEADER,
         pack('N', 1),  # header version
@@ -196,7 +192,7 @@ sub setup_fh {
 
             $self->write_file_header;
 
-            $obj->{base_offset} = $self->_request_space( $self->tag_size( $self->{index_size} ) );
+            $obj->{base_offset} = $self->_fileobj->request_space( $self->tag_size( $self->{index_size} ) );
 
             $self->write_tag(
                 $obj->_base_offset, $obj->_type,
@@ -284,8 +280,6 @@ sub load_tag {
     my ($offset) = @_;
 
     local($/,$\);
-
-#    print join(':',map{$_||''}caller(1)), $/;
 
     my $fh = $self->_fh;
 
@@ -418,8 +412,7 @@ sub add_bucket {
     my $location = 0;
     my $result = 2;
 
-    my $root = $self->_fileobj;
-    my $fh   = $self->_fh;
+    my $fileobj = $self->_fileobj;
 
     my $actual_length = $self->_length_needed( $value, $plain_key );
 
@@ -427,8 +420,8 @@ sub add_bucket {
     my ($subloc, $offset, $size,$is_deleted) = $self->_find_in_buckets( $tag, $md5, 1 );
 
     my @transactions;
-    if ( $self->_fileobj->transaction_id == 0 ) {
-        @transactions = $self->_fileobj->current_transactions;
+    if ( $fileobj->transaction_id == 0 ) {
+        @transactions = $fileobj->current_transactions;
     }
 
 #    $self->_release_space( $size, $subloc );
@@ -441,36 +434,35 @@ sub add_bucket {
             $location = $subloc;
         }
         else {
-            $location = $self->_request_space( $actual_length );
-            seek(
-                $fh,
-                $tag->{offset} + $offset
-              + $self->{hash_size} + $root->{file_offset},
-                SEEK_SET,
+            $location = $fileobj->request_space( $actual_length );
+
+            $fileobj->print_at( $tag->{offset} + $offset + $self->{hash_size},
+                pack($self->{long_pack}, $location ),
+                pack($self->{long_pack}, $actual_length ),
+                pack('n n', $fileobj->transaction_id, $deleted ),
             );
-            print( $fh pack($self->{long_pack}, $location ) );
-            print( $fh pack($self->{long_pack}, $actual_length ) );
-            print( $fh pack('n n', $root->transaction_id, $deleted ) );
         }
     }
     # Adding a new md5
     elsif ( defined $offset ) {
-        $location = $self->_request_space( $actual_length );
+        $location = $fileobj->request_space( $actual_length );
 
-        seek( $fh, $tag->{offset} + $offset + $root->{file_offset}, SEEK_SET );
-        print( $fh $md5 . pack($self->{long_pack}, $location ) );
-        print( $fh pack($self->{long_pack}, $actual_length ) );
-        print( $fh pack('n n', $root->transaction_id, $deleted ) );
+        $fileobj->print_at( $tag->{offset} + $offset,
+            $md5,
+            pack($self->{long_pack}, $location ),
+            pack($self->{long_pack}, $actual_length ),
+            pack('n n', $fileobj->transaction_id, $deleted ),
+        );
 
         for ( @transactions ) {
             my $tag2 = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
-            $self->_fileobj->{transaction_id} = $_;
+            $fileobj->{transaction_id} = $_;
             $self->add_bucket( $tag2, $md5, '', '', 1, $orig_key );
-            $self->_fileobj->{transaction_id} = 0;
+            $fileobj->{transaction_id} = 0;
         }
     }
     # If bucket didn't fit into list, split into a new index level
-    # split_index() will do the _request_space() call
+    # split_index() will do the _fileobj->request_space() call
     else {
         $location = $self->split_index( $md5, $tag );
     }
@@ -581,24 +573,20 @@ sub split_index {
     my $self = shift;
     my ($md5, $tag) = @_;
 
-    local($/,$\);
+    my $fileobj = $self->_fileobj;
 
-    my $fh = $self->_fh;
-    my $root = $self->_fileobj;
-
-    my $loc = $self->_request_space(
+    my $loc = $fileobj->request_space(
         $self->tag_size( $self->{index_size} ),
     );
 
-    seek($fh, $tag->{ref_loc} + $root->{file_offset}, SEEK_SET);
-    print( $fh pack($self->{long_pack}, $loc) );
+    $fileobj->print_at( $tag->{ref_loc}, pack($self->{long_pack}, $loc) );
 
     my $index_tag = $self->write_tag(
         $loc, SIG_INDEX,
         chr(0)x$self->{index_size},
     );
 
-    my $newtag_loc = $self->_request_space(
+    my $newtag_loc = $fileobj->request_space(
         $self->tag_size( $self->{bucket_list_size} ),
     );
 
@@ -618,7 +606,11 @@ sub split_index {
         my $num = ord(substr($key, $tag->{ch} + 1, 1));
 
         if ($newloc[$num]) {
-            seek($fh, $newloc[$num] + $root->{file_offset}, SEEK_SET);
+            local($/,$\);
+
+            my $fh = $self->_fh;
+
+            seek($fh, $newloc[$num] + $fileobj->{file_offset}, SEEK_SET);
             my $subkeys;
             read( $fh, $subkeys, $self->{bucket_list_size});
 
@@ -627,27 +619,26 @@ sub split_index {
                 { content => $subkeys }, '',
             );
 
-            seek($fh, $newloc[$num] + $offset + $root->{file_offset}, SEEK_SET);
-            print( $fh $key . pack($self->{long_pack}, $old_subloc) );
+            $fileobj->print_at( $newloc[$num] + $offset, $key . pack($self->{long_pack}, $old_subloc) );
 
             next;
         }
 
-        seek($fh, $index_tag->{offset} + ($num * $self->{long_size}) + $root->{file_offset}, SEEK_SET);
-
-        my $loc = $self->_request_space(
+        my $loc = $fileobj->request_space(
             $self->tag_size( $self->{bucket_list_size} ),
         );
 
-        print( $fh pack($self->{long_pack}, $loc) );
+        $fileobj->print_at(
+            $index_tag->{offset} + ($num * $self->{long_size}),
+            pack($self->{long_pack}, $loc),
+        );
 
         my $blist_tag = $self->write_tag(
             $loc, SIG_BLIST,
             chr(0)x$self->{bucket_list_size},
         );
 
-        seek($fh, $blist_tag->{offset} + $root->{file_offset}, SEEK_SET);
-        print( $fh $key . pack($self->{long_pack}, $old_subloc) );
+        $fileobj->print_at( $blist_tag->{offset}, $key . pack($self->{long_pack}, $old_subloc) );
 
         $newloc[$num] = $blist_tag->{offset};
     }
@@ -772,16 +763,15 @@ sub delete_bucket {
     my $self = shift;
     my ($tag, $md5, $orig_key) = @_;
 
-    local($/,$\);
-
     #ACID - This is a mutation. Must only find the exact transaction
     my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5, 1 );
-#XXX This needs _release_space()
+#XXX This needs _release_space() for the value and anything below
     if ( $subloc ) {
-        my $fh = $self->_fh;
-        seek($fh, $tag->{offset} + $offset + $self->_fileobj->{file_offset}, SEEK_SET);
-        print( $fh substr($tag->{content}, $offset + $self->{bucket_size} ) );
-        print( $fh chr(0) x $self->{bucket_size} );
+        $self->_fileobj->print_at(
+            $tag->{offset} + $offset,
+            substr($tag->{content}, $offset + $self->{bucket_size} ),
+            chr(0) x $self->{bucket_size},
+        );
 
         return 1;
     }
@@ -826,13 +816,11 @@ sub find_bucket_list {
         if (!$tag) {
             return if !$args->{create};
 
-            my $loc = $self->_request_space(
+            my $loc = $self->_fileobj->request_space(
                 $self->tag_size( $self->{bucket_list_size} ),
             );
 
-            my $fh = $self->_fh;
-            seek($fh, $ref_loc + $self->_fileobj->{file_offset}, SEEK_SET);
-            print( $fh pack($self->{long_pack}, $loc) );
+            $self->_fileobj->print_at( $ref_loc, pack($self->{long_pack}, $loc) );
 
             $tag = $self->write_tag(
                 $loc, SIG_BLIST,
@@ -1039,29 +1027,16 @@ sub _find_in_buckets {
     return;
 }
 
-sub _request_space {
-    my $self = shift;
-    my ($size) = @_;
-
-    my $loc = $self->_fileobj->{end};
-    $self->_fileobj->{end} += $size;
-
-    return $loc;
-}
-
 sub _release_space {
     my $self = shift;
     my ($size, $loc) = @_;
 
-    local($/,$\);
-
     my $next_loc = 0;
 
-    my $fh = $self->_fh;
-    seek( $fh, $loc + $self->_fileobj->{file_offset}, SEEK_SET );
-    print( $fh SIG_FREE
-        . pack($self->{long_pack}, $size )
-        . pack($self->{long_pack}, $next_loc )
+    $self->_fileobj->print_at( $loc,
+        SIG_FREE, 
+        pack($self->{long_pack}, $size ),
+        pack($self->{long_pack}, $next_loc ),
     );
 
     return;
@@ -1098,19 +1073,6 @@ sub _read_at {
     else {
         return $buffer;
     }
-}
-
-sub _print_at {
-    my $self = shift;
-    my ($spot, $data) = @_;
-
-    local($/,$\);
-
-    my $fh = $self->_fh;
-    seek( $fh, $spot, SEEK_SET );
-    print( $fh $data );
-
-    return;
 }
 
 sub get_file_version {

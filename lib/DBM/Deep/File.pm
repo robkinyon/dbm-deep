@@ -110,6 +110,19 @@ sub close {
     return 1;
 }
 
+sub print_at {
+    my $self = shift;
+    my $loc  = shift;
+
+    local ($/,$\);
+
+    my $fh = $self->{fh};
+    seek( $fh, $loc + $self->{file_offset}, SEEK_SET );
+    print( $fh @_ );
+
+    return 1;
+}
+
 sub DESTROY {
     my $self = shift;
     return unless $self;
@@ -118,6 +131,34 @@ sub DESTROY {
 
     return;
 }
+
+sub request_space {
+    my $self = shift;
+    my ($size) = @_;
+
+    my $loc = $self->{end};
+    $self->{end} += $size;
+
+    return $loc;
+}
+
+#sub release_space {
+#    my $self = shift;
+#    my ($size, $loc) = @_;
+#
+#    local($/,$\);
+#
+#    my $next_loc = 0;
+#
+#    my $fh = $self->{fh};
+#    seek( $fh, $loc + $self->{file_offset}, SEEK_SET );
+#    print( $fh SIG_FREE
+#        . pack($self->{long_pack}, $size )
+#        . pack($self->{long_pack}, $next_loc )
+#    );
+#
+#    return;
+#}
 
 ##
 # If db locking is set, flock() the db file.  If called multiple

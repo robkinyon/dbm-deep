@@ -335,8 +335,7 @@ sub rollback {
 
 sub commit {
     my $self = shift->_get_self;
-    # At this point, we need to replay the actions taken
-    $self->_fileobj->end_transaction;
+    $self->_fileobj->commit_transaction;
     return 1;
 }
 
@@ -388,19 +387,28 @@ sub _find_parent {
     my $base = '';
     if ( my $parent = $self->{parent} ) {
         my $child = $self;
-        while ( 1 ) {
+        while ( $parent->{parent} ) {
             $base = (
                 $parent->_type eq TYPE_HASH
                     ? "\{$child->{parent_key}\}"
                     : "\[$child->{parent_key}\]"
+#                "->get('$child->{parent_key}')"
             ) . $base;
 
             $child = $parent;
             $parent = $parent->{parent};
-            last unless $parent;
+#            last unless $parent;
+        }
+        if ( $base ) {
+            $base = "\$db->get( '$child->{parent_key}' )->" . $base;
+        }
+        else {
+            $base = "\$db->get( '$child->{parent_key}' )";
         }
     }
-    return '$db->' . $base;
+#    return '$db->' . $base;
+#    return '$db' . $base;
+    return $base;
 }
 
 sub STORE {
@@ -416,14 +424,6 @@ sub STORE {
     }
 
     if ( defined $orig_key ) {
-        my $lhs = $self->_find_parent;
-        if ( $self->_type eq TYPE_HASH ) {
-            $lhs .= "\{$orig_key\}";
-        }
-        else {
-            $lhs .= "\[$orig_key\]";
-        }
-
         my $rhs;
 
         my $r = Scalar::Util::reftype( $value ) || '';
@@ -444,7 +444,24 @@ sub STORE {
             $rhs = "bless $rhs, '$c'";
         }
 
-        $self->_fileobj->audit( "$lhs = $rhs;" );
+        my $lhs = $self->_find_parent;
+        if ( $lhs ) {
+            if ( $self->_type eq TYPE_HASH ) {
+                $lhs .= "->\{$orig_key\}";
+            }
+            else {
+                $lhs .= "->\[$orig_key\]";
+            }
+
+            $lhs .= "=$rhs;";
+        }
+        else {
+            $lhs = "\$db->put('$orig_key',$rhs);";
+        }
+
+#        $self->_fileobj->audit( "$lhs = $rhs;" );
+#        $self->_fileobj->audit( "$lhs $rhs);" );
+        $self->_fileobj->audit($lhs);
     }
 
     ##
@@ -519,14 +536,21 @@ sub DELETE {
 
     if ( defined $orig_key ) {
         my $lhs = $self->_find_parent;
-        if ( $self->_type eq TYPE_HASH ) {
-            $lhs .= "\{$orig_key\}";
+#        if ( $self->_type eq TYPE_HASH ) {
+#            $lhs .= "\{$orig_key\}";
+#        }
+#        else {
+#            $lhs .= "\[$orig_key]\]";
+#        }
+
+#        $self->_fileobj->audit( "delete $lhs;" );
+#        $self->_fileobj->audit( "$lhs->delete('$orig_key');" );
+        if ( $lhs ) {
+            $self->_fileobj->audit( "delete $lhs;" );
         }
         else {
-            $lhs .= "\[$orig_key]\]";
+            $self->_fileobj->audit( "\$db->delete('$orig_key');" );
         }
-
-        $self->_fileobj->audit( "delete $lhs;" );
     }
 
     ##

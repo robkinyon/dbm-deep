@@ -37,11 +37,8 @@ is( $db1->{other_x}, undef, "Since other_x was added after the transaction began
 
 $db1->commit;
 
-TODO: {
-    local $TODO = 'Need to finish auditing first before commit will work.';
-    is( $db1->{x}, 'z', "After commit, DB1's X is Y" );
-    is( $db2->{x}, 'z', "After commit, DB2's X is Y" );
-}
+is( $db1->{x}, 'z', "After commit, DB1's X is Y" );
+is( $db2->{x}, 'z', "After commit, DB2's X is Y" );
 
 is( $db1->{other_x}, 'foo', "After DB1 transaction is over, DB1 can see other_x" );
 is( $db2->{other_x}, 'foo', "After DB1 transaction is over, DB2 can still see other_x" );

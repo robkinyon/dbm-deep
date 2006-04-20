@@ -33,6 +33,7 @@ sub new {
         # $args. They are here for documentation purposes.
         transaction_id     => 0,
         transaction_offset => 0,
+        trans_audit        => undef,
         base_db_obj        => undef,
     }, $class;
 
@@ -68,10 +69,13 @@ sub new {
 }
 
 sub set_db {
-    unless ( $_[0]{base_db_obj} ) {
-        $_[0]{base_db_obj} = $_[1];
-        Scalar::Util::weaken( $_[0]{base_db_obj} );
+    my $self = shift;
+    unless ( $self->{base_db_obj} ) {
+        $self->{base_db_obj} = shift;
+        Scalar::Util::weaken( $self->{base_db_obj} );
     }
+
+    return;
 }
 
 sub open {
@@ -273,10 +277,9 @@ sub set_transaction_offset {
 
 sub audit {
     my $self = shift;
+    my ($string) = @_;
 
     if ( my $afh = $self->{audit_fh} ) {
-        my ($string) = @_;
-
         flock( $afh, LOCK_EX );
 
         if ( $string =~ /^#/ ) {
@@ -287,6 +290,10 @@ sub audit {
         }
 
         flock( $afh, LOCK_UN );
+    }
+
+    if ( $self->{trans_audit} ) {
+        push @{$self->{trans_audit}}, $string;
     }
 
     return 1;
@@ -316,6 +323,8 @@ sub begin_transaction {
 
     $self->unlock;
 
+    $self->{trans_audit} = [];
+
     return $self->{transaction_id};
 }
 
@@ -332,6 +341,7 @@ sub end_transaction {
     $buffer = unpack( 'N', $buffer );
 
     # Unset $self->{transaction_id} bit
+    $buffer ^= (1 << $self->{transaction_id}-1);
 
     seek( $fh, $self->{transaction_offset} + $self->{file_offset}, SEEK_SET );
     print( $fh pack( 'N', $buffer ) );
@@ -339,6 +349,9 @@ sub end_transaction {
     $self->unlock;
 
     $self->{transaction_id} = 0;
+    $self->{trans_audit} = undef;
+
+    return 1;
 }
 
 sub current_transactions {
@@ -367,8 +380,23 @@ sub current_transactions {
 
 sub transaction_id { return $_[0]->{transaction_id} }
 
-#sub commit {
-#}
+sub commit_transaction {
+    my $self = shift;
+
+    my @audit = @{$self->{trans_audit}};
+
+    $self->end_transaction;
+
+    {
+        my $db = $self->{base_db_obj};
+        for ( @audit ) {
+            eval "$_;";
+            warn "$_: $@\n" if $@;
+        }
+    }
+
+    return 1;
+}
 
 1;
 __END__

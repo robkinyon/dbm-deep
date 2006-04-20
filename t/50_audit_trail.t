@@ -49,9 +49,11 @@ sub testit {
 
     for ( @$audit ) {
         eval "$_";
+        warn "$_ -> $@\n" if $@;
     }
 
     my $export2 = $db->export;
+#    use Data::Dumper;warn Dumper $export2;
 
     cmp_deeply( $export2, $export, "And recovery works" );
 }

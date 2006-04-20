@@ -110,6 +110,18 @@ sub close {
     return 1;
 }
 
+sub set_inode {
+    my $self = shift;
+
+    unless ( $self->{inode} ) {
+        my @stats = stat($self->{fh});
+        $self->{inode} = $stats[1];
+        $self->{end} = $stats[7];
+    }
+
+    return 1;
+}
+
 sub print_at {
     my $self = shift;
     my $loc  = shift;
@@ -117,8 +129,39 @@ sub print_at {
     local ($/,$\);
 
     my $fh = $self->{fh};
-    seek( $fh, $loc + $self->{file_offset}, SEEK_SET );
+    if ( defined $loc ) {
+        seek( $fh, $loc + $self->{file_offset}, SEEK_SET );
+    }
+
     print( $fh @_ );
+
+    return 1;
+}
+
+sub read_at {
+    my $self = shift;
+    my ($loc, $size) = @_;
+
+    local ($/,$\);
+
+    my $fh = $self->{fh};
+    if ( defined $loc ) {
+        seek( $fh, $loc + $self->{file_offset}, SEEK_SET );
+    }
+
+    my $buffer;
+    read( $fh, $buffer, $size);
+
+    return $buffer;
+}
+
+sub increment_pointer {
+    my $self = shift;
+    my ($size) = @_;
+
+    if ( defined $size ) {
+        seek( $self->{fh}, $size, SEEK_CUR );
+    }
 
     return 1;
 }
@@ -136,6 +179,7 @@ sub request_space {
     my $self = shift;
     my ($size) = @_;
 
+    #XXX Do I need to reset $self->{end} here? I need a testcase
     my $loc = $self->{end};
     $self->{end} += $size;
 

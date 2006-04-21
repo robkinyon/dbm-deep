@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 32;
+use Test::More tests => 36;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -31,6 +31,15 @@ is( $db->{key3}, 'value3', "... and hash-access also works" );
 
 ok( $db->exists("key1"), "exists() function works" );
 ok( exists $db->{key2}, "exists() works against tied hash" );
+
+ok( !exists $db->{key4}, "exists() function works for keys that aren't there" );
+is( $db->{key4}, undef, "Autovivified key4" );
+TODO: {
+    local $TODO = "Autovivification isn't correct yet";
+    ok( exists $db->{key4}, "Autovivified key4 now exists" );
+}
+delete $db->{key4};
+ok( !exists $db->{key4}, "And key4 doesn't exists anymore" );
 
 ##
 # count keys

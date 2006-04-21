@@ -498,7 +498,8 @@ sub FETCH {
     ##
     $self->lock( LOCK_SH );
 
-    my $tag = $self->{engine}->find_bucket_list( $self->_base_offset, $md5 );
+    my $tag = $self->{engine}->find_bucket_list( $self->_base_offset, $md5 );#, { create => 1 } );
+    #XXX This needs to autovivify
     if (!$tag) {
         $self->unlock();
         return;

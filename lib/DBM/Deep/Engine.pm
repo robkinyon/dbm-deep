@@ -709,10 +709,17 @@ sub get_bucket_value {
     my ($tag, $md5, $orig_key) = @_;
 
     #ACID - This is a read. Can find exact or HEAD
-    my ($subloc, $offset, $size,$is_deleted) = $self->_find_in_buckets( $tag, $md5 );
-    if ( $subloc && !$is_deleted ) {
+    my ($subloc, $offset, $size, $is_deleted) = $self->_find_in_buckets( $tag, $md5 );
+
+    if ( !$subloc ) {
+        #XXX Need to use real key
+#        $self->add_bucket( $tag, $md5, $orig_key, undef, undef, $orig_key );
+#        return;
+    }
+    elsif ( !$is_deleted ) {
         return $self->read_from_loc( $subloc, $orig_key );
     }
+
     return;
 }
 

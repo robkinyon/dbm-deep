@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 31;
+use Test::More tests => 37;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -60,13 +60,13 @@ is( $db2->{x}, 'z', "After commit, DB2's X is Z" );
 $db1->begin_work;
 
     delete $db2->{other_x};
-    is( $db2->{other_x}, undef, "DB2 deleted other_x in DB1's transaction, so it can't see it anymore" );
+    ok( !exists $db2->{other_x}, "DB2 deleted other_x in DB1's transaction, so it can't see it anymore" );
     is( $db1->{other_x}, 'foo', "Since other_x was deleted after the transaction began, DB1 still sees it." );
 
     delete $db1->{x};
-    is( $db1->{x}, undef, "DB1 deleted X in a transaction, so it can't see it anymore" );
-
+    ok( !exists $db1->{x}, "DB1 deleted X in a transaction, so it can't see it anymore" );
     is( $db2->{x}, 'z', "But, DB2 can still see it" );
+
 $db1->rollback;
 
 is( $db2->{other_x}, undef, "It's still deleted for DB2" );
@@ -78,10 +78,29 @@ is( $db2->{x}, 'z', "DB2 can still see it" );
 $db1->begin_work;
 
     delete $db1->{x};
-    is( $db1->{x}, undef, "DB1 deleted X in a transaction, so it can't see it anymore" );
+    ok( !exists $db1->{x}, "DB1 deleted X in a transaction, so it can't see it anymore" );
     is( $db2->{x}, 'z', "But, DB2 can still see it" );
 
 $db1->commit;
 
 is( $db1->{x}, undef, "The transaction was committed, so DB1 still deleted X" );
 is( $db2->{x}, undef, "DB2 can now see the deletion of X" );
+
+$db1->{foo} = 'bar';
+is( $db1->{foo}, 'bar', "Set foo to bar in DB1" );
+is( $db2->{foo}, 'bar', "Set foo to bar in DB2" );
+
+TODO: {
+    local $TODO = 'Still need to work on clear()';
+
+$db1->begin_work;
+
+    %$db1 = (); # clear()
+    ok( !exists $db1->{foo}, "Cleared foo" );
+    is( $db2->{foo}, 'bar', "But in DB2, we can still see it" );
+
+$db1->rollback;
+
+is( $db1->{foo}, 'bar', "Rollback means 'foo' is still there" );
+is( $db2->{foo}, 'bar', "Rollback means 'foo' is still there" );
+}

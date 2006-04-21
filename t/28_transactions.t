@@ -65,8 +65,8 @@ $db1->begin_work;
 
     delete $db1->{x};
     is( $db1->{x}, undef, "DB1 deleted X in a transaction, so it can't see it anymore" );
-    is( $db2->{x}, 'z', "But, DB2 can still see it" );
 
+    is( $db2->{x}, 'z', "But, DB2 can still see it" );
 $db1->rollback;
 
 is( $db2->{other_x}, undef, "It's still deleted for DB2" );

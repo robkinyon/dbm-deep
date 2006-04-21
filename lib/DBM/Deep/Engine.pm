@@ -183,7 +183,9 @@ sub setup_fh {
 
             $self->write_file_header;
 
-            $obj->{base_offset} = $self->_fileobj->request_space( $self->tag_size( $self->{index_size} ) );
+            $obj->{base_offset} = $self->_fileobj->request_space(
+                $self->tag_size( $self->{index_size} ),
+            );
 
             $self->write_tag(
                 $obj->_base_offset, $obj->_type,
@@ -437,6 +439,7 @@ sub add_bucket {
             $self->add_bucket( $tag2, $md5, '', '', 1, $orig_key );
             $fileobj->{transaction_id} = 0;
         }
+        $tag = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
     }
     # If bucket didn't fit into list, split into a new index level
     # split_index() will do the _fileobj->request_space() call
@@ -720,8 +723,9 @@ sub delete_bucket {
     my $self = shift;
     my ($tag, $md5, $orig_key) = @_;
 
-    #ACID - This is a mutation. Must only find the exact transaction
-    my ($subloc, $offset, $size,$is_deleted) = $self->_find_in_buckets( $tag, $md5, 1 );
+    #ACID - Although this is a mutation, we must find any transaction.
+    # This is because we need to mark something as deleted that is in the HEAD.
+    my ($subloc, $offset, $size,$is_deleted) = $self->_find_in_buckets( $tag, $md5 );
 
     return if !$subloc;
 
@@ -732,27 +736,18 @@ sub delete_bucket {
         @transactions = $fileobj->current_transactions;
     }
 
-#XXX This code taken from add_bucket() as an example
-#    for ( @transactions ) {
-#        my $tag2 = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
-#        $fileobj->{transaction_id} = $_;
-#        $self->add_bucket( $tag2, $md5, '', '', 1, $orig_key );
-#        $fileobj->{transaction_id} = 0;
-#    }
-
-    #XXX This needs _release_space() for the value and anything below
     if ( $fileobj->transaction_id == 0 ) {
         my $value = $self->read_from_loc( $subloc, $orig_key );
 
         for (@transactions) {
-#            warn "Marking $_ $orig_key : $value as still there\n";
-            my $tag2 = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
             $fileobj->{transaction_id} = $_;
             #XXX Need to use real key
-            $self->add_bucket( $tag2, $md5, $orig_key, $value, 0, $orig_key );
+            $self->add_bucket( $tag, $md5, $orig_key, $value, undef, $orig_key );
             $fileobj->{transaction_id} = 0;
         }
+        $tag = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
 
+        #XXX This needs _release_space() for the value and anything below
         $fileobj->print_at(
             $tag->{offset} + $offset,
             substr( $tag->{content}, $offset + $self->{bucket_size} ),
@@ -760,6 +755,7 @@ sub delete_bucket {
         );
     }
     else {
+        $self->add_bucket( $tag, $md5, '', '', 1, $orig_key );
     }
 
     return 1;
@@ -975,6 +971,7 @@ sub _get_key_subloc {
 sub _find_in_buckets {
     my $self = shift;
     my ($tag, $md5, $exact) = @_;
+    $exact ||= 0;
 
     my $trans_id = $self->_fileobj->transaction_id;
 

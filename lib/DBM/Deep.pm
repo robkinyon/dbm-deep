@@ -385,6 +385,7 @@ sub _find_parent {
     my $self = shift;
 
     my $base = '';
+    #XXX This if() is redundant
     if ( my $parent = $self->{parent} ) {
         my $child = $self;
         while ( $parent->{parent} ) {
@@ -392,12 +393,10 @@ sub _find_parent {
                 $parent->_type eq TYPE_HASH
                     ? "\{$child->{parent_key}\}"
                     : "\[$child->{parent_key}\]"
-#                "->get('$child->{parent_key}')"
             ) . $base;
 
             $child = $parent;
             $parent = $parent->{parent};
-#            last unless $parent;
         }
         if ( $base ) {
             $base = "\$db->get( '$child->{parent_key}' )->" . $base;
@@ -406,8 +405,6 @@ sub _find_parent {
             $base = "\$db->get( '$child->{parent_key}' )";
         }
     }
-#    return '$db->' . $base;
-#    return '$db' . $base;
     return $base;
 }
 
@@ -459,8 +456,6 @@ sub STORE {
             $lhs = "\$db->put('$orig_key',$rhs);";
         }
 
-#        $self->_fileobj->audit( "$lhs = $rhs;" );
-#        $self->_fileobj->audit( "$lhs $rhs);" );
         $self->_fileobj->audit($lhs);
     }
 
@@ -536,15 +531,6 @@ sub DELETE {
 
     if ( defined $orig_key ) {
         my $lhs = $self->_find_parent;
-#        if ( $self->_type eq TYPE_HASH ) {
-#            $lhs .= "\{$orig_key\}";
-#        }
-#        else {
-#            $lhs .= "\[$orig_key]\]";
-#        }
-
-#        $self->_fileobj->audit( "delete $lhs;" );
-#        $self->_fileobj->audit( "$lhs->delete('$orig_key');" );
         if ( $lhs ) {
             $self->_fileobj->audit( "delete $lhs;" );
         }

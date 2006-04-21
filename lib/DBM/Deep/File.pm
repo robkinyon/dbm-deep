@@ -33,7 +33,7 @@ sub new {
         # $args. They are here for documentation purposes.
         transaction_id     => 0,
         transaction_offset => 0,
-        trans_audit        => undef,
+        transaction_audit  => undef,
         base_db_obj        => undef,
     }, $class;
 
@@ -70,6 +70,7 @@ sub new {
 
 sub set_db {
     my $self = shift;
+
     unless ( $self->{base_db_obj} ) {
         $self->{base_db_obj} = shift;
         Scalar::Util::weaken( $self->{base_db_obj} );
@@ -81,7 +82,7 @@ sub set_db {
 sub open {
     my $self = shift;
 
-    # Adding O_BINARY does remove the need for the binmode below. However,
+    # Adding O_BINARY should remove the need for the binmode below. However,
     # I'm not going to remove it because I don't have the Win32 chops to be
     # absolutely certain everything will be ok.
     my $flags = O_RDWR | O_CREAT | O_BINARY;
@@ -292,8 +293,8 @@ sub audit {
         flock( $afh, LOCK_UN );
     }
 
-    if ( $self->{trans_audit} ) {
-        push @{$self->{trans_audit}}, $string;
+    if ( $self->{transaction_audit} ) {
+        push @{$self->{transaction_audit}}, $string;
     }
 
     return 1;
@@ -306,24 +307,27 @@ sub begin_transaction {
 
     $self->lock;
 
-    seek( $fh, $self->{transaction_offset} + $self->{file_offset}, SEEK_SET );
-    my $buffer;
-    read( $fh, $buffer, 4 );
-    $buffer = unpack( 'N', $buffer );
+    my $buffer = $self->read_at( $self->{transaction_offset}, 4 );
+    my ($next, @trans) = unpack( 'C C C C', $buffer );
 
-    for ( 1 .. 32 ) {
-        next if $buffer & (1 << ($_ - 1));
-        $self->{transaction_id} = $_;
-        $buffer |= (1 << $_-1 );
+    $self->{transaction_id} = ++$next;
+
+    die if $trans[-1] != 0;
+
+    for ( my $i = 0; $i <= $#trans; $i++ ) {
+        next if $trans[$i] != 0;
+        $trans[$i] = $next;
         last;
     }
 
-    seek( $fh, $self->{transaction_offset} + $self->{file_offset}, SEEK_SET );
-    print( $fh pack( 'N', $buffer ) );
+    $self->print_at(
+        $self->{transaction_offset},
+        pack( 'C C C C', $next, @trans),
+    );
 
     $self->unlock;
 
-    $self->{trans_audit} = [];
+    $self->{transaction_audit} = [];
 
     return $self->{transaction_id};
 }
@@ -335,21 +339,26 @@ sub end_transaction {
 
     $self->lock;
 
-    seek( $fh, $self->{transaction_offset} + $self->{file_offset}, SEEK_SET );
-    my $buffer;
-    read( $fh, $buffer, 4 );
-    $buffer = unpack( 'N', $buffer );
+    my $buffer = $self->read_at( $self->{transaction_offset}, 4 );
+    my ($next, @trans) = unpack( 'C C C C', $buffer );
 
-    # Unset $self->{transaction_id} bit
-    $buffer ^= (1 << $self->{transaction_id}-1);
+    @trans = grep { $_ != $self->{transaction_id} } @trans;
 
-    seek( $fh, $self->{transaction_offset} + $self->{file_offset}, SEEK_SET );
-    print( $fh pack( 'N', $buffer ) );
+    $self->print_at(
+        $self->{transaction_offset},
+        pack( 'C C C C', $next, @trans),
+    );
+
+    #XXX Need to free the space used by the current transaction
 
     $self->unlock;
 
     $self->{transaction_id} = 0;
-    $self->{trans_audit} = undef;
+    $self->{transaction_audit} = undef;
+
+#    $self->{base_db_obj}->optimize;
+#    $self->{inode} = undef;
+#    $self->set_inode;
 
     return 1;
 }
@@ -361,21 +370,12 @@ sub current_transactions {
 
     $self->lock;
 
-    seek( $fh, $self->{transaction_offset} + $self->{file_offset}, SEEK_SET );
-    my $buffer;
-    read( $fh, $buffer, 4 );
-    $buffer = unpack( 'N', $buffer );
+    my $buffer = $self->read_at( $self->{transaction_offset}, 4 );
+    my ($next, @trans) = unpack( 'C C C C', $buffer );
 
     $self->unlock;
 
-    my @transactions;
-    for ( 1 .. 32 ) {
-        if ( $buffer & (1 << ($_ - 1)) ) {
-            push @transactions, $_;
-        }
-    }
-
-    return grep { $_ != $self->{transaction_id} } @transactions;
+    return grep { $_ && $_ != $self->{transaction_id} } @trans;
 }
 
 sub transaction_id { return $_[0]->{transaction_id} }
@@ -383,7 +383,7 @@ sub transaction_id { return $_[0]->{transaction_id} }
 sub commit_transaction {
     my $self = shift;
 
-    my @audit = @{$self->{trans_audit}};
+    my @audit = @{$self->{transaction_audit}};
 
     $self->end_transaction;
 

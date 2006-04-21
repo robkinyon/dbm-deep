@@ -5,7 +5,7 @@ use 5.6.0;
 use strict;
 use warnings;
 
-use Fcntl qw( :DEFAULT :flock :seek );
+use Fcntl qw( :DEFAULT :flock );
 use Scalar::Util ();
 
 # File-wide notes:
@@ -92,6 +92,8 @@ sub _fileobj { return $_[0]{fileobj} }
 sub calculate_sizes {
     my $self = shift;
 
+    # The 2**8 here indicates the number of different characters in the
+    # current hashing algorithm
     #XXX Does this need to be updated with different hashing algorithms?
     $self->{index_size}       = (2**8) * $self->{long_size};
     $self->{bucket_size}      = $self->{hash_size} + $self->{long_size} * 3;
@@ -323,19 +325,22 @@ sub _length_needed {
         $value->isa( 'DBM::Deep' );
     };
 
-    my $len = SIG_SIZE + $self->{data_size}
-            + $self->{data_size} + length( $key );
+    my $len = SIG_SIZE
+            + $self->{data_size} # size for value
+            + $self->{data_size} # size for key
+            + length( $key );    # length of key
 
     if ( $is_dbm_deep && $value->_fileobj eq $self->_fileobj ) {
+        # long_size is for the internal reference
         return $len + $self->{long_size};
     }
 
-    my $r = Scalar::Util::reftype( $value ) || '';
     if ( $self->_fileobj->{autobless} ) {
         # This is for the bit saying whether or not this thing is blessed.
         $len += 1;
     }
 
+    my $r = Scalar::Util::reftype( $value ) || '';
     unless ( $r eq 'HASH' || $r eq 'ARRAY' ) {
         if ( defined $value ) {
             $len += length( $value );
@@ -494,8 +499,7 @@ sub write_value {
     # If value is blessed, preserve class name
     ##
     if ( $fileobj->{autobless} ) {
-        my $c = Scalar::Util::blessed($value);
-        if ( defined $c && !$dbm_deep_obj ) {
+        if ( defined( my $c = Scalar::Util::blessed($value) ) ) {
             $fileobj->print_at( undef, chr(1), pack($self->{data_pack}, length($c)) . $c );
         }
         else {
@@ -563,6 +567,8 @@ sub split_index {
 
     my @newloc = ();
     BUCKET:
+    # The <= here is deliberate - we have max_buckets+1 keys to iterate
+    # through, unlike every other loop that uses max_buckets as a stop.
     for (my $i = 0; $i <= $self->{max_buckets}; $i++) {
         my ($key, $old_subloc, $size) = $self->_get_key_subloc( $keys, $i );
 
@@ -579,7 +585,10 @@ sub split_index {
                 { content => $subkeys }, '',
             );
 
-            $fileobj->print_at( $newloc[$num] + $offset, $key . pack($self->{long_pack}, $old_subloc) );
+            $fileobj->print_at(
+                $newloc[$num] + $offset,
+                $key, pack($self->{long_pack}, $old_subloc),
+            );
 
             next;
         }
@@ -617,9 +626,6 @@ sub read_from_loc {
 
     my $fileobj = $self->_fileobj;
 
-    ##
-    # Found match -- seek to offset and read signature
-    ##
     my $signature = $fileobj->read_at( $subloc, SIG_SIZE );
 
     ##
@@ -715,18 +721,48 @@ sub delete_bucket {
     my ($tag, $md5, $orig_key) = @_;
 
     #ACID - This is a mutation. Must only find the exact transaction
-    my ($subloc, $offset, $size) = $self->_find_in_buckets( $tag, $md5, 1 );
-#XXX This needs _release_space() for the value and anything below
-    if ( $subloc ) {
-        $self->_fileobj->print_at(
+    my ($subloc, $offset, $size,$is_deleted) = $self->_find_in_buckets( $tag, $md5, 1 );
+
+    return if !$subloc;
+
+    my $fileobj = $self->_fileobj;
+
+    my @transactions;
+    if ( $fileobj->transaction_id == 0 ) {
+        @transactions = $fileobj->current_transactions;
+    }
+
+#XXX This code taken from add_bucket() as an example
+#    for ( @transactions ) {
+#        my $tag2 = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
+#        $fileobj->{transaction_id} = $_;
+#        $self->add_bucket( $tag2, $md5, '', '', 1, $orig_key );
+#        $fileobj->{transaction_id} = 0;
+#    }
+
+    #XXX This needs _release_space() for the value and anything below
+    if ( $fileobj->transaction_id == 0 ) {
+        my $value = $self->read_from_loc( $subloc, $orig_key );
+
+        for (@transactions) {
+#            warn "Marking $_ $orig_key : $value as still there\n";
+            my $tag2 = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
+            $fileobj->{transaction_id} = $_;
+            #XXX Need to use real key
+            $self->add_bucket( $tag2, $md5, $orig_key, $value, 0, $orig_key );
+            $fileobj->{transaction_id} = 0;
+        }
+
+        $fileobj->print_at(
             $tag->{offset} + $offset,
-            substr($tag->{content}, $offset + $self->{bucket_size} ),
+            substr( $tag->{content}, $offset + $self->{bucket_size} ),
             chr(0) x $self->{bucket_size},
         );
-
-        return 1;
     }
-    return;
+    else {
+    }
+
+    return 1;
 }
 
 sub bucket_exists {
@@ -953,7 +989,7 @@ sub _find_in_buckets {
         my @rv = ($subloc, $i * $self->{bucket_size}, $size, $is_deleted);
 
         unless ( $subloc ) {
-            if ( !$exact && @zero and $trans_id ) {
+            if ( !$exact && @zero && $trans_id ) {
                 @rv = ($zero[2], $zero[0] * $self->{bucket_size},$zero[3],$is_deleted);
             }
             return @rv;

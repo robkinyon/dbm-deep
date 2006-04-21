@@ -42,7 +42,7 @@ cmp_deeply(
         hash1 => {
             subkey1 => "subvalue1",
             subkey2 => "subvalue2",
-            subkey3 => Test::Deep::requireclass( bless {}, 'Foo' ),
+            subkey3 => useclass( bless {}, 'Foo' ),
         },
     }),
     "Everything matches",

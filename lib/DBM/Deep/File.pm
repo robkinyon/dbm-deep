@@ -217,6 +217,10 @@ sub request_space {
 sub lock {
     my $self = shift;
     my ($obj, $type) = @_;
+
+    #XXX This may not always be the correct thing to do
+    $obj = $self->{base_db_obj} unless defined $obj;
+
     $type = LOCK_EX unless defined $type;
 
     if (!defined($self->{fh})) { return; }

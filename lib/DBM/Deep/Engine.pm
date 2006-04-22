@@ -884,8 +884,8 @@ sub traverse_index {
         } # index loop
 
         $obj->{return_next} = 1;
-    } # tag is an index
-
+    }
+    # This is the bucket list
     else {
         my $keys = $tag->{content};
         if ($force_return_next) { $obj->{return_next} = 1; }
@@ -893,8 +893,14 @@ sub traverse_index {
         ##
         # Iterate through buckets, looking for a key match
         ##
+        my $transaction_id = $self->_fileobj->transaction_id;
         for (my $i = 0; $i < $self->{max_buckets}; $i++) {
-            my ($key, $subloc) = $self->_get_key_subloc( $keys, $i );
+            my ($key, $subloc, $size, $trans_id, $is_deleted) = $self->_get_key_subloc( $keys, $i );
+
+            next if $is_deleted;
+#XXX Need to find all the copies of this key to find out if $transaction_id has it
+#XXX marked as deleted, in use, or what.
+            next if $trans_id && $trans_id != $transaction_id;
 
             # End of bucket list -- return to outer loop
             if (!$subloc) {
@@ -928,7 +934,7 @@ sub traverse_index {
         }
 
         $obj->{return_next} = 1;
-    } # tag is a bucket list
+    }
 
     return;
 }

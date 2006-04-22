@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 2;
+use Test::More tests => 4;
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
@@ -30,3 +30,7 @@ for ( 0 .. $max_keys ) {
     };
 }
 is( $count, $max_keys, "We read $count keys" );
+
+cmp_ok( scalar(keys %$db), '==', $max_keys + 1, "Number of keys is correct" );
+$db->clear;
+cmp_ok( scalar(keys %$db), '==', 0, "Number of keys after clear() is correct" );

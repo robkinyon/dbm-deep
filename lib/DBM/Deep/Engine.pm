@@ -421,6 +421,15 @@ sub add_bucket {
                 pack('n n', $fileobj->transaction_id, $deleted ),
             );
         }
+
+        my $old_value = $self->read_from_loc( $subloc, $orig_key );
+        for ( @transactions ) {
+            my $tag2 = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
+            $fileobj->{transaction_id} = $_;
+            $self->add_bucket( $tag2, $md5, $orig_key, $old_value, undef, $orig_key );
+            $fileobj->{transaction_id} = 0;
+        }
+        $tag = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
     }
     # Adding a new md5
     elsif ( defined $offset ) {

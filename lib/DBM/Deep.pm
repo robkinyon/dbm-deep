@@ -420,7 +420,8 @@ sub STORE {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
-    if ( defined $orig_key ) {
+    #XXX The second condition needs to disappear
+    if ( defined $orig_key && !( $self->_type eq TYPE_ARRAY && $orig_key eq 'length') ) {
         my $rhs;
 
         my $r = Scalar::Util::reftype( $value ) || '';

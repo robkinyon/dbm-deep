@@ -42,3 +42,4 @@ t/30_already_tied.t
 t/31_references.t
 t/32_dash_ell.t
 t/33_audit_trail.t
+t/34_transaction_arrays.t

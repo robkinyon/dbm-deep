@@ -36,19 +36,20 @@ sub _import {
 sub TIEARRAY {
     my $class = shift;
     my $args = $class->_get_args( @_ );
-	
-	$args->{type} = $class->TYPE_ARRAY;
-	
-	return $class->_init($args);
+
+    $args->{type} = $class->TYPE_ARRAY;
+
+    return $class->_init($args);
 }
 
 sub FETCH {
     my $self = shift->_get_self;
     my ($key) = @_;
 
-	$self->lock( $self->LOCK_SH );
+    $self->lock( $self->LOCK_SH );
 
-    my $orig_key = $key eq 'length' ? undef : $key;
+#    my $orig_key = $key eq 'length' ? undef : $key;
+    my $orig_key = $key;
     if ( $key =~ /^-?\d+$/ ) {
         if ( $key < 0 ) {
             $key += $self->FETCHSIZE;
@@ -74,7 +75,8 @@ sub STORE {
 
     $self->lock( $self->LOCK_EX );
 
-    my $orig = $key eq 'length' ? undef : $key;
+#    my $orig = $key eq 'length' ? undef : $key;
+    my $orig_key = $key;
 
     my $size;
     my $numeric_idx;
@@ -84,19 +86,19 @@ sub STORE {
             $size = $self->FETCHSIZE;
             $key += $size;
             if ( $key < 0 ) {
-                die( "Modification of non-creatable array value attempted, subscript $orig" );
+                die( "Modification of non-creatable array value attempted, subscript $orig_key" );
             }
         }
 
         $key = pack($self->{engine}{long_pack}, $key);
     }
 
-    my $rv = $self->SUPER::STORE( $key, $value, $orig );
+    my $rv = $self->SUPER::STORE( $key, $value, $orig_key );
 
     if ( $numeric_idx && $rv == 2 ) {
         $size = $self->FETCHSIZE unless defined $size;
-        if ( $orig >= $size ) {
-            $self->STORESIZE( $orig + 1 );
+        if ( $orig_key >= $size ) {
+            $self->STORESIZE( $orig_key + 1 );
         }
     }
 
@@ -109,7 +111,7 @@ sub EXISTS {
     my $self = shift->_get_self;
     my ($key) = @_;
 
-	$self->lock( $self->LOCK_SH );
+    $self->lock( $self->LOCK_SH );
 
     if ( $key =~ /^\-?\d+$/ ) {
         if ( $key < 0 ) {
@@ -154,9 +156,9 @@ sub DELETE {
 
     my $rv = $self->SUPER::DELETE( $key, $orig );
 
-	if ($rv && $unpacked_key == $size - 1) {
-		$self->STORESIZE( $unpacked_key );
-	}
+    if ($rv && $unpacked_key == $size - 1) {
+        $self->STORESIZE( $unpacked_key );
+    }
 
     $self->unlock;
 
@@ -168,38 +170,38 @@ sub FETCHSIZE {
 
     $self->lock( $self->LOCK_SH );
 
-	my $SAVE_FILTER = $self->_fileobj->{filter_fetch_value};
-	$self->_fileobj->{filter_fetch_value} = undef;
-	
-	my $packed_size = $self->FETCH('length');
-	
-	$self->_fileobj->{filter_fetch_value} = $SAVE_FILTER;
-	
+    my $SAVE_FILTER = $self->_fileobj->{filter_fetch_value};
+    $self->_fileobj->{filter_fetch_value} = undef;
+
+    my $packed_size = $self->FETCH('length');
+
+    $self->_fileobj->{filter_fetch_value} = $SAVE_FILTER;
+
     $self->unlock;
 
-	if ($packed_size) {
+    if ($packed_size) {
         return int(unpack($self->{engine}{long_pack}, $packed_size));
     }
 
-	return 0;
+    return 0;
 }
 
 sub STORESIZE {
     my $self = shift->_get_self;
-	my ($new_length) = @_;
-	
+    my ($new_length) = @_;
+
     $self->lock( $self->LOCK_EX );
 
-	my $SAVE_FILTER = $self->_fileobj->{filter_store_value};
-	$self->_fileobj->{filter_store_value} = undef;
-	
-	my $result = $self->STORE('length', pack($self->{engine}{long_pack}, $new_length));
-	
-	$self->_fileobj->{filter_store_value} = $SAVE_FILTER;
-	
+    my $SAVE_FILTER = $self->_fileobj->{filter_store_value};
+    $self->_fileobj->{filter_store_value} = undef;
+
+    my $result = $self->STORE('length', pack($self->{engine}{long_pack}, $new_length), 'length');
+
+    $self->_fileobj->{filter_store_value} = $SAVE_FILTER;
+
     $self->unlock;
 
-	return $result;
+    return $result;
 }
 
 sub POP {
@@ -207,33 +209,33 @@ sub POP {
 
     $self->lock( $self->LOCK_EX );
 
-	my $length = $self->FETCHSIZE();
-	
-	if ($length) {
-		my $content = $self->FETCH( $length - 1 );
-		$self->DELETE( $length - 1 );
+    my $length = $self->FETCHSIZE();
+
+    if ($length) {
+        my $content = $self->FETCH( $length - 1 );
+        $self->DELETE( $length - 1 );
 
         $self->unlock;
 
-		return $content;
-	}
-	else {
+        return $content;
+    }
+    else {
         $self->unlock;
-		return;
-	}
+        return;
+    }
 }
 
 sub PUSH {
     my $self = shift->_get_self;
-	
+
     $self->lock( $self->LOCK_EX );
 
-	my $length = $self->FETCHSIZE();
+    my $length = $self->FETCHSIZE();
 
-	while (my $content = shift @_) {
-		$self->STORE( $length, $content );
-		$length++;
-	}
+    while (my $content = shift @_) {
+        $self->STORE( $length, $content );
+        $length++;
+    }
 
     $self->unlock;
 
@@ -245,44 +247,44 @@ sub SHIFT {
 
     $self->lock( $self->LOCK_EX );
 
-	my $length = $self->FETCHSIZE();
-	
-	if ($length) {
-		my $content = $self->FETCH( 0 );
-		
-		for (my $i = 0; $i < $length - 1; $i++) {
-			$self->STORE( $i, $self->FETCH($i + 1) );
-		}
-		$self->DELETE( $length - 1 );
+    my $length = $self->FETCHSIZE();
+
+    if ($length) {
+        my $content = $self->FETCH( 0 );
+
+        for (my $i = 0; $i < $length - 1; $i++) {
+            $self->STORE( $i, $self->FETCH($i + 1) );
+        }
+        $self->DELETE( $length - 1 );
 
         $self->unlock;
-		
-		return $content;
-	}
-	else {
+
+        return $content;
+    }
+    else {
         $self->unlock;
-		return;
-	}
+        return;
+    }
 }
 
 sub UNSHIFT {
     my $self = shift->_get_self;
-	my @new_elements = @_;
+    my @new_elements = @_;
 
     $self->lock( $self->LOCK_EX );
 
-	my $length = $self->FETCHSIZE();
-	my $new_size = scalar @new_elements;
-	
-	if ($length) {
-		for (my $i = $length - 1; $i >= 0; $i--) {
-			$self->STORE( $i + $new_size, $self->FETCH($i) );
-		}
-	}
-	
-	for (my $i = 0; $i < $new_size; $i++) {
-		$self->STORE( $i, $new_elements[$i] );
-	}
+    my $length = $self->FETCHSIZE();
+    my $new_size = scalar @new_elements;
+
+    if ($length) {
+        for (my $i = $length - 1; $i >= 0; $i--) {
+            $self->STORE( $i + $new_size, $self->FETCH($i) );
+        }
+    }
+
+    for (my $i = 0; $i < $new_size; $i++) {
+        $self->STORE( $i, $new_elements[$i] );
+    }
 
     $self->unlock;
 
@@ -294,33 +296,33 @@ sub SPLICE {
 
     $self->lock( $self->LOCK_EX );
 
-	my $length = $self->FETCHSIZE();
-	
-	##
-	# Calculate offset and length of splice
-	##
-	my $offset = shift;
+    my $length = $self->FETCHSIZE();
+
+    ##
+    # Calculate offset and length of splice
+    ##
+    my $offset = shift;
     $offset = 0 unless defined $offset;
-	if ($offset < 0) { $offset += $length; }
-	
-	my $splice_length;
-	if (scalar @_) { $splice_length = shift; }
-	else { $splice_length = $length - $offset; }
-	if ($splice_length < 0) { $splice_length += ($length - $offset); }
-	
-	##
-	# Setup array with new elements, and copy out old elements for return
-	##
-	my @new_elements = @_;
-	my $new_size = scalar @new_elements;
-	
+    if ($offset < 0) { $offset += $length; }
+
+    my $splice_length;
+    if (scalar @_) { $splice_length = shift; }
+    else { $splice_length = $length - $offset; }
+    if ($splice_length < 0) { $splice_length += ($length - $offset); }
+
+    ##
+    # Setup array with new elements, and copy out old elements for return
+    ##
+    my @new_elements = @_;
+    my $new_size = scalar @new_elements;
+
     my @old_elements = map {
         $self->FETCH( $_ )
     } $offset .. ($offset + $splice_length - 1);
-	
-	##
-	# Adjust array length, and shift elements to accomodate new section.
-	##
+
+    ##
+    # Adjust array length, and shift elements to accomodate new section.
+    ##
     if ( $new_size != $splice_length ) {
         if ($new_size > $splice_length) {
             for (my $i = $length - 1; $i >= $offset + $splice_length; $i--) {
@@ -336,30 +338,30 @@ sub SPLICE {
                 $length--;
             }
         }
-	}
-	
-	##
-	# Insert new elements into array
-	##
-	for (my $i = $offset; $i < $offset + $new_size; $i++) {
-		$self->STORE( $i, shift @new_elements );
-	}
-	
+    }
+
+    ##
+    # Insert new elements into array
+    ##
+    for (my $i = $offset; $i < $offset + $new_size; $i++) {
+        $self->STORE( $i, shift @new_elements );
+    }
+
     $self->unlock;
 
-	##
-	# Return deleted section, or last element in scalar context.
-	##
-	return wantarray ? @old_elements : $old_elements[-1];
+    ##
+    # Return deleted section, or last element in scalar context.
+    ##
+    return wantarray ? @old_elements : $old_elements[-1];
 }
 
 # We don't need to define it, yet.
 # It will be useful, though, when we split out HASH and ARRAY
 sub EXTEND {
-	##
-	# Perl will call EXTEND() when the array is likely to grow.
-	# We don't care, but include it because it gets called at times.
-	##
+    ##
+    # Perl will call EXTEND() when the array is likely to grow.
+    # We don't care, but include it because it gets called at times.
+    ##
 }
 
 sub _copy_node {

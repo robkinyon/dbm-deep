@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 56;
+use Test::More tests => 58;
 use Test::Deep;
 use t::common qw( new_fh );
 
@@ -58,6 +58,10 @@ $db1->begin_work;
     is( $db1->{x}, 'z', "Within DB1 transaction, DB1's X is Z" );
     is( $db2->{x}, 'y', "Within DB1 transaction, DB2's X is still Y" );
 
+    $db2->{other_x} = 'bar';
+    is( $db2->{other_x}, 'bar', "DB2 set other_x within DB1's transaction, so DB2 can see it" );
+    is( $db1->{other_x}, 'foo', "Since other_x was modified after the transaction began, DB1 doesn't see the change." );
+
     cmp_bag( [ keys %$db1 ], [qw( x other_x )], "DB1 keys correct" );
     cmp_bag( [ keys %$db2 ], [qw( x other_x )], "DB2 keys correct" );
 
@@ -70,7 +74,7 @@ $db1->begin_work;
 
     delete $db2->{other_x};
     ok( !exists $db2->{other_x}, "DB2 deleted other_x in DB1's transaction, so it can't see it anymore" );
-    is( $db1->{other_x}, 'foo', "Since other_x was deleted after the transaction began, DB1 still sees it." );
+    is( $db1->{other_x}, 'bar', "Since other_x was deleted after the transaction began, DB1 still sees it." );
 
     cmp_bag( [ keys %$db1 ], [qw( x other_x )], "DB1 keys correct" );
     cmp_bag( [ keys %$db2 ], [qw( x )], "DB2 keys correct" );

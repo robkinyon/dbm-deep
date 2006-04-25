@@ -5,6 +5,8 @@ use 5.6.0;
 use strict;
 use warnings;
 
+our $VERSION = q(0.99_01);
+
 use base 'DBM::Deep';
 
 sub _get_self {

@@ -5,6 +5,8 @@ use 5.6.0;
 use strict;
 use warnings;
 
+our $VERSION = '0.99_01';
+
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative
 # indices for us. This was causing bugs for negative index handling.
@@ -95,7 +97,7 @@ sub STORE {
 
     my $rv = $self->SUPER::STORE( $key, $value, $orig_key );
 
-    if ( $numeric_idx && $rv == 2 ) {
+    if ( $numeric_idx ) {
         $size = $self->FETCHSIZE unless defined $size;
         if ( $orig_key >= $size ) {
             $self->STORESIZE( $orig_key + 1 );

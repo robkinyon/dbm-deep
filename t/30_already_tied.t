@@ -72,4 +72,4 @@ my $db = DBM::Deep->new( $filename );
 
 throws_ok {
     $db->{foo} = \$scalar;
-} qr/Storage of variables of type 'SCALAR' is not supported/, "Cannot store scalar references, let alone tied scalars";
+} qr/Storage of references of type 'SCALAR' is not supported/, "Cannot store scalar references, let alone tied scalars";

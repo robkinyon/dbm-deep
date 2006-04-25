@@ -5,6 +5,8 @@ use 5.6.0;
 use strict;
 use warnings;
 
+our $VERSION = q(0.99_01);
+
 use Fcntl qw( :DEFAULT :flock );
 use Scalar::Util ();
 
@@ -27,6 +29,7 @@ sub SIG_DATA     () { 'D'    }
 sub SIG_INDEX    () { 'I'    }
 sub SIG_BLIST    () { 'B'    }
 sub SIG_FREE     () { 'F'    }
+sub SIG_KEYS     () { 'K'    }
 sub SIG_SIZE     () {  1     }
 
 sub new {
@@ -34,16 +37,16 @@ sub new {
     my ($args) = @_;
 
     my $self = bless {
-        long_size   => 4,
-        long_pack   => 'N',
-        data_size   => 4,
-        data_pack   => 'N',
+        long_size => 4,
+        long_pack => 'N',
+        data_size => 4,
+        data_pack => 'N',
 
-        digest      => \&Digest::MD5::md5,
-        hash_size   => 16,
+        digest    => \&Digest::MD5::md5,
+        hash_size => 16,
 
         ##
-        # Maximum number of buckets per list before another level of indexing is
+        # Maximum number of buckets per blist before another level of indexing is
         # done. Increase this value for slightly greater speed, but larger database
         # files. DO NOT decrease this value below 16, due to risk of recursive
         # reindex overrun.
@@ -250,9 +253,9 @@ sub write_tag {
 
     return {
         signature => $sig,
-        size => $size,
-        offset => $offset + SIG_SIZE + $self->{data_size},
-        content => $content
+        size      => $size,
+        offset    => $offset + SIG_SIZE + $self->{data_size},
+        content   => $content
     };
 }
 
@@ -265,103 +268,17 @@ sub load_tag {
 
     my $fileobj = $self->_fileobj;
 
-    my $s = SIG_SIZE + $self->{data_size};
-    my $b = $fileobj->read_at( $offset, $s );
-    my ($sig, $size) = unpack( "A $self->{data_pack}", $b );
-
-    my $buffer = $fileobj->read_at( undef, $size );
+    my ($sig, $size) = unpack(
+        "A $self->{data_pack}",
+        $fileobj->read_at( $offset, SIG_SIZE + $self->{data_size} ),
+    );
 
     return {
         signature => $sig,
-        size => $size,
-        offset => $offset + SIG_SIZE + $self->{data_size},
-        content => $buffer
+        size      => $size,
+        offset    => $offset + SIG_SIZE + $self->{data_size},
+        content   => $fileobj->read_at( undef, $size ),
     };
-}
-
-sub _get_dbm_object {
-    my $item = shift;
-
-    my $obj = eval {
-        local $SIG{__DIE__};
-        if ($item->isa( 'DBM::Deep' )) {
-            return $item;
-        }
-        return;
-    };
-    return $obj if $obj;
-
-    my $r = Scalar::Util::reftype( $item ) || '';
-    if ( $r eq 'HASH' ) {
-        my $obj = eval {
-            local $SIG{__DIE__};
-            my $obj = tied(%$item);
-            if ($obj->isa( 'DBM::Deep' )) {
-                return $obj;
-            }
-            return;
-        };
-        return $obj if $obj;
-    }
-    elsif ( $r eq 'ARRAY' ) {
-        my $obj = eval {
-            local $SIG{__DIE__};
-            my $obj = tied(@$item);
-            if ($obj->isa( 'DBM::Deep' )) {
-                return $obj;
-            }
-            return;
-        };
-        return $obj if $obj;
-    }
-
-    return;
-}
-
-sub _length_needed {
-    my $self = shift;
-    my ($value, $key) = @_;
-
-    my $is_dbm_deep = eval {
-        local $SIG{'__DIE__'};
-        $value->isa( 'DBM::Deep' );
-    };
-
-    my $len = SIG_SIZE
-            + $self->{data_size} # size for value
-            + $self->{data_size} # size for key
-            + length( $key );    # length of key
-
-    if ( $is_dbm_deep && $value->_fileobj eq $self->_fileobj ) {
-        # long_size is for the internal reference
-        return $len + $self->{long_size};
-    }
-
-    if ( $self->_fileobj->{autobless} ) {
-        # This is for the bit saying whether or not this thing is blessed.
-        $len += 1;
-    }
-
-    my $r = Scalar::Util::reftype( $value ) || '';
-    unless ( $r eq 'HASH' || $r eq 'ARRAY' ) {
-        if ( defined $value ) {
-            $len += length( $value );
-        }
-        return $len;
-    }
-
-    $len += $self->{index_size};
-
-    # if autobless is enabled, must also take into consideration
-    # the class name as it is stored after the key.
-    if ( $self->_fileobj->{autobless} ) {
-        my $c = Scalar::Util::blessed($value);
-        if ( defined $c && !$is_dbm_deep ) {
-            $len += $self->{data_size} + length($c);
-        }
-    }
-
-    return $len;
 }
 
 sub add_bucket {
@@ -373,23 +290,18 @@ sub add_bucket {
     my ($tag, $md5, $plain_key, $value, $deleted, $orig_key) = @_;
     $deleted ||= 0;
 
-    local($/,$\);
-
     # This verifies that only supported values will be stored.
     {
         my $r = Scalar::Util::reftype( $value );
-        last if !defined $r;
 
+        last if !defined $r;
         last if $r eq 'HASH';
         last if $r eq 'ARRAY';
 
         $self->_throw_error(
-            "Storage of variables of type '$r' is not supported."
+            "Storage of references of type '$r' is not supported."
         );
     }
-
-    my $location = 0;
-    my $result = 2;
 
     my $fileobj = $self->_fileobj;
 
@@ -406,9 +318,8 @@ sub add_bucket {
 #    $self->_release_space( $size, $subloc );
     # Updating a known md5
 #XXX This needs updating to use _release_space
+    my $location;
     if ( $subloc ) {
-        $result = 1;
-
         if ($actual_length <= $size) {
             $location = $subloc;
         }
@@ -451,14 +362,15 @@ sub add_bucket {
         $tag = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
     }
     # If bucket didn't fit into list, split into a new index level
-    # split_index() will do the _fileobj->request_space() call
+    # split_index() will do the $self->_fileobj->request_space() call
+    #XXX It also needs to be transactionally aware
     else {
         $location = $self->split_index( $md5, $tag );
     }
 
     $self->write_value( $location, $plain_key, $value, $orig_key );
 
-    return $result;
+    return 1;
 }
 
 sub write_value {
@@ -664,16 +576,15 @@ sub read_from_loc {
             if ($size) { $fileobj->increment_pointer( $size ); }
 
             my $bless_bit = $fileobj->read_at( undef, 1 );
-            if (ord($bless_bit)) {
-                ##
-                # Yes, object needs to be re-blessed
-                ##
-                my $size = $fileobj->read_at( undef, $self->{data_size} );
-                $size = unpack($self->{data_pack}, $size);
+            if ( ord($bless_bit) ) {
+                my $size = unpack(
+                    $self->{data_pack},
+                    $fileobj->read_at( undef, $self->{data_size} ),
+                );
 
-                my $class_name;
-                if ($size) { $class_name = $fileobj->read_at( undef, $size ); }
-                if (defined $class_name) { $new_obj = bless( $new_obj, $class_name ); }
+                if ( $size ) {
+                    $new_obj = bless $new_obj, $fileobj->read_at( undef, $size );
+                }
             }
         }
 
@@ -699,8 +610,7 @@ sub read_from_loc {
         my $size = $fileobj->read_at( undef, $self->{data_size} );
         $size = unpack($self->{data_pack}, $size);
 
-        my $value = '';
-        if ($size) { $value = $fileobj->read_at( undef, $size ); }
+        my $value = $size ? $fileobj->read_at( undef, $size ) : '';
         return $value;
     }
 
@@ -796,8 +706,6 @@ sub find_bucket_list {
     my $self = shift;
     my ($offset, $md5, $args) = @_;
     $args = {} unless $args;
-
-    local($/,$\);
 
     ##
     # Locate offset for bucket list using digest index system
@@ -935,9 +843,9 @@ sub traverse_index {
                 # Read in plain key and return as scalar
                 $size = $fileobj->read_at( undef, $self->{data_size} );
                 $size = unpack($self->{data_pack}, $size);
+
                 my $plain_key;
                 if ($size) { $plain_key = $fileobj->read_at( undef, $size); }
-
                 return $plain_key;
             }
         }
@@ -1044,6 +952,91 @@ sub _release_space {
 
 sub _throw_error {
     die "DBM::Deep: $_[1]\n";
+}
+
+sub _get_dbm_object {
+    my $item = shift;
+
+    my $obj = eval {
+        local $SIG{__DIE__};
+        if ($item->isa( 'DBM::Deep' )) {
+            return $item;
+        }
+        return;
+    };
+    return $obj if $obj;
+
+    my $r = Scalar::Util::reftype( $item ) || '';
+    if ( $r eq 'HASH' ) {
+        my $obj = eval {
+            local $SIG{__DIE__};
+            my $obj = tied(%$item);
+            if ($obj->isa( 'DBM::Deep' )) {
+                return $obj;
+            }
+            return;
+        };
+        return $obj if $obj;
+    }
+    elsif ( $r eq 'ARRAY' ) {
+        my $obj = eval {
+            local $SIG{__DIE__};
+            my $obj = tied(@$item);
+            if ($obj->isa( 'DBM::Deep' )) {
+                return $obj;
+            }
+            return;
+        };
+        return $obj if $obj;
+    }
+
+    return;
+}
+
+sub _length_needed {
+    my $self = shift;
+    my ($value, $key) = @_;
+
+    my $is_dbm_deep = eval {
+        local $SIG{'__DIE__'};
+        $value->isa( 'DBM::Deep' );
+    };
+
+    my $len = SIG_SIZE
+            + $self->{data_size} # size for value
+            + $self->{data_size} # size for key
+            + length( $key );    # length of key
+
+    if ( $is_dbm_deep && $value->_fileobj eq $self->_fileobj ) {
+        # long_size is for the internal reference
+        return $len + $self->{long_size};
+    }
+
+    if ( $self->_fileobj->{autobless} ) {
+        # This is for the bit saying whether or not this thing is blessed.
+        $len += 1;
+    }
+
+    my $r = Scalar::Util::reftype( $value ) || '';
+    unless ( $r eq 'HASH' || $r eq 'ARRAY' ) {
+        if ( defined $value ) {
+            $len += length( $value );
+        }
+        return $len;
+    }
+
+    $len += $self->{index_size};
+
+    # if autobless is enabled, must also take into consideration
+    # the class name as it is stored after the key.
+    if ( $self->_fileobj->{autobless} ) {
+        my $c = Scalar::Util::blessed($value);
+        if ( defined $c && !$is_dbm_deep ) {
+            $len += $self->{data_size} + length($c);
+        }
+    }
+
+    return $len;
 }
 
 1;

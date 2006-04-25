@@ -14,22 +14,22 @@ my $x = 25;
 
     throws_ok {
         $db->{scalarref} = \$x;
-    } qr/Storage of variables of type 'SCALAR' is not supported/,
+    } qr/Storage of references of type 'SCALAR' is not supported/,
     'Storage of scalar refs not supported';
 
     throws_ok {
         $db->{scalarref} = \\$x;
-    } qr/Storage of variables of type 'REF' is not supported/,
+    } qr/Storage of references of type 'REF' is not supported/,
     'Storage of ref refs not supported';
 
     throws_ok {
         $db->{scalarref} = sub { 1 };
-    } qr/Storage of variables of type 'CODE' is not supported/,
+    } qr/Storage of references of type 'CODE' is not supported/,
     'Storage of code refs not supported';
 
     throws_ok {
         $db->{scalarref} = $db->_get_self->_fh;
-    } qr/Storage of variables of type 'GLOB' is not supported/,
+    } qr/Storage of references of type 'GLOB' is not supported/,
     'Storage of glob refs not supported';
 
     $db->{scalar} = $x;

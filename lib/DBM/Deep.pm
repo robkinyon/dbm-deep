@@ -34,6 +34,8 @@ use 5.6.0;
 use strict;
 use warnings;
 
+our $VERSION = q(0.99_01);
+
 use Fcntl qw( :DEFAULT :flock :seek );
 use Digest::MD5 ();
 use Scalar::Util ();
@@ -41,14 +43,11 @@ use Scalar::Util ();
 use DBM::Deep::Engine;
 use DBM::Deep::File;
 
-use vars qw( $VERSION );
-$VERSION = q(0.99_01);
-
 ##
 # Setup constants for users to pass to new()
 ##
-sub TYPE_HASH   () { DBM::Deep::Engine->SIG_HASH   }
-sub TYPE_ARRAY  () { DBM::Deep::Engine->SIG_ARRAY  }
+sub TYPE_HASH   () { DBM::Deep::Engine->SIG_HASH  }
+sub TYPE_ARRAY  () { DBM::Deep::Engine->SIG_ARRAY }
 
 sub _get_args {
     my $proto = shift;
@@ -478,11 +477,11 @@ sub STORE {
     ##
     # Add key/value to bucket list
     ##
-    my $result = $self->{engine}->add_bucket( $tag, $md5, $key, $value, undef, $orig_key ); 
+    $self->{engine}->add_bucket( $tag, $md5, $key, $value, undef, $orig_key ); 
 
     $self->unlock();
 
-    return $result;
+    return 1;
 }
 
 sub FETCH {

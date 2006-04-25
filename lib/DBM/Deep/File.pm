@@ -5,9 +5,9 @@ use 5.6.0;
 use strict;
 use warnings;
 
-use Fcntl qw( :DEFAULT :flock :seek );
+our $VERSION = q(0.99_01);
 
-our $VERSION = '0.01';
+use Fcntl qw( :DEFAULT :flock :seek );
 
 sub new {
     my $class = shift;

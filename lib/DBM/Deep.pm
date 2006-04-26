@@ -129,7 +129,7 @@ sub _init {
         $self->{$param} = $args->{$param};
     }
 
-    $self->{engine}->setup_fh( $self );
+    $self->_engine->setup_fh( $self );
 
     $self->{fileobj}->set_db( $self );
 
@@ -277,7 +277,7 @@ sub optimize {
     $self->unlock();
     $self->_fileobj->close;
     $self->_fileobj->open;
-    $self->{engine}->setup_fh( $self );
+    $self->_engine->setup_fh( $self );
 
     return 1;
 }
@@ -341,6 +341,11 @@ sub commit {
 ##
 # Accessor methods
 ##
+
+sub _engine {
+    my $self = $_[0]->_get_self;
+    return $self->{engine};
+}
 
 sub _fileobj {
     my $self = $_[0]->_get_self;
@@ -464,9 +469,9 @@ sub STORE {
     ##
     $self->lock( LOCK_EX );
 
-    my $md5 = $self->{engine}{digest}->($key);
+    my $md5 = $self->_engine->{digest}->($key);
 
-    my $tag = $self->{engine}->find_bucket_list( $self->_base_offset, $md5, { create => 1 } );
+    my $tag = $self->_engine->find_blist( $self->_base_offset, $md5, { create => 1 } );
 
     # User may be storing a hash, in which case we do not want it run
     # through the filtering system
@@ -477,7 +482,7 @@ sub STORE {
     ##
     # Add key/value to bucket list
     ##
-    $self->{engine}->add_bucket( $tag, $md5, $key, $value, undef, $orig_key ); 
+    $self->_engine->add_bucket( $tag, $md5, $key, $value, undef, $orig_key ); 
 
     $self->unlock();
 
@@ -491,14 +496,14 @@ sub FETCH {
     my $self = shift->_get_self;
     my ($key, $orig_key) = @_;
 
-    my $md5 = $self->{engine}{digest}->($key);
+    my $md5 = $self->_engine->{digest}->($key);
 
     ##
     # Request shared lock for reading
     ##
     $self->lock( LOCK_SH );
 
-    my $tag = $self->{engine}->find_bucket_list( $self->_base_offset, $md5 );#, { create => 1 } );
+    my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );#, { create => 1 } );
     #XXX This needs to autovivify
     if (!$tag) {
         $self->unlock();
@@ -508,7 +513,7 @@ sub FETCH {
     ##
     # Get value from bucket list
     ##
-    my $result = $self->{engine}->get_bucket_value( $tag, $md5, $orig_key );
+    my $result = $self->_engine->get_bucket_value( $tag, $md5, $orig_key );
 
     $self->unlock();
 
@@ -545,9 +550,9 @@ sub DELETE {
     ##
     $self->lock( LOCK_EX );
 
-    my $md5 = $self->{engine}{digest}->($key);
+    my $md5 = $self->_engine->{digest}->($key);
 
-    my $tag = $self->{engine}->find_bucket_list( $self->_base_offset, $md5 );
+    my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );
     if (!$tag) {
         $self->unlock();
         return;
@@ -556,13 +561,13 @@ sub DELETE {
     ##
     # Delete bucket
     ##
-    my $value = $self->{engine}->get_bucket_value( $tag, $md5 );
+    my $value = $self->_engine->get_bucket_value( $tag, $md5 );
 
     if (defined $value && !ref($value) && $self->_fileobj->{filter_fetch_value}) {
         $value = $self->_fileobj->{filter_fetch_value}->($value);
     }
 
-    my $result = $self->{engine}->delete_bucket( $tag, $md5, $orig_key );
+    my $result = $self->_engine->delete_bucket( $tag, $md5, $orig_key );
 
     ##
     # If this object is an array and the key deleted was on the end of the stack,
@@ -581,14 +586,14 @@ sub EXISTS {
     my $self = shift->_get_self;
     my ($key) = @_;
 
-    my $md5 = $self->{engine}{digest}->($key);
+    my $md5 = $self->_engine->{digest}->($key);
 
     ##
     # Request shared lock for reading
     ##
     $self->lock( LOCK_SH );
 
-    my $tag = $self->{engine}->find_bucket_list( $self->_base_offset, $md5 );
+    my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );
     if (!$tag) {
         $self->unlock();
 
@@ -601,7 +606,7 @@ sub EXISTS {
     ##
     # Check if bucket exists and return 1 or ''
     ##
-    my $result = $self->{engine}->bucket_exists( $tag, $md5 ) || '';
+    my $result = $self->_engine->bucket_exists( $tag, $md5 ) || '';
 
     $self->unlock();
 
@@ -637,9 +642,9 @@ sub CLEAR {
     $self->lock( LOCK_EX );
 
 #XXX This needs updating to use _release_space
-    $self->{engine}->write_tag(
+    $self->_engine->write_tag(
         $self->_base_offset, $self->_type,
-        chr(0)x$self->{engine}{index_size},
+        chr(0)x$self->_engine->{index_size},
     );
 
     $self->unlock();

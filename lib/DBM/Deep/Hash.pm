@@ -91,7 +91,7 @@ sub FIRSTKEY {
 	##
 	$self->lock( $self->LOCK_SH );
 	
-	my $result = $self->{engine}->get_next_key($self);
+	my $result = $self->_engine->get_next_key($self);
 	
 	$self->unlock();
 	
@@ -110,14 +110,14 @@ sub NEXTKEY {
         ? $self->_fileobj->{filter_store_key}->($_[0])
         : $_[0];
 
-	my $prev_md5 = $self->{engine}{digest}->($prev_key);
+	my $prev_md5 = $self->_engine->{digest}->($prev_key);
 
 	##
 	# Request shared lock for reading
 	##
 	$self->lock( $self->LOCK_SH );
 	
-	my $result = $self->{engine}->get_next_key( $self, $prev_md5 );
+	my $result = $self->_engine->get_next_key( $self, $prev_md5 );
 	
 	$self->unlock();
 	

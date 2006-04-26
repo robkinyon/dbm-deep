@@ -253,6 +253,7 @@ sub write_tag {
 
     return {
         signature => $sig,
+        #XXX Is this even used?
         size      => $size,
         offset    => $offset + SIG_SIZE + $self->{data_size},
         content   => $content
@@ -275,6 +276,7 @@ sub load_tag {
 
     return {
         signature => $sig,
+        #XXX Is this even used?
         size      => $size,
         offset    => $offset + SIG_SIZE + $self->{data_size},
         content   => $fileobj->read_at( undef, $size ),
@@ -699,7 +701,7 @@ sub bucket_exists {
     return ($subloc && !$is_deleted) && 1;
 }
 
-sub find_bucket_list {
+sub find_blist {
     ##
     # Locate offset for bucket list, given digested key
     ##

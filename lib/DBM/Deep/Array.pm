@@ -61,7 +61,7 @@ sub FETCH {
             }
         }
 
-        $key = pack($self->{engine}{long_pack}, $key);
+        $key = pack($self->_engine->{long_pack}, $key);
     }
 
     my $rv = $self->SUPER::FETCH( $key, $orig_key );
@@ -92,7 +92,7 @@ sub STORE {
             }
         }
 
-        $key = pack($self->{engine}{long_pack}, $key);
+        $key = pack($self->_engine->{long_pack}, $key);
     }
 
     my $rv = $self->SUPER::STORE( $key, $value, $orig_key );
@@ -124,7 +124,7 @@ sub EXISTS {
             }
         }
 
-        $key = pack($self->{engine}{long_pack}, $key);
+        $key = pack($self->_engine->{long_pack}, $key);
     }
 
     my $rv = $self->SUPER::EXISTS( $key );
@@ -153,7 +153,7 @@ sub DELETE {
             }
         }
 
-        $key = pack($self->{engine}{long_pack}, $key);
+        $key = pack($self->_engine->{long_pack}, $key);
     }
 
     my $rv = $self->SUPER::DELETE( $key, $orig );
@@ -182,7 +182,7 @@ sub FETCHSIZE {
     $self->unlock;
 
     if ($packed_size) {
-        return int(unpack($self->{engine}{long_pack}, $packed_size));
+        return int(unpack($self->_engine->{long_pack}, $packed_size));
     }
 
     return 0;
@@ -197,7 +197,7 @@ sub STORESIZE {
     my $SAVE_FILTER = $self->_fileobj->{filter_store_value};
     $self->_fileobj->{filter_store_value} = undef;
 
-    my $result = $self->STORE('length', pack($self->{engine}{long_pack}, $new_length), 'length');
+    my $result = $self->STORE('length', pack($self->_engine->{long_pack}, $new_length), 'length');
 
     $self->_fileobj->{filter_store_value} = $SAVE_FILTER;
 

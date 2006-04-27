@@ -36,10 +36,11 @@ t/24_autobless.t
 t/25_tie_return_value.t
 t/26_scalar_ref.t
 t/27_filehandle.t
-t/28_transactions.t
+t/28_audit_trail.t
 t/29_freespace_manager.t
 t/30_already_tied.t
 t/31_references.t
 t/32_dash_ell.t
-t/33_audit_trail.t
+t/33_transactions.t
 t/34_transaction_arrays.t
+t/35_transaction_multiple.t

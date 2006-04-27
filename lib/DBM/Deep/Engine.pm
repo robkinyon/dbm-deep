@@ -98,9 +98,14 @@ sub calculate_sizes {
     # The 2**8 here indicates the number of different characters in the
     # current hashing algorithm
     #XXX Does this need to be updated with different hashing algorithms?
-    $self->{index_size}       = (2**8) * $self->{long_size};
-    $self->{bucket_size}      = $self->{hash_size} + $self->{long_size} * 3;
+    $self->{hash_chars_used}  = (2**8);
+    $self->{index_size}       = $self->{hash_chars_used} * $self->{long_size};
+
+    $self->{bucket_size}      = $self->{hash_size} + $self->{long_size} * 2;
     $self->{bucket_list_size} = $self->{max_buckets} * $self->{bucket_size};
+
+    $self->{key_size}         = $self->{long_size} * 2;
+    $self->{keyloc_size}      = $self->{max_buckets} * $self->{key_size};
 
     return;
 }
@@ -283,6 +288,30 @@ sub load_tag {
     };
 }
 
+sub find_keyloc {
+    my $self = shift;
+    my ($tag, $transaction_id) = @_;
+    $transaction_id = $self->_fileobj->transaction_id
+        unless defined $transaction_id;
+
+    for ( my $i = 0; $i < $self->{max_buckets}; $i++ ) {
+        my ($loc, $trans_id, $is_deleted) = unpack(
+            "$self->{long_pack} C C",
+            substr( $tag->{content}, $i * $self->{key_size}, $self->{key_size} ),
+        );
+
+        if ( $loc == 0 ) {
+            return ( $loc, $is_deleted, $i * $self->{key_size} );
+        }
+
+        next if $transaction_id != $trans_id;
+
+        return ( $loc, $is_deleted, $i * $self->{key_size} );
+    }
+
+    return;
+}
+
 sub add_bucket {
     ##
     # Adds one key/value pair to bucket list, given offset, MD5 digest of key,
@@ -290,7 +319,6 @@ sub add_bucket {
     ##
     my $self = shift;
     my ($tag, $md5, $plain_key, $value, $deleted, $orig_key) = @_;
-    $deleted ||= 0;
 
     # This verifies that only supported values will be stored.
     {
@@ -307,10 +335,8 @@ sub add_bucket {
 
     my $fileobj = $self->_fileobj;
 
-    my $actual_length = $self->_length_needed( $value, $plain_key );
-
     #ACID - This is a mutation. Must only find the exact transaction
-    my ($subloc, $offset, $size,$is_deleted) = $self->_find_in_buckets( $tag, $md5, 1 );
+    my ($keyloc, $offset) = $self->_find_in_buckets( $tag, $md5, 1 );
 
     my @transactions;
     if ( $fileobj->transaction_id == 0 ) {
@@ -318,56 +344,72 @@ sub add_bucket {
     }
 
 #    $self->_release_space( $size, $subloc );
-    # Updating a known md5
 #XXX This needs updating to use _release_space
+
     my $location;
-    if ( $subloc ) {
-        if ($actual_length <= $size) {
-            $location = $subloc;
-        }
-        else {
-            $location = $fileobj->request_space( $actual_length );
+    my $size = $self->_length_needed( $value, $plain_key );
 
-            $fileobj->print_at( $tag->{offset} + $offset + $self->{hash_size},
-                pack($self->{long_pack}, $location ),
-                pack($self->{long_pack}, $actual_length ),
-                pack('n n', $fileobj->transaction_id, $deleted ),
-            );
+    # Updating a known md5
+    if ( $keyloc ) {
+        my $keytag = $self->load_tag( $keyloc );
+        my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
+
+        if ( @transactions ) {
+            my $old_value = $self->read_from_loc( $subloc, $orig_key );
+            my $old_size = $self->_length_needed( $old_value, $plain_key );
+
+            for my $trans_id ( @transactions ) {
+                my ($loc, $is_deleted, $offset2) = $self->find_keyloc( $keytag, $trans_id );
+                unless ($loc) {
+                    my $location2 = $fileobj->request_space( $old_size );
+                    $fileobj->print_at( $keytag->{offset} + $offset2,
+                        pack($self->{long_pack}, $location2 ),
+                        pack( 'C C', $trans_id, 0 ),
+                    );
+                    $self->write_value( $location2, $plain_key, $old_value, $orig_key );
+                }
+            }
         }
 
-        my $old_value = $self->read_from_loc( $subloc, $orig_key );
-        for ( @transactions ) {
-            my $tag2 = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
-            $fileobj->{transaction_id} = $_;
-            $self->add_bucket( $tag2, $md5, $orig_key, $old_value, undef, $orig_key );
-            $fileobj->{transaction_id} = 0;
-        }
-        $tag = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
+        $location = $self->_fileobj->request_space( $size );
+        #XXX This needs to be transactionally-aware in terms of which keytag->{offset} to use
+        $fileobj->print_at( $keytag->{offset} + $offset,
+            pack($self->{long_pack}, $location ),
+            pack( 'C C', $fileobj->transaction_id, 0 ),
+        );
     }
     # Adding a new md5
-    elsif ( defined $offset ) {
-        $location = $fileobj->request_space( $actual_length );
+    else {
+        my $keyloc = $fileobj->request_space( $self->tag_size( $self->{keyloc_size} ) );
 
-        $fileobj->print_at( $tag->{offset} + $offset,
-            $md5,
-            pack($self->{long_pack}, $location ),
-            pack($self->{long_pack}, $actual_length ),
-            pack('n n', $fileobj->transaction_id, $deleted ),
+        # The bucket fit into list
+        if ( defined $offset ) {
+            $fileobj->print_at( $tag->{offset} + $offset,
+                $md5, pack( $self->{long_pack}, $keyloc ),
+            );
+        }
+        # If bucket didn't fit into list, split into a new index level
+        else {
+            $self->split_index( $tag, $md5, $keyloc );
+        }
+
+        my $keytag = $self->write_tag(
+            $keyloc, SIG_KEYS, chr(0)x$self->{keyloc_size},
         );
 
-        for ( @transactions ) {
-            my $tag2 = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
-            $fileobj->{transaction_id} = $_;
-            $self->add_bucket( $tag2, $md5, '', '', 1, $orig_key );
-            $fileobj->{transaction_id} = 0;
+        $location = $self->_fileobj->request_space( $size );
+        $fileobj->print_at( $keytag->{offset},
+            pack( $self->{long_pack}, $location ),
+            pack( 'C C', $fileobj->transaction_id, 0 ),
+        );
+
+        my $offset = 1;
+        for my $trans_id ( @transactions ) {
+            $fileobj->print_at( $keytag->{offset} + $self->{key_size} * $offset++,
+                pack( $self->{long_pack}, -1 ),
+                pack( 'C C', $trans_id, 1 ),
+            );
         }
-        $tag = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
-    }
-    # If bucket didn't fit into list, split into a new index level
-    # split_index() will do the $self->_fileobj->request_space() call
-    #XXX It also needs to be transactionally aware
-    else {
-        $location = $self->split_index( $md5, $tag );
     }
 
     $self->write_value( $location, $plain_key, $value, $orig_key );
@@ -467,7 +509,7 @@ sub write_value {
 
 sub split_index {
     my $self = shift;
-    my ($md5, $tag) = @_;
+    my ($tag, $md5, $keyloc) = @_;
 
     my $fileobj = $self->_fileobj;
 
@@ -482,21 +524,15 @@ sub split_index {
         chr(0)x$self->{index_size},
     );
 
-    my $newtag_loc = $fileobj->request_space(
-        $self->tag_size( $self->{bucket_list_size} ),
-    );
-
     my $keys = $tag->{content}
-             . $md5 . pack($self->{long_pack}, $newtag_loc)
-                    . pack($self->{long_pack}, 0)  # size
-                    . pack($self->{long_pack}, 0); # transaction ID
+             . $md5 . pack($self->{long_pack}, $keyloc);
 
     my @newloc = ();
     BUCKET:
     # The <= here is deliberate - we have max_buckets+1 keys to iterate
     # through, unlike every other loop that uses max_buckets as a stop.
     for (my $i = 0; $i <= $self->{max_buckets}; $i++) {
-        my ($key, $old_subloc, $size) = $self->_get_key_subloc( $keys, $i );
+        my ($key, $old_subloc) = $self->_get_key_subloc( $keys, $i );
 
         die "[INTERNAL ERROR]: No key in split_index()\n" unless $key;
         die "[INTERNAL ERROR]: No subloc in split_index()\n" unless $old_subloc;
@@ -507,7 +543,7 @@ sub split_index {
             my $subkeys = $fileobj->read_at( $newloc[$num], $self->{bucket_list_size} );
 
             # This is looking for the first empty spot
-            my ($subloc, $offset, $size) = $self->_find_in_buckets(
+            my ($subloc, $offset) = $self->_find_in_buckets(
                 { content => $subkeys }, '',
             );
 
@@ -543,7 +579,7 @@ sub split_index {
         $tag->{offset} - SIG_SIZE - $self->{data_size},
     );
 
-    return $newtag_loc;
+    return 1;
 }
 
 sub read_from_loc {
@@ -630,15 +666,23 @@ sub get_bucket_value {
     my ($tag, $md5, $orig_key) = @_;
 
     #ACID - This is a read. Can find exact or HEAD
-    my ($subloc, $offset, $size, $is_deleted) = $self->_find_in_buckets( $tag, $md5 );
+    my ($keyloc, $offset) = $self->_find_in_buckets( $tag, $md5 );
 
-    if ( !$subloc ) {
+    if ( !$keyloc ) {
         #XXX Need to use real key
-#        $self->add_bucket( $tag, $md5, $orig_key, undef, undef, $orig_key );
+#        $self->add_bucket( $tag, $md5, $orig_key, undef, $orig_key );
 #        return;
     }
-    elsif ( !$is_deleted ) {
-        return $self->read_from_loc( $subloc, $orig_key );
+#    elsif ( !$is_deleted ) {
+    else {
+        my $keytag = $self->load_tag( $keyloc );
+        my ($subloc, $is_deleted) = $self->find_keyloc( $keytag );
+        if (!$subloc) {
+            ($subloc, $is_deleted) = $self->find_keyloc( $keytag, 0 );
+        }
+        if ( $subloc && !$is_deleted ) {
+            return $self->read_from_loc( $subloc, $orig_key );
+        }
     }
 
     return;
@@ -653,9 +697,9 @@ sub delete_bucket {
 
     #ACID - Although this is a mutation, we must find any transaction.
     # This is because we need to mark something as deleted that is in the HEAD.
-    my ($subloc, $offset, $size,$is_deleted) = $self->_find_in_buckets( $tag, $md5 );
+    my ($keyloc, $offset) = $self->_find_in_buckets( $tag, $md5 );
 
-    return if !$subloc;
+    return if !$keyloc;
 
     my $fileobj = $self->_fileobj;
 
@@ -665,25 +709,38 @@ sub delete_bucket {
     }
 
     if ( $fileobj->transaction_id == 0 ) {
+        my $keytag = $self->load_tag( $keyloc );
+        my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
         my $value = $self->read_from_loc( $subloc, $orig_key );
 
-        for (@transactions) {
-            $fileobj->{transaction_id} = $_;
-            #XXX Need to use real key
-            $self->add_bucket( $tag, $md5, $orig_key, $value, undef, $orig_key );
-            $fileobj->{transaction_id} = 0;
-        }
-        $tag = $self->load_tag( $tag->{offset} - SIG_SIZE - $self->{data_size} );
+        my $size = $self->_length_needed( $value, $orig_key );
 
-        #XXX This needs _release_space() for the value and anything below
-        $fileobj->print_at(
-            $tag->{offset} + $offset,
-            substr( $tag->{content}, $offset + $self->{bucket_size} ),
-            chr(0) x $self->{bucket_size},
+        for my $trans_id ( @transactions ) {
+            my ($loc, $is_deleted, $offset2) = $self->find_keyloc( $keytag, $trans_id );
+            unless ($loc) {
+                my $location2 = $fileobj->request_space( $size );
+                $fileobj->print_at( $keytag->{offset} + $offset2,
+                    pack($self->{long_pack}, $location2 ),
+                    pack( 'C C', $trans_id, 0 ),
+                );
+                $self->write_value( $location2, $orig_key, $value, $orig_key );
+            }
+        }
+
+        $keytag = $self->load_tag( $keyloc );
+        ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
+        $fileobj->print_at( $keytag->{offset} + $offset,
+            substr( $keytag->{content}, $offset + $self->{key_size} ),
+            chr(0) x $self->{key_size},
         );
     }
     else {
-        $self->add_bucket( $tag, $md5, '', '', 1, $orig_key );
+        my $keytag = $self->load_tag( $keyloc );
+        my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
+        $fileobj->print_at( $keytag->{offset} + $offset,
+            pack($self->{long_pack}, -1 ),
+            pack( 'C C', $fileobj->transaction_id, 1 ),
+        );
     }
 
     return 1;
@@ -697,7 +754,12 @@ sub bucket_exists {
     my ($tag, $md5) = @_;
 
     #ACID - This is a read. Can find exact or HEAD
-    my ($subloc, $offset, $size, $is_deleted) = $self->_find_in_buckets( $tag, $md5 );
+    my ($keyloc) = $self->_find_in_buckets( $tag, $md5 );
+    my $keytag = $self->load_tag( $keyloc );
+    my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
+    if ( !$subloc ) {
+        ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag, 0 );
+    }
     return ($subloc && !$is_deleted) && 1;
 }
 
@@ -775,19 +837,18 @@ sub traverse_index {
     # Scan index and recursively step into deeper levels, looking for next key.
     ##
     my $self = shift;
-    my ($obj, $offset, $ch, $force_return_next) = @_;
+    my ($xxxx, $offset, $ch, $force_return_next) = @_;
 
     my $tag = $self->load_tag( $offset );
 
     if ($tag->{signature} ne SIG_BLIST) {
-        my $content = $tag->{content};
-        my $start = $obj->{return_next} ? 0 : ord(substr($obj->{prev_md5}, $ch, 1));
+        my $start = $xxxx->{return_next} ? 0 : ord(substr($xxxx->{prev_md5}, $ch, 1));
 
-        for (my $idx = $start; $idx < (2**8); $idx++) {
+        for (my $idx = $start; $idx < $self->{hash_chars_used}; $idx++) {
             my $subloc = unpack(
                 $self->{long_pack},
                 substr(
-                    $content,
+                    $tag->{content},
                     $idx * $self->{long_size},
                     $self->{long_size},
                 ),
@@ -795,45 +856,47 @@ sub traverse_index {
 
             if ($subloc) {
                 my $result = $self->traverse_index(
-                    $obj, $subloc, $ch + 1, $force_return_next,
+                    $xxxx, $subloc, $ch + 1, $force_return_next,
                 );
 
-                if (defined($result)) { return $result; }
+                if (defined $result) { return $result; }
             }
         } # index loop
 
-        $obj->{return_next} = 1;
+        $xxxx->{return_next} = 1;
     }
     # This is the bucket list
     else {
         my $keys = $tag->{content};
-        if ($force_return_next) { $obj->{return_next} = 1; }
+        if ($force_return_next) { $xxxx->{return_next} = 1; }
 
         ##
         # Iterate through buckets, looking for a key match
         ##
         my $transaction_id = $self->_fileobj->transaction_id;
         for (my $i = 0; $i < $self->{max_buckets}; $i++) {
-            my ($key, $subloc, $size, $trans_id, $is_deleted) = $self->_get_key_subloc( $keys, $i );
-
-            next if $is_deleted;
-#XXX Need to find all the copies of this key to find out if $transaction_id has it
-#XXX marked as deleted, in use, or what.
-            next if $trans_id && $trans_id != $transaction_id;
+            my ($key, $keyloc) = $self->_get_key_subloc( $keys, $i );
 
             # End of bucket list -- return to outer loop
-            if (!$subloc) {
-                $obj->{return_next} = 1;
+            if (!$keyloc) {
+                $xxxx->{return_next} = 1;
                 last;
             }
             # Located previous key -- return next one found
-            elsif ($key eq $obj->{prev_md5}) {
-                $obj->{return_next} = 1;
+            elsif ($key eq $xxxx->{prev_md5}) {
+                $xxxx->{return_next} = 1;
                 next;
             }
             # Seek to bucket location and skip over signature
-            elsif ($obj->{return_next}) {
+            elsif ($xxxx->{return_next}) {
                 my $fileobj = $self->_fileobj;
+
+                my $keytag = $self->load_tag( $keyloc );
+                my ($subloc, $is_deleted) = $self->find_keyloc( $keytag );
+                if ( $subloc == 0 ) {
+                    ($subloc, $is_deleted) = $self->find_keyloc( $keytag, 0 );
+                }
+                next if $is_deleted;
 
                 # Skip over value to get to plain key
                 my $sig = $fileobj->read_at( $subloc, SIG_SIZE );
@@ -852,7 +915,7 @@ sub traverse_index {
             }
         }
 
-        $obj->{return_next} = 1;
+        $xxxx->{return_next} = 1;
     }
 
     return;
@@ -865,19 +928,25 @@ sub get_next_key {
     my $self = shift;
     my ($obj) = @_;
 
-    $obj->{prev_md5} = $_[1] ? $_[1] : undef;
-    $obj->{return_next} = 0;
-
     ##
     # If the previous key was not specifed, start at the top and
     # return the first one found.
     ##
-    if (!$obj->{prev_md5}) {
-        $obj->{prev_md5} = chr(0) x $self->{hash_size};
-        $obj->{return_next} = 1;
+    my $temp;
+    if ( @_ > 1 ) {
+        $temp = {
+            prev_md5    => $_[1],
+            return_next => 0,
+        };
+    }
+    else {
+        $temp = {
+            prev_md5    => chr(0) x $self->{hash_size},
+            return_next => 1,
+        };
     }
 
-    return $self->traverse_index( $obj, $obj->_base_offset, 0 );
+    return $self->traverse_index( $temp, $obj->_base_offset, 0 );
 }
 
 # Utilities
@@ -886,50 +955,35 @@ sub _get_key_subloc {
     my $self = shift;
     my ($keys, $idx) = @_;
 
-    my ($key, $subloc, $size, $transaction_id, $is_deleted) = unpack(
+    return unpack(
         # This is 'a', not 'A'. Please read the pack() documentation for the
         # difference between the two and why it's important.
-        "a$self->{hash_size} $self->{long_pack}2 n2",
+        "a$self->{hash_size} $self->{long_pack}",
         substr(
             $keys,
             ($idx * $self->{bucket_size}),
             $self->{bucket_size},
         ),
     );
-
-    return ($key, $subloc, $size, $transaction_id, $is_deleted);
 }
 
 sub _find_in_buckets {
     my $self = shift;
-    my ($tag, $md5, $exact) = @_;
-    $exact ||= 0;
-
-    my $trans_id = $self->_fileobj->transaction_id;
-
-    my @zero;
+    my ($tag, $md5) = @_;
 
     BUCKET:
     for ( my $i = 0; $i < $self->{max_buckets}; $i++ ) {
-        my ($key, $subloc, $size, $transaction_id, $is_deleted) = $self->_get_key_subloc(
+        my ($key, $subloc) = $self->_get_key_subloc(
             $tag->{content}, $i,
         );
 
-        my @rv = ($subloc, $i * $self->{bucket_size}, $size, $is_deleted);
+        my @rv = ($subloc, $i * $self->{bucket_size});
 
         unless ( $subloc ) {
-            if ( !$exact && @zero && $trans_id ) {
-                @rv = ($zero[2], $zero[0] * $self->{bucket_size},$zero[3],$is_deleted);
-            }
             return @rv;
         }
 
         next BUCKET if $key ne $md5;
-
-        # Save off the HEAD in case we need it.
-        @zero = ($i,$key,$subloc,$size,$transaction_id,$is_deleted) if $transaction_id == 0;
-
-        next BUCKET if $transaction_id != $trans_id;
 
         return @rv;
     }

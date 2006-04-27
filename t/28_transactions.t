@@ -35,10 +35,7 @@ $db1->begin_work;
     is( $db2->{other_x}, 'foo', "DB2 set other_x within DB1's transaction, so DB2 can see it" );
     is( $db1->{other_x}, undef, "Since other_x was added after the transaction began, DB1 doesn't see it." );
 
-TODO: {
-    local $TODO = "keys aren't working yet";
     cmp_bag( [ keys %$db1 ], [qw( x )], "DB1 keys correct" );
-}
     cmp_bag( [ keys %$db2 ], [qw( x other_x )], "DB2 keys correct" );
 
 $db1->rollback;
@@ -83,10 +80,7 @@ $db1->begin_work;
     ok( !exists $db1->{x}, "DB1 deleted X in a transaction, so it can't see it anymore" );
     is( $db2->{x}, 'z', "But, DB2 can still see it" );
 
-TODO: {
-    local $TODO = "keys aren't working yet";
     cmp_bag( [ keys %$db1 ], [qw( other_x )], "DB1 keys correct" );
-}
     cmp_bag( [ keys %$db2 ], [qw( x )], "DB2 keys correct" );
 
 $db1->rollback;
@@ -104,12 +98,10 @@ $db1->begin_work;
 
     delete $db1->{x};
     ok( !exists $db1->{x}, "DB1 deleted X in a transaction, so it can't see it anymore" );
+#__END__
     is( $db2->{x}, 'z', "But, DB2 can still see it" );
 
-TODO: {
-    local $TODO = "keys aren't working yet";
     cmp_bag( [ keys %$db1 ], [qw()], "DB1 keys correct" );
-}
     cmp_bag( [ keys %$db2 ], [qw( x )], "DB2 keys correct" );
 
 $db1->commit;

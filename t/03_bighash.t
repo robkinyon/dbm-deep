@@ -32,7 +32,6 @@ for ( 0 .. $max_keys ) {
 }
 is( $count, $max_keys, "We read $count keys" );
 
-
 my @keys = sort keys %$db;
 cmp_ok( scalar(@keys), '==', $max_keys + 1, "Number of keys is correct" );
 my @control =  sort map { "hello $_" } 0 .. $max_keys;

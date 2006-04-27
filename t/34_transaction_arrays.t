@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 29;
+use Test::More tests => 43;
 use Test::Deep;
 use t::common qw( new_fh );
 
@@ -74,3 +74,37 @@ is( $db2->[2], 'z', "After DB1 transaction is over, DB2 can now see 2" );
 cmp_ok( scalar(@$db1), '==', 3, "DB1 now has 2 elements" );
 cmp_ok( scalar(@$db2), '==', 3, "DB2 still has 2 elements" );
 
+$db1->begin_work;
+
+    push @$db1, 'foo';
+    unshift @$db1, 'bar';
+
+    cmp_ok( scalar(@$db1), '==', 5, "DB1 now has 5 elements" );
+    cmp_ok( scalar(@$db2), '==', 3, "DB2 still has 3 elements" );
+
+    is( $db1->[0], 'bar' );
+    is( $db1->[-1], 'foo' );
+
+$db1->rollback;
+
+cmp_ok( scalar(@$db1), '==', 3, "DB1 is back to 3 elements" );
+cmp_ok( scalar(@$db2), '==', 3, "DB2 still has 3 elements" );
+
+$db1->begin_work;
+
+    push @$db1, 'foo';
+    unshift @$db1, 'bar';
+
+    cmp_ok( scalar(@$db1), '==', 5, "DB1 now has 5 elements" );
+    cmp_ok( scalar(@$db2), '==', 3, "DB2 still has 3 elements" );
+
+$db1->commit;
+
+cmp_ok( scalar(@$db1), '==', 5, "DB1 is still at 5 elements" );
+cmp_ok( scalar(@$db2), '==', 5, "DB2 now has 5 elements" );
+
+is( $db1->[0], 'bar' );
+is( $db1->[-1], 'foo' );
+
+is( $db2->[0], 'bar' );
+is( $db2->[-1], 'foo' );

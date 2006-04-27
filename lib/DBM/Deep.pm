@@ -641,11 +641,30 @@ sub CLEAR {
     ##
     $self->lock( LOCK_EX );
 
+    if ( $self->_type eq TYPE_HASH ) {
+        my $key = $self->first_key;
+        while ( $key ) {
+            my $next_key = $self->next_key( $key );
+            my $md5 = $self->_engine->{digest}->($key);
+            my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );
+            $self->_engine->delete_bucket( $tag, $md5, $key );
+            $key = $next_key;
+        }
+    }
+    else {
+        my $size = $self->FETCHSIZE;
+        for my $key ( map { pack ( $self->_engine->{long_pack}, $_ ) } 0 .. $size - 1 ) {
+            my $md5 = $self->_engine->{digest}->($key);
+            my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );
+            $self->_engine->delete_bucket( $tag, $md5, $key );
+        }
+        $self->STORESIZE( 0 );
+    }
 #XXX This needs updating to use _release_space
-    $self->_engine->write_tag(
-        $self->_base_offset, $self->_type,
-        chr(0)x$self->_engine->{index_size},
-    );
+#    $self->_engine->write_tag(
+#        $self->_base_offset, $self->_type,
+#        chr(0)x$self->_engine->{index_size},
+#    );
 
     $self->unlock();
 

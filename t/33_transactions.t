@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 58;
+use Test::More tests => 62;
 use Test::Deep;
 use t::common qw( new_fh );
 
@@ -116,9 +116,6 @@ is( $db2->{foo}, 'bar', "Set foo to bar in DB2" );
 cmp_bag( [ keys %$db1 ], [qw( foo )], "DB1 keys correct" );
 cmp_bag( [ keys %$db2 ], [qw( foo )], "DB2 keys correct" );
 
-TODO: {
-    todo_skip 'Still need to work on clear()', 4;
-
 $db1->begin_work;
 
     %$db1 = (); # clear()
@@ -136,9 +133,8 @@ is( $db2->{foo}, 'bar', "Rollback means 'foo' is still there" );
 cmp_bag( [ keys %$db1 ], [qw( foo )], "DB1 keys correct" );
 cmp_bag( [ keys %$db2 ], [qw( foo )], "DB2 keys correct" );
 
-}
-
 $db1->optimize;
+
 is( $db1->{foo}, 'bar', 'After optimize, everything is ok' );
 is( $db2->{foo}, 'bar', 'After optimize, everything is ok' );
 

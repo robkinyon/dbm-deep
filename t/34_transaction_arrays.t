@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 43;
+use Test::More tests => 47;
 use Test::Deep;
 use t::common qw( new_fh );
 
@@ -108,3 +108,16 @@ is( $db1->[-1], 'foo' );
 
 is( $db2->[0], 'bar' );
 is( $db2->[-1], 'foo' );
+
+$db1->begin_work;
+
+    @$db1 = (); # clear()
+
+    cmp_ok( scalar(@$db1), '==', 0, "DB1 now has 0 elements" );
+    cmp_ok( scalar(@$db2), '==', 5, "DB2 still has 5 elements" );
+
+$db1->rollback;
+
+cmp_ok( scalar(@$db1), '==', 5, "DB1 now has 5 elements" );
+cmp_ok( scalar(@$db2), '==', 5, "DB2 still has 5 elements" );
+

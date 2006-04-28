@@ -312,7 +312,7 @@ sub begin_transaction {
     $self->lock;
 
     my $buffer = $self->read_at( $self->{transaction_offset}, 4 );
-    my ($next, @trans) = unpack( 'C C C C', $buffer );
+    my ($next, @trans) = unpack( 'C C C C C C C C C C C C C C C C', $buffer );
 
     $self->{transaction_id} = ++$next;
 
@@ -326,7 +326,7 @@ sub begin_transaction {
 
     $self->print_at(
         $self->{transaction_offset},
-        pack( 'C C C C', $next, @trans),
+        pack( 'C C C C C C C C C C C C C C C C', $next, @trans),
     );
 
     $self->unlock;
@@ -344,13 +344,13 @@ sub end_transaction {
     $self->lock;
 
     my $buffer = $self->read_at( $self->{transaction_offset}, 4 );
-    my ($next, @trans) = unpack( 'C C C C', $buffer );
+    my ($next, @trans) = unpack( 'C C C C C C C C C C C C C C C C', $buffer );
 
     @trans = grep { $_ != $self->{transaction_id} } @trans;
 
     $self->print_at(
         $self->{transaction_offset},
-        pack( 'C C C C', $next, @trans),
+        pack( 'C C C C C C C C C C C C C C C C', $next, @trans),
     );
 
     #XXX Need to free the space used by the current transaction
@@ -375,7 +375,7 @@ sub current_transactions {
     $self->lock;
 
     my $buffer = $self->read_at( $self->{transaction_offset}, 4 );
-    my ($next, @trans) = unpack( 'C C C C', $buffer );
+    my ($next, @trans) = unpack( 'C C C C C C C C C C C C C C C C', $buffer );
 
     $self->unlock;
 

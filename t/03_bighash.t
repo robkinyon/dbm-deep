@@ -8,6 +8,8 @@ use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
 
+diag "This test can take up to a minute to run. Please be patient.";
+
 my ($fh, $filename) = new_fh();
 my $db = DBM::Deep->new(
 	file => $filename,

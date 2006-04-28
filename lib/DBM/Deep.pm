@@ -694,10 +694,10 @@ DBM::Deep - A pure perl multi-level hash/array DBM
   use DBM::Deep;
   my $db = DBM::Deep->new( "foo.db" );
 
-  $db->{key} = 'value'; # tie() style
+  $db->{key} = 'value';
   print $db->{key};
 
-  $db->put('key' => 'value'); # OO style
+  $db->put('key' => 'value');
   print $db->get('key');
 
   # true multi-level support
@@ -706,33 +706,29 @@ DBM::Deep - A pure perl multi-level hash/array DBM
       42, 99,
   ];
 
+  tie my %db, 'DBM::Deep', 'foo.db';
+  $db{key} = 'value';
+  print $db{key};
+
+  tied(%db)->put('key' => 'value');
+  print tied(%db)->get('key');
+
 =head1 DESCRIPTION
 
-A unique flat-file database module, written in pure perl.  True
-multi-level hash/array support (unlike MLDBM, which is faked), hybrid
-OO / tie() interface, cross-platform FTPable files, and quite fast.  Can
-handle millions of keys and unlimited hash levels without significant
-slow-down.  Written from the ground-up in pure perl -- this is NOT a
-wrapper around a C-based DBM.  Out-of-the-box compatibility with Unix,
-Mac OS X and Windows.
+A unique flat-file database module, written in pure perl.  True multi-level
+hash/array support (unlike MLDBM, which is faked), hybrid OO / tie()
+interface, cross-platform FTPable files, ACID transactions, and is quite fast.
+Can handle millions of keys and unlimited levels without significant
+slow-down.  Written from the ground-up in pure perl -- this is NOT a wrapper
+around a C-based DBM.  Out-of-the-box compatibility with Unix, Mac OS X and
+Windows.
 
 =head1 VERSION DIFFERENCES
 
-B<NOTE>: 0.99_01 and above have significant file format differences from 0.98 and
-before. While attempts have been made to be backwards compatible, no guarantees.
-
-=head1 INSTALLATION
-
-Hopefully you are using Perl's excellent CPAN module, which will download
-and install the module for you.  If not, get the tarball, and run these
-commands:
-
-    tar zxf DBM-Deep-*
-    cd DBM-Deep-*
-    perl Makefile.PL
-    make
-    make test
-    make install
+B<NOTE>: 0.99_01 and above have significant file format differences from 0.983 and
+before. There will be a backwards-compatibility layer in 1.00, but that is
+slated for a later 0.99_x release. This version is B<NOT> backwards compatible
+with 0.983 and before.
 
 =head1 SETUP
 
@@ -742,7 +738,7 @@ Perl's tie() function.  Both are examined here.
 =head2 OO CONSTRUCTION
 
 The recommended way to construct a DBM::Deep object is to use the new()
-method, which gets you a blessed, tied hash or array reference.
+method, which gets you a blessed I<and> tied hash (or array) reference.
 
     my $db = DBM::Deep->new( "foo.db" );
 
@@ -752,11 +748,11 @@ opened in "r+" (read/write) mode, and the type of object returned is a
 hash, unless otherwise specified (see L<OPTIONS> below).
 
 You can pass a number of options to the constructor to specify things like
-locking, autoflush, etc.  This is done by passing an inline hash:
+locking, autoflush, etc.  This is done by passing an inline hash (or hashref):
 
     my $db = DBM::Deep->new(
-        file => "foo.db",
-        locking => 1,
+        file      => "foo.db",
+        locking   => 1,
         autoflush => 1
     );
 
@@ -764,8 +760,6 @@ Notice that the filename is now specified I<inside> the hash with
 the "file" parameter, as opposed to being the sole argument to the
 constructor.  This is required if any options are specified.
 See L<OPTIONS> below for the complete list.
-
-
 
 You can also start with an array instead of a hash.  For this, you must
 specify the C<type> parameter:
@@ -784,8 +778,8 @@ the wrong type is passed in.
 
 Alternately, you can create a DBM::Deep handle by using Perl's built-in
 tie() function.  The object returned from tie() can be used to call methods,
-such as lock() and unlock(), but cannot be used to assign to the DBM::Deep
-file (as expected with most tie'd objects).
+such as lock() and unlock(). (That object can be retrieved from the tied
+variable at any time using tied() - please see L<perltie/> for more info.
 
     my %hash;
     my $db = tie %hash, "DBM::Deep", "foo.db";
@@ -828,6 +822,11 @@ needs. If you open it read-only and attempt to write, an exception will be throw
 open it write-only or append-only, an exception will be thrown immediately as DBM::Deep
 needs to read from the fh.
 
+=item * audit_file / audit_fh
+
+These are just like file/fh, except for auditing. Please see L</AUDITING> for
+more information.
+
 =item * file_offset
 
 This is the offset within the file that the DBM::Deep db starts. Most of the time, you will
@@ -853,11 +852,12 @@ parameter, and defaults to C<DBM::Deep-E<gt>TYPE_HASH>.
 
 =item * locking
 
-Specifies whether locking is to be enabled.  DBM::Deep uses Perl's Fnctl flock()
-function to lock the database in exclusive mode for writes, and shared mode for
-reads.  Pass any true value to enable.  This affects the base DB handle I<and
-any child hashes or arrays> that use the same DB file.  This is an optional
-parameter, and defaults to 0 (disabled).  See L<LOCKING> below for more.
+Specifies whether locking is to be enabled.  DBM::Deep uses Perl's flock()
+function to lock the database in exclusive mode for writes, and shared mode
+for reads.  Pass any true value to enable.  This affects the base DB handle
+I<and any child hashes or arrays> that use the same DB file.  This is an
+optional parameter, and defaults to 0 (disabled).  See L<LOCKING> below for
+more.
 
 =item * autoflush
 
@@ -913,7 +913,7 @@ You can even step through hash keys using the normal Perl C<keys()> function:
 
 Remember that Perl's C<keys()> function extracts I<every> key from the hash and
 pushes them onto an array, all before the loop even begins.  If you have an
-extra large hash, this may exhaust Perl's memory.  Instead, consider using
+extremely large hash, this may exhaust Perl's memory.  Instead, consider using
 Perl's C<each()> function, which pulls keys/values one at a time, using very
 little memory:
 
@@ -960,7 +960,8 @@ or simply be a nested array reference inside a hash.  Example:
 In addition to the I<tie()> interface, you can also use a standard OO interface
 to manipulate all aspects of DBM::Deep databases.  Each type of object (hash or
 array) has its own methods, but both types share the following common methods:
-C<put()>, C<get()>, C<exists()>, C<delete()> and C<clear()>.
+C<put()>, C<get()>, C<exists()>, C<delete()> and C<clear()>. C<fetch()> and
+C<store(> are aliases to C<put()> and C<get()>, respectively.
 
 =over
 
@@ -1022,7 +1023,8 @@ q.v. Locking.
 
 =item * optimize()
 
-Recover lost disk space.
+Recover lost disk space. This is important to do, especially if you use
+transactions.
 
 =item * import() / export()
 
@@ -1231,7 +1233,8 @@ The C<import()> method can be called on any database level (not just the base
 level), and works with both hash and array DB types.
 
 B<Note:> Make sure your existing structure has no circular references in it.
-These will cause an infinite loop when importing.
+These will cause an infinite loop when importing. There are plans to fix this
+in a later release.
 
 =head2 EXPORTING
 
@@ -1259,7 +1262,8 @@ large databases -- you can store a lot more data in a DBM::Deep object than an
 in-memory Perl structure.
 
 B<Note:> Make sure your database has no circular references in it.
-These will cause an infinite loop when exporting.
+These will cause an infinite loop when exporting. There are plans to fix this
+in a later release.
 
 =head1 FILTERS
 
@@ -1518,6 +1522,41 @@ B<Note>: Passing the object to a function that recursively walks the
 object tree (such as I<Data::Dumper> or even the built-in C<optimize()> or
 C<export()> methods) will result in an infinite loop. This will be fixed in
 a future release.
+
+=head1 AUDITING
+
+New in 0.99_01 is the ability to audit your databases actions. By passing in
+audit_file (or audit_fh) to the constructor, all actions will be logged to
+that file. The format is one that is suitable for eval'ing against the
+database to replay the actions. Please see t/33_audit_trail.t for an example
+of how to do this.
+
+=head1 TRANSACTIONS
+
+New in 0.99_01 is ACID transactions. Every DBM::Deep object is completely
+transaction-ready - it is not an option you have to turn on. Three new methods
+have been added to support them. They are:
+
+=over 4
+
+=item * begin_work()
+
+This starts a transaction.
+
+=item * commit()
+
+This applies the changes done within the transaction to the mainline and ends
+the transaction.
+
+=item * rollback()
+
+This discards the changes done within the transaction to the mainline and ends
+the transaction.
+
+=back
+
+Transactions in DBM::Deep are done using the MVCC method, the same method used
+by the InnoDB MySQL table type.
 
 =head1 CAVEATS / ISSUES / BUGS
 
@@ -1838,29 +1877,31 @@ built-in hashes.
 
 =head1 CODE COVERAGE
 
-We use B<Devel::Cover> to test the code coverage of our tests, below is the
-B<Devel::Cover> report on this module's test suite.
+B<Devel::Cover> is used to test the code coverage of the tests. Below is the
+B<Devel::Cover> report on this distribution's test suite.
 
-  ----------------------------------- ------ ------ ------ ------ ------ ------
-  File                                  stmt   bran   cond    sub   time  total
-  ----------------------------------- ------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm                  94.9   80.6   73.0  100.0   37.9   90.4
-  blib/lib/DBM/Deep/Array.pm           100.0   91.1  100.0  100.0   18.2   98.1
-  blib/lib/DBM/Deep/Engine.pm           98.9   87.3   80.0  100.0   34.2   95.2
-  blib/lib/DBM/Deep/Hash.pm            100.0   87.5  100.0  100.0    9.7   97.3
-  Total                                 97.9   85.9   79.7  100.0  100.0   94.3
-  ----------------------------------- ------ ------ ------ ------ ------ ------
+  ---------------------------- ------ ------ ------ ------ ------ ------ ------
+  File                           stmt   bran   cond    sub    pod   time  total
+  ---------------------------- ------ ------ ------ ------ ------ ------ ------
+  blib/lib/DBM/Deep.pm           96.2   89.0   75.0   95.8   89.5   36.0   92.9
+  blib/lib/DBM/Deep/Array.pm     96.1   88.3  100.0   96.4  100.0   15.9   94.7
+  blib/lib/DBM/Deep/Engine.pm    96.6   86.6   89.5  100.0    0.0   20.0   91.0
+  blib/lib/DBM/Deep/File.pm      99.4   88.3   55.6  100.0    0.0   19.6   89.5
+  blib/lib/DBM/Deep/Hash.pm      98.5   83.3  100.0  100.0  100.0    8.5   96.3
+  Total                          96.9   87.4   81.2   98.0   38.5  100.0   92.1
+  ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 MORE INFORMATION
 
 Check out the DBM::Deep Google Group at L<http://groups.google.com/group/DBM-Deep>
-or send email to L<DBM-Deep@googlegroups.com>.
+or send email to L<DBM-Deep@googlegroups.com>. You can also visit #dbm-deep on
+irc.perl.org
 
-=head1 AUTHORS
-
-Joseph Huckaby, L<jhuckaby@cpan.org>
+=head1 MAINTAINERS
 
 Rob Kinyon, L<rkinyon@cpan.org>
+
+Originally written by Joseph Huckaby, L<jhuckaby@cpan.org>
 
 Special thanks to Adam Sah and Rich Gaushell!  You know why :-)
 

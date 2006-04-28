@@ -113,14 +113,14 @@ sub calculate_sizes {
 sub write_file_header {
     my $self = shift;
 
-    my $loc = $self->_fileobj->request_space( length( SIG_FILE ) + 21 );
+    my $loc = $self->_fileobj->request_space( length( SIG_FILE ) + 33 );
 
     $self->_fileobj->print_at( $loc,
         SIG_FILE,
         SIG_HEADER,
         pack('N', 1),  # header version
-        pack('N', 12), # header size
-        pack('N', 0),  # currently running transaction IDs
+        pack('N', 24), # header size
+        pack('N4', 0, 0, 0, 0),  # currently running transaction IDs
         pack('n', $self->{long_size}),
         pack('A', $self->{long_pack}),
         pack('n', $self->{data_size}),
@@ -154,7 +154,7 @@ sub read_file_header {
     }
 
     my $buffer2 = $self->_fileobj->read_at( undef, $size );
-    my ($running_transactions, @values) = unpack( 'N n A n A n', $buffer2 );
+    my ($a1, $a2, $a3, $a4, @values) = unpack( 'N4 n A n A n', $buffer2 );
 
     $self->_fileobj->set_transaction_offset( 13 );
 

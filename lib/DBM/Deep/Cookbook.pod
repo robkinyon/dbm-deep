@@ -1,0 +1,29 @@
+=head1 NAME
+
+DBM::Deep::Cookbook
+
+=head1 DESCRIPTION
+
+This is the Cookbook for L<DBM::Deep/>. It contains useful tips and tricks,
+plus some examples of how to do common tasks.
+
+=head1 RECIPES
+
+=head2 UTF8 data
+
+When you're using UTF8 data, you may run into the "Wide character in print"
+warning. To fix that in 5.8+, do the following:
+
+  my $db = DBM::Deep->new( ... );
+  binmode $db->_fh, ":utf8";
+
+In 5.6, you will have to do the following:
+
+  my $db = DBM::Deep->new( ... );
+  $db->set_filter( 'store_value' => sub { pack "U0C*", unpack "C*", $_[0] } );
+  $db->set_filter( 'retrieve_value' => sub { pack "C*", unpack "U0C*", $_[0] } );
+
+In a future version, you will be able to specify C<utf8 =E<gt> 1> and
+L<DBM::Deep/> will do these things for you.
+
+=end

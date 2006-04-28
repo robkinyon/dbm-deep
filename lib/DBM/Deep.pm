@@ -34,7 +34,7 @@ use 5.6.0;
 use strict;
 use warnings;
 
-our $VERSION = q(0.99_02);
+our $VERSION = q(0.99_03);
 
 use Fcntl qw( :DEFAULT :flock :seek );
 use Digest::MD5 ();
@@ -1648,13 +1648,13 @@ be addressed in a later version of DBM::Deep.
 
 =head2 DB OVER NFS
 
-Beware of using DB files over NFS.  DBM::Deep uses flock(), which works well on local
-filesystems, but will NOT protect you from file corruption over NFS.  I've heard
-about setting up your NFS server with a locking daemon, then using lockf() to
-lock your files, but your mileage may vary there as well.  From what I
-understand, there is no real way to do it.  However, if you need access to the
-underlying filehandle in DBM::Deep for using some other kind of locking scheme like
-lockf(), see the L<LOW-LEVEL ACCESS> section above.
+Beware of using DBM::Deep files over NFS.  DBM::Deep uses flock(), which works
+well on local filesystems, but will NOT protect you from file corruption over
+NFS.  I've heard about setting up your NFS server with a locking daemon, then
+using lockf() to lock your files, but your mileage may vary there as well.
+From what I understand, there is no real way to do it.  However, if you need
+access to the underlying filehandle in DBM::Deep for using some other kind of
+locking scheme like lockf(), see the L<LOW-LEVEL ACCESS> section above.
 
 =head2 COPYING OBJECTS
 
@@ -1665,7 +1665,7 @@ returns a new, blessed, tied hash or array to the same level in the DB.
     my $copy = $db->clone();
 
 B<Note>: Since clone() here is cloning the object, not the database location, any
-modifications to either $db or $copy will be visible in both.
+modifications to either $db or $copy will be visible to both.
 
 =head2 LARGE ARRAYS
 
@@ -1758,123 +1758,6 @@ process after storing and fetching 1,000,000 keys:
 Notice the memory usage increased by only 56K.  Test was performed on a 700mHz
 x86 box running Linux RedHat 7.2 & Perl 5.6.1.
 
-=head1 DB FILE FORMAT
-
-In case you were interested in the underlying DB file format, it is documented
-here in this section.  You don't need to know this to use the module, it's just
-included for reference.
-
-=head2 SIGNATURE
-
-DBM::Deep files always start with a 32-bit signature to identify the file type.
-This is at offset 0.  The signature is "DPDB" in network byte order.  This is
-checked for when the file is opened and an error will be thrown if it's not found.
-
-=head2 TAG
-
-The DBM::Deep file is in a I<tagged format>, meaning each section of the file
-has a standard header containing the type of data, the length of data, and then
-the data itself.  The type is a single character (1 byte), the length is a
-32-bit unsigned long in network byte order, and the data is, well, the data.
-Here is how it unfolds:
-
-=head2 MASTER INDEX
-
-Immediately after the 32-bit file signature is the I<Master Index> record.
-This is a standard tag header followed by 1024 bytes (in 32-bit mode) or 2048
-bytes (in 64-bit mode) of data.  The type is I<H> for hash or I<A> for array,
-depending on how the DBM::Deep object was constructed.
-
-The index works by looking at a I<MD5 Hash> of the hash key (or array index
-number).  The first 8-bit char of the MD5 signature is the offset into the
-index, multipled by 4 in 32-bit mode, or 8 in 64-bit mode.  The value of the
-index element is a file offset of the next tag for the key/element in question,
-which is usually a I<Bucket List> tag (see below).
-
-The next tag I<could> be another index, depending on how many keys/elements
-exist.  See L<RE-INDEXING> below for details.
-
-=head2 BUCKET LIST
-
-A I<Bucket List> is a collection of 16 MD5 hashes for keys/elements, plus
-file offsets to where the actual data is stored.  It starts with a standard
-tag header, with type I<B>, and a data size of 320 bytes in 32-bit mode, or
-384 bytes in 64-bit mode.  Each MD5 hash is stored in full (16 bytes), plus
-the 32-bit or 64-bit file offset for the I<Bucket> containing the actual data.
-When the list fills up, a I<Re-Index> operation is performed (See
-L<RE-INDEXING> below).
-
-=head2 BUCKET
-
-A I<Bucket> is a tag containing a key/value pair (in hash mode), or a
-index/value pair (in array mode).  It starts with a standard tag header with
-type I<D> for scalar data (string, binary, etc.), or it could be a nested
-hash (type I<H>) or array (type I<A>).  The value comes just after the tag
-header.  The size reported in the tag header is only for the value, but then,
-just after the value is another size (32-bit unsigned long) and then the plain
-key itself.  Since the value is likely to be fetched more often than the plain
-key, I figured it would be I<slightly> faster to store the value first.
-
-If the type is I<H> (hash) or I<A> (array), the value is another I<Master Index>
-record for the nested structure, where the process begins all over again.
-
-=head2 RE-INDEXING
-
-After a I<Bucket List> grows to 16 records, its allocated space in the file is
-exhausted.  Then, when another key/element comes in, the list is converted to a
-new index record.  However, this index will look at the next char in the MD5
-hash, and arrange new Bucket List pointers accordingly.  This process is called
-I<Re-Indexing>.  Basically, a new index tag is created at the file EOF, and all
-17 (16 + new one) keys/elements are removed from the old Bucket List and
-inserted into the new index.  Several new Bucket Lists are created in the
-process, as a new MD5 char from the key is being examined (it is unlikely that
-the keys will all share the same next char of their MD5s).
-
-Because of the way the I<MD5> algorithm works, it is impossible to tell exactly
-when the Bucket Lists will turn into indexes, but the first round tends to
-happen right around 4,000 keys.  You will see a I<slight> decrease in
-performance here, but it picks back up pretty quick (see L<SPEED> above).  Then
-it takes B<a lot> more keys to exhaust the next level of Bucket Lists.  It's
-right around 900,000 keys.  This process can continue nearly indefinitely --
-right up until the point the I<MD5> signatures start colliding with each other,
-and this is B<EXTREMELY> rare -- like winning the lottery 5 times in a row AND
-getting struck by lightning while you are walking to cash in your tickets.
-Theoretically, since I<MD5> hashes are 128-bit values, you I<could> have up to
-340,282,366,921,000,000,000,000,000,000,000,000,000 keys/elements (I believe
-this is 340 unodecillion, but don't quote me).
-
-=head2 STORING
-
-When a new key/element is stored, the key (or index number) is first run through
-I<Digest::MD5> to get a 128-bit signature (example, in hex:
-b05783b0773d894396d475ced9d2f4f6).  Then, the I<Master Index> record is checked
-for the first char of the signature (in this case I<b0>).  If it does not exist,
-a new I<Bucket List> is created for our key (and the next 15 future keys that
-happen to also have I<b> as their first MD5 char).  The entire MD5 is written
-to the I<Bucket List> along with the offset of the new I<Bucket> record (EOF at
-this point, unless we are replacing an existing I<Bucket>), where the actual
-data will be stored.
-
-=head2 FETCHING
-
-Fetching an existing key/element involves getting a I<Digest::MD5> of the key
-(or index number), then walking along the indexes.  If there are enough
-keys/elements in this DB level, there might be nested indexes, each linked to
-a particular char of the MD5.  Finally, a I<Bucket List> is pointed to, which
-contains up to 16 full MD5 hashes.  Each is checked for equality to the key in
-question.  If we found a match, the I<Bucket> tag is loaded, where the value and
-plain key are stored.
-
-Fetching the plain key occurs when calling the I<first_key()> and I<next_key()>
-methods.  In this process the indexes are walked systematically, and each key
-fetched in increasing MD5 order (which is why it appears random).   Once the
-I<Bucket> is found, the value is skipped and the plain key returned instead.
-B<Note:> Do not count on keys being fetched as if the MD5 hashes were
-alphabetically sorted.  This only happens on an index-level -- as soon as the
-I<Bucket Lists> are hit, the keys will come out in the order they went in --
-so it's pretty much undefined how the keys will come out -- just like Perl's
-built-in hashes.
-
 =head1 CODE COVERAGE
 
 B<Devel::Cover> is used to test the code coverage of the tests. Below is the
@@ -1896,6 +1779,8 @@ B<Devel::Cover> report on this distribution's test suite.
 Check out the DBM::Deep Google Group at L<http://groups.google.com/group/DBM-Deep>
 or send email to L<DBM-Deep@googlegroups.com>. You can also visit #dbm-deep on
 irc.perl.org
+
+The source code repository is at L<http://svn.perl.org/modules/DBM-Deep>
 
 =head1 MAINTAINERS
 

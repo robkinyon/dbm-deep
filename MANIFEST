@@ -9,6 +9,7 @@ lib/DBM/Deep/Engine.pm
 lib/DBM/Deep/File.pm
 lib/DBM/Deep/Array.pm
 lib/DBM/Deep/Hash.pm
+t/common.pm
 t/01_basic.t
 t/02_hash.t
 t/03_bighash.t

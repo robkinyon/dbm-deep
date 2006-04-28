@@ -1,6 +1,9 @@
 Revision history for DBM::Deep.
 
-0.99_01 ??? ?? ??;??:?? 2006 Pacific
+0.99_02 Apr 28 05:00:00 2006 Pacific
+    - Added missing file to the MANIFEST
+
+0.99_01 Apr 27 18:00:00 2006 Pacific
     - Added explicit dependency on Perl 5.6.0
       - Digest::MD5 requires 5.6.0
       - Sub::Uplevel (dep of Test::Exception) requires 5.6.0
@@ -14,6 +17,7 @@ Revision history for DBM::Deep.
     - set_pack() and set_digest() have been removed.
       - Instead, you will now pass the appropriate values into new()
       - A pack_size parameter has been added to make 64-bit files easier
+    - Transactions now work
 
 0.98  Feb 28 11:00:00 2006 Pacific
     - Added in patch by David Cantrell to allow use of DATA filehandle

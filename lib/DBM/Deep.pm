@@ -233,7 +233,17 @@ sub import {
         $struct = $self->_repr( @_ );
     }
 
-    return $self->_import( $struct );
+#XXX These are correct, but impossible until the other bug is fixed
+    eval {
+#        $self->begin_work;
+        $self->_import( $struct );
+#        $self->commit;
+    }; if ( $@ ) {
+        $self->rollback;
+        die $@;
+    }
+
+    return 1;
 }
 
 sub optimize {
@@ -247,6 +257,8 @@ sub optimize {
 #    if ($self->_fileobj->{links} > 1) {
 #        $self->_throw_error("Cannot optimize: reference count is greater than 1");
 #    }
+
+    #XXX Do we have to lock the tempfile?
 
     my $db_temp = DBM::Deep->new(
         file => $self->_fileobj->{file} . '.tmp',

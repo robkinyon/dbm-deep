@@ -710,7 +710,10 @@ sub delete_bucket {
 
     if ( $fileobj->transaction_id == 0 ) {
         my $keytag = $self->load_tag( $keyloc );
+
         my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
+        return if !$subloc || $is_deleted;
+
         my $value = $self->read_from_loc( $subloc, $orig_key );
 
         my $size = $self->_length_needed( $value, $orig_key );
@@ -736,7 +739,9 @@ sub delete_bucket {
     }
     else {
         my $keytag = $self->load_tag( $keyloc );
+
         my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
+
         $fileobj->print_at( $keytag->{offset} + $offset,
             pack($self->{long_pack}, -1 ),
             pack( 'C C', $fileobj->transaction_id, 1 ),

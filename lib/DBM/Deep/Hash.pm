@@ -13,6 +13,7 @@ sub _get_self {
     eval { local $SIG{'__DIE__'}; tied( %{$_[0]} ) } || $_[0]
 }
 
+#XXX Need to add a check here for @_ % 2
 sub _repr { shift;return { @_ } }
 
 sub _import {

@@ -37,6 +37,8 @@ use warnings;
 our $VERSION = q(0.99_03);
 
 use Fcntl qw( :DEFAULT :flock :seek );
+
+use Clone::Any '_clone_data';
 use Digest::MD5 ();
 use FileHandle::Fmode ();
 use Scalar::Util ();
@@ -233,11 +235,12 @@ sub import {
         $struct = $self->_repr( @_ );
     }
 
-#XXX These are correct, but impossible until the other bug is fixed
+    #XXX This isn't the best solution. Better would be to use Data::Walker,
+    #XXX but that's a lot more thinking than I want to do right now.
     eval {
-#        $self->begin_work;
-        $self->_import( $struct );
-#        $self->commit;
+        $self->begin_work;
+        $self->_import( _clone_data( $struct ) );
+        $self->commit;
     }; if ( $@ ) {
         $self->rollback;
         die $@;

@@ -7,6 +7,7 @@ my $build = Module::Build->new(
     license => 'perl',
     requires => {
         'perl'              => '5.6.0',
+        'Clone::Any'        => '0',
         'Digest::MD5'       => '1.00',
         'Fcntl'             => '0.01',
         'FileHandle::Fmode' => '0.05',

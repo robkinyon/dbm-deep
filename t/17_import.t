@@ -55,3 +55,9 @@ ok( !exists $db->{foo}, "\$db doesn't have the 'foo' key, so \$struct is not tie
 $struct->{hash1}->{foo} = 'bar';
 is( $struct->{hash1}->{foo}, 'bar', "\$struct->{hash1} has foo and it's 'bar'" );
 ok( !exists $db->{hash1}->{foo}, "\$db->{hash1} doesn't have the 'foo' key, so \$struct->{hash1} is not tied" );
+
+__END__
+
+Need to add tests for:
+    - Failure case (have something tied or a glob or something like that)
+    - Where we already have $db->{hash1} to make sure that it's not overwritten

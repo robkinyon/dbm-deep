@@ -1640,10 +1640,10 @@ all to support a feature that has never been requested.
 
 =item * CODE
 
-L<http://search.cpan.org/search?module=Data::Dump::Streamer> provides a
-mechanism for serializing coderefs, including saving off all closure state.
-However, just as for SCALAR and REF, that closure state may change without
-notifying the DBM::Deep object storing the reference.
+L<Data::Dump::Streamer/> provides a mechanism for serializing coderefs,
+including saving off all closure state.  However, just as for SCALAR and REF,
+that closure state may change without notifying the DBM::Deep object storing
+the reference.
 
 =back
 
@@ -1691,83 +1691,6 @@ If you pass in a filehandle to new(), you may have opened it in either a readonl
 writeonly mode. STORE will verify that the filehandle is writable. However, there
 doesn't seem to be a good way to determine if a filehandle is readable. And, if the
 filehandle isn't readable, it's not clear what will happen. So, don't do that.
-
-=head1 PERFORMANCE
-
-This section discusses DBM::Deep's speed and memory usage.
-
-=head2 SPEED
-
-Obviously, DBM::Deep isn't going to be as fast as some C-based DBMs, such as
-the almighty I<BerkeleyDB>.  But it makes up for it in features like true
-multi-level hash/array support, and cross-platform FTPable files.  Even so,
-DBM::Deep is still pretty fast, and the speed stays fairly consistent, even
-with huge databases.  Here is some test data:
-
-    Adding 1,000,000 keys to new DB file...
-
-    At 100 keys, avg. speed is 2,703 keys/sec
-    At 200 keys, avg. speed is 2,642 keys/sec
-    At 300 keys, avg. speed is 2,598 keys/sec
-    At 400 keys, avg. speed is 2,578 keys/sec
-    At 500 keys, avg. speed is 2,722 keys/sec
-    At 600 keys, avg. speed is 2,628 keys/sec
-    At 700 keys, avg. speed is 2,700 keys/sec
-    At 800 keys, avg. speed is 2,607 keys/sec
-    At 900 keys, avg. speed is 2,190 keys/sec
-    At 1,000 keys, avg. speed is 2,570 keys/sec
-    At 2,000 keys, avg. speed is 2,417 keys/sec
-    At 3,000 keys, avg. speed is 1,982 keys/sec
-    At 4,000 keys, avg. speed is 1,568 keys/sec
-    At 5,000 keys, avg. speed is 1,533 keys/sec
-    At 6,000 keys, avg. speed is 1,787 keys/sec
-    At 7,000 keys, avg. speed is 1,977 keys/sec
-    At 8,000 keys, avg. speed is 2,028 keys/sec
-    At 9,000 keys, avg. speed is 2,077 keys/sec
-    At 10,000 keys, avg. speed is 2,031 keys/sec
-    At 20,000 keys, avg. speed is 1,970 keys/sec
-    At 30,000 keys, avg. speed is 2,050 keys/sec
-    At 40,000 keys, avg. speed is 2,073 keys/sec
-    At 50,000 keys, avg. speed is 1,973 keys/sec
-    At 60,000 keys, avg. speed is 1,914 keys/sec
-    At 70,000 keys, avg. speed is 2,091 keys/sec
-    At 80,000 keys, avg. speed is 2,103 keys/sec
-    At 90,000 keys, avg. speed is 1,886 keys/sec
-    At 100,000 keys, avg. speed is 1,970 keys/sec
-    At 200,000 keys, avg. speed is 2,053 keys/sec
-    At 300,000 keys, avg. speed is 1,697 keys/sec
-    At 400,000 keys, avg. speed is 1,838 keys/sec
-    At 500,000 keys, avg. speed is 1,941 keys/sec
-    At 600,000 keys, avg. speed is 1,930 keys/sec
-    At 700,000 keys, avg. speed is 1,735 keys/sec
-    At 800,000 keys, avg. speed is 1,795 keys/sec
-    At 900,000 keys, avg. speed is 1,221 keys/sec
-    At 1,000,000 keys, avg. speed is 1,077 keys/sec
-
-This test was performed on a PowerMac G4 1gHz running Mac OS X 10.3.2 & Perl
-5.8.1, with an 80GB Ultra ATA/100 HD spinning at 7200RPM.  The hash keys and
-values were between 6 - 12 chars in length.  The DB file ended up at 210MB.
-Run time was 12 min 3 sec.
-
-=head2 MEMORY USAGE
-
-One of the great things about DBM::Deep is that it uses very little memory.
-Even with huge databases (1,000,000+ keys) you will not see much increased
-memory on your process.  DBM::Deep relies solely on the filesystem for storing
-and fetching data.  Here is output from I</usr/bin/top> before even opening a
-database handle:
-
-      PID USER     PRI  NI  SIZE  RSS SHARE STAT %CPU %MEM   TIME COMMAND
-    22831 root      11   0  2716 2716  1296 R     0.0  0.2   0:07 perl
-
-Basically the process is taking 2,716K of memory.  And here is the same
-process after storing and fetching 1,000,000 keys:
-
-      PID USER     PRI  NI  SIZE  RSS SHARE STAT %CPU %MEM   TIME COMMAND
-    22831 root      14   0  2772 2772  1328 R     0.0  0.2  13:32 perl
-
-Notice the memory usage increased by only 56K.  Test was performed on a 700mHz
-x86 box running Linux RedHat 7.2 & Perl 5.6.1.
 
 =head1 CODE COVERAGE
 

@@ -47,3 +47,4 @@ t/32_dash_ell.t
 t/33_transactions.t
 t/34_transaction_arrays.t
 t/35_transaction_multiple.t
+t/36_transaction_deep.t

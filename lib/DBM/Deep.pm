@@ -405,7 +405,7 @@ sub _find_parent {
         while ( $parent->{parent} ) {
             $base = (
                 $parent->_type eq TYPE_HASH
-                    ? "\{$child->{parent_key}\}"
+                    ? "\{q{$child->{parent_key}}\}"
                     : "\[$child->{parent_key}\]"
             ) . $base;
 
@@ -413,10 +413,10 @@ sub _find_parent {
             $parent = $parent->{parent};
         }
         if ( $base ) {
-            $base = "\$db->get( '$child->{parent_key}' )->" . $base;
+            $base = "\$db->get( q{$child->{parent_key}} )->" . $base;
         }
         else {
-            $base = "\$db->get( '$child->{parent_key}' )";
+            $base = "\$db->get( q{$child->{parent_key}} )";
         }
     }
     return $base;
@@ -459,7 +459,7 @@ sub STORE {
         my $lhs = $self->_find_parent;
         if ( $lhs ) {
             if ( $self->_type eq TYPE_HASH ) {
-                $lhs .= "->\{$orig_key\}";
+                $lhs .= "->\{q{$orig_key}\}";
             }
             else {
                 $lhs .= "->\[$orig_key\]";
@@ -468,7 +468,7 @@ sub STORE {
             $lhs .= "=$rhs;";
         }
         else {
-            $lhs = "\$db->put('$orig_key',$rhs);";
+            $lhs = "\$db->put(q{$orig_key},$rhs);";
         }
 
         $self->_fileobj->audit($lhs);

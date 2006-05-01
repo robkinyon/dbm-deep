@@ -210,7 +210,7 @@ sub export {
         my $c = Scalar::Util::blessed(
             $self->{parent}->get($self->{parent_key})
         );
-        if ( $c ) {
+        if ( $c && !$c->isa( 'DBM::Deep' ) ) {
             bless $temp, $c;
         }
     }

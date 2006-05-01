@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 2;
+use Test::More tests => 6;
 use Test::Deep;
 use t::common qw( new_fh );
 
@@ -15,27 +15,30 @@ my %struct = (
     hash1 => {
         subkey1 => "subvalue1",
         subkey2 => "subvalue2",
-        subkey3 => bless( {}, 'Foo' ),
+        subkey3 => bless( {
+            sub_obj => bless([
+                bless([], 'Foo'),
+            ], 'Foo'),
+            sub_obj2 => bless([], 'Foo'),
+        }, 'Foo' ),
     },
 );
 
-my $compare = do {
-    my ($fh, $filename) = new_fh();
-    my $db = DBM::Deep->new({
-        file      => $filename,
-        autobless => 1,
-    });
+my ($fh, $filename) = new_fh();
+my $db = DBM::Deep->new({
+    file      => $filename,
+    autobless => 1,
+});
 
-    ##
-    # Create structure in DB
-    ##
-    $db->import( %struct );
+##
+# Create structure in DB
+##
+$db->import( %struct );
 
-    ##
-    # Export entire thing
-    ##
-    $db->export();
-};
+##
+# Export entire thing
+##
+my $compare = $db->export();
 
 cmp_deeply(
     $compare,
@@ -46,8 +49,18 @@ cmp_deeply(
         hash1 => {
             subkey1 => "subvalue1",
             subkey2 => "subvalue2",
-            subkey3 => bless( {}, 'Foo' ),
+            subkey3 => bless( {
+                sub_obj => bless([
+                    bless([], 'Foo'),
+                ], 'Foo'),
+                sub_obj2 => bless([], 'Foo'),
+            }, 'Foo' ),
         },
     },
     "Everything matches",
 );
+
+isa_ok( tied(%{$db->{hash1}{subkey3}})->export, 'Foo' );
+isa_ok( tied(@{$db->{hash1}{subkey3}{sub_obj}})->export, 'Foo' );
+isa_ok( tied(@{$db->{hash1}{subkey3}{sub_obj}[0]})->export, 'Foo' );
+isa_ok( tied(@{$db->{hash1}{subkey3}{sub_obj2}})->export, 'Foo' );

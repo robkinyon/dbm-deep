@@ -205,6 +205,16 @@ sub export {
     $self->_copy_node( $temp );
     $self->unlock();
 
+    # This will always work because $self, after _get_self() is a HASH
+    if ( $self->{parent} ) {
+        my $c = Scalar::Util::blessed(
+            $self->{parent}->get($self->{parent_key})
+        );
+        if ( $c ) {
+            bless $temp, $c;
+        }
+    }
+
     return $temp;
 }
 
@@ -1190,11 +1200,12 @@ then incremented, then stored again.
     $db->unlock();
 
 You can pass C<lock()> an optional argument, which specifies which mode to use
-(exclusive or shared).  Use one of these two constants: C<DBM::Deep-E<gt>LOCK_EX>
-or C<DBM::Deep-E<gt>LOCK_SH>.  These are passed directly to C<flock()>, and are the
-same as the constants defined in Perl's C<Fcntl> module.
+(exclusive or shared).  Use one of these two constants:
+C<DBM::Deep-E<gt>LOCK_EX> or C<DBM::Deep-E<gt>LOCK_SH>.  These are passed
+directly to C<flock()>, and are the same as the constants defined in Perl's
+L<Fcntl/> module.
 
-    $db->lock( DBM::Deep->LOCK_SH );
+    $db->lock( $db->LOCK_SH );
     # something here
     $db->unlock();
 

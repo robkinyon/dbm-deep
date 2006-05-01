@@ -63,7 +63,8 @@ is( $db->{a}{c}, 'value2', "key2's value is still there after optimize" );
 ##
 
 SKIP: {
-    skip "Fork tests skipped on Win32", 4 if $^O eq 'MSWin32';
+    skip "Fork tests skipped on Win32", 4
+        if $^O eq 'MSWin32' || $^O eq 'cygwin';
 
     ##
     # first things first, get us about 1000 keys so the optimize() will take 

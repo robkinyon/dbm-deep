@@ -2,6 +2,7 @@ Revision history for DBM::Deep.
 
 0.99_03 ??? ?? ??:??:?? 2006 Pacific
     - Converted to use FileHandle::Fmode to handle filehandle status checks
+    - Fixed bug with deleting already-deleted items on Win32 (reported by Nigel Sandever)
 
 0.99_02 Apr 28 05:00:00 2006 Pacific
     - Added missing file to the MANIFEST

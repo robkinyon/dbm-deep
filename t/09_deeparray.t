@@ -5,6 +5,8 @@ use strict;
 use Test::More tests => 3;
 use t::common qw( new_fh );
 
+diag "This test can take up to a minute to run. Please be patient.";
+
 use_ok( 'DBM::Deep' );
 
 my ($fh, $filename) = new_fh();

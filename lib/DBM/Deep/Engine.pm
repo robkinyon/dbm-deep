@@ -354,7 +354,7 @@ sub add_bucket {
         my $keytag = $self->load_tag( $keyloc );
         my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
 
-        if ( @transactions ) {
+        if ( $subloc && !$is_deleted && @transactions ) {
             my $old_value = $self->read_from_loc( $subloc, $orig_key );
             my $old_size = $self->_length_needed( $old_value, $plain_key );
 
@@ -406,7 +406,7 @@ sub add_bucket {
         my $offset = 1;
         for my $trans_id ( @transactions ) {
             $fileobj->print_at( $keytag->{offset} + $self->{key_size} * $offset++,
-                pack( $self->{long_pack}, -1 ),
+                pack( $self->{long_pack}, 0 ),
                 pack( 'C C', $trans_id, 1 ),
             );
         }
@@ -677,7 +677,7 @@ sub get_bucket_value {
     else {
         my $keytag = $self->load_tag( $keyloc );
         my ($subloc, $is_deleted) = $self->find_keyloc( $keytag );
-        if (!$subloc) {
+        if (!$subloc && !$is_deleted) {
             ($subloc, $is_deleted) = $self->find_keyloc( $keytag, 0 );
         }
         if ( $subloc && !$is_deleted ) {
@@ -743,7 +743,7 @@ sub delete_bucket {
         my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
 
         $fileobj->print_at( $keytag->{offset} + $offset,
-            pack($self->{long_pack}, -1 ),
+            pack($self->{long_pack}, 0 ),
             pack( 'C C', $fileobj->transaction_id, 1 ),
         );
     }
@@ -762,7 +762,7 @@ sub bucket_exists {
     my ($keyloc) = $self->_find_in_buckets( $tag, $md5 );
     my $keytag = $self->load_tag( $keyloc );
     my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
-    if ( !$subloc ) {
+    if ( !$subloc && !$is_deleted ) {
         ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag, 0 );
     }
     return ($subloc && !$is_deleted) && 1;
@@ -898,7 +898,7 @@ sub traverse_index {
 
                 my $keytag = $self->load_tag( $keyloc );
                 my ($subloc, $is_deleted) = $self->find_keyloc( $keytag );
-                if ( $subloc == 0 ) {
+                if ( $subloc == 0 && !$is_deleted ) {
                     ($subloc, $is_deleted) = $self->find_keyloc( $keytag, 0 );
                 }
                 next if $is_deleted;

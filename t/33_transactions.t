@@ -33,7 +33,7 @@ $db1->begin_work;
 
     $db2->{other_x} = 'foo';
     is( $db2->{other_x}, 'foo', "DB2 set other_x within DB1's transaction, so DB2 can see it" );
-    is( $db1->{other_x}, undef, "Since other_x was added after the transaction began, DB1 doesn't see it." );
+    ok( !exists $db1->{other_x}, "Since other_x was added after the transaction began, DB1 doesn't see it." );
 
     cmp_bag( [ keys %$db1 ], [qw( x )], "DB1 keys correct" );
     cmp_bag( [ keys %$db2 ], [qw( x other_x )], "DB2 keys correct" );
@@ -133,19 +133,24 @@ is( $db2->{foo}, 'bar', "Rollback means 'foo' is still there" );
 cmp_bag( [ keys %$db1 ], [qw( foo )], "DB1 keys correct" );
 cmp_bag( [ keys %$db2 ], [qw( foo )], "DB2 keys correct" );
 
-$db1->optimize;
+SKIP: {
+    skip "Optimize tests skipped on Win32", 5
+        if $^O eq 'MSWin32' || $^O eq 'cygwin';
 
-is( $db1->{foo}, 'bar', 'After optimize, everything is ok' );
-is( $db2->{foo}, 'bar', 'After optimize, everything is ok' );
+    $db1->optimize;
 
-cmp_bag( [ keys %$db1 ], [qw( foo )], "DB1 keys correct" );
-cmp_bag( [ keys %$db2 ], [qw( foo )], "DB2 keys correct" );
+    is( $db1->{foo}, 'bar', 'After optimize, everything is ok' );
+    is( $db2->{foo}, 'bar', 'After optimize, everything is ok' );
 
-$db1->begin_work;
+    cmp_bag( [ keys %$db1 ], [qw( foo )], "DB1 keys correct" );
+    cmp_bag( [ keys %$db2 ], [qw( foo )], "DB2 keys correct" );
 
-    cmp_ok( $db1->_fileobj->transaction_id, '==', 1, "Transaction ID has been reset after optimize" );
+    $db1->begin_work;
 
-$db1->rollback;
+        cmp_ok( $db1->_fileobj->transaction_id, '==', 1, "Transaction ID has been reset after optimize" );
+
+    $db1->rollback;
+}
 
 __END__
 

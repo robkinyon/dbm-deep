@@ -246,6 +246,8 @@ sub import {
     return 1;
 }
 
+#XXX Need to keep track of who has a fh to this file in order to
+#XXX close them all prior to optimize on Win32/cygwin
 sub optimize {
     ##
     # Rebuild entire database into new file, then move

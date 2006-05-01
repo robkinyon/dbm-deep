@@ -38,6 +38,7 @@ our $VERSION = q(0.99_03);
 
 use Fcntl qw( :DEFAULT :flock :seek );
 use Digest::MD5 ();
+use FileHandle::Fmode ();
 use Scalar::Util ();
 
 use DBM::Deep::Engine;
@@ -385,16 +386,6 @@ sub _throw_error {
     die "DBM::Deep: $_[1]\n";
 }
 
-sub _is_writable {
-    my $fh = shift;
-    (O_WRONLY | O_RDWR) & fcntl( $fh, F_GETFL, my $slush = 0);
-}
-
-#sub _is_readable {
-#    my $fh = shift;
-#    (O_RDONLY | O_RDWR) & fcntl( $fh, F_GETFL, my $slush = 0);
-#}
-
 sub _find_parent {
     my $self = shift;
 
@@ -430,7 +421,7 @@ sub STORE {
     my ($key, $value, $orig_key) = @_;
 
 
-    if ( $^O ne 'MSWin32' && !_is_writable( $self->_fh ) ) {
+    if ( !FileHandle::Fmode::is_W( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
@@ -541,7 +532,7 @@ sub DELETE {
     my $self = shift->_get_self;
     my ($key, $orig_key) = @_;
 
-    if ( $^O ne 'MSWin32' && !_is_writable( $self->_fh ) ) {
+    if ( !FileHandle::Fmode::is_W( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
@@ -629,7 +620,7 @@ sub CLEAR {
     ##
     my $self = shift->_get_self;
 
-    if ( $^O ne 'MSWin32' && !_is_writable( $self->_fh ) ) {
+    if ( !FileHandle::Fmode::is_W( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
@@ -750,7 +741,7 @@ Perl's tie() function.  Both are examined here.
 The recommended way to construct a DBM::Deep object is to use the new()
 method, which gets you a blessed I<and> tied hash (or array) reference.
 
-    my $db = DBM::Deep->new( "foo.db" );
+  my $db = DBM::Deep->new( "foo.db" );
 
 This opens a new database handle, mapped to the file "foo.db".  If this
 file does not exist, it will automatically be created.  DB files are
@@ -760,11 +751,11 @@ hash, unless otherwise specified (see L<OPTIONS> below).
 You can pass a number of options to the constructor to specify things like
 locking, autoflush, etc.  This is done by passing an inline hash (or hashref):
 
-    my $db = DBM::Deep->new(
-        file      => "foo.db",
-        locking   => 1,
-        autoflush => 1
-    );
+  my $db = DBM::Deep->new(
+      file      => "foo.db",
+      locking   => 1,
+      autoflush => 1
+  );
 
 Notice that the filename is now specified I<inside> the hash with
 the "file" parameter, as opposed to being the sole argument to the
@@ -774,10 +765,10 @@ See L<OPTIONS> below for the complete list.
 You can also start with an array instead of a hash.  For this, you must
 specify the C<type> parameter:
 
-    my $db = DBM::Deep->new(
-        file => "foo.db",
-        type => DBM::Deep->TYPE_ARRAY
-    );
+  my $db = DBM::Deep->new(
+      file => "foo.db",
+      type => DBM::Deep->TYPE_ARRAY
+  );
 
 B<Note:> Specifing the C<type> parameter only takes effect when beginning
 a new DB file.  If you create a DBM::Deep object with an existing file, the
@@ -791,21 +782,21 @@ tie() function.  The object returned from tie() can be used to call methods,
 such as lock() and unlock(). (That object can be retrieved from the tied
 variable at any time using tied() - please see L<perltie/> for more info.
 
-    my %hash;
-    my $db = tie %hash, "DBM::Deep", "foo.db";
+  my %hash;
+  my $db = tie %hash, "DBM::Deep", "foo.db";
 
-    my @array;
-    my $db = tie @array, "DBM::Deep", "bar.db";
+  my @array;
+  my $db = tie @array, "DBM::Deep", "bar.db";
 
 As with the OO constructor, you can replace the DB filename parameter with
 a hash containing one or more options (see L<OPTIONS> just below for the
 complete list).
 
-    tie %hash, "DBM::Deep", {
-        file => "foo.db",
-        locking => 1,
-        autoflush => 1
-    };
+  tie %hash, "DBM::Deep", {
+      file => "foo.db",
+      locking => 1,
+      autoflush => 1
+  };
 
 =head2 OPTIONS
 
@@ -907,19 +898,19 @@ to access your databases.
 You can treat any DBM::Deep object like a normal Perl hash reference.  Add keys,
 or even nested hashes (or arrays) using standard Perl syntax:
 
-    my $db = DBM::Deep->new( "foo.db" );
+  my $db = DBM::Deep->new( "foo.db" );
 
-    $db->{mykey} = "myvalue";
-    $db->{myhash} = {};
-    $db->{myhash}->{subkey} = "subvalue";
+  $db->{mykey} = "myvalue";
+  $db->{myhash} = {};
+  $db->{myhash}->{subkey} = "subvalue";
 
-    print $db->{myhash}->{subkey} . "\n";
+  print $db->{myhash}->{subkey} . "\n";
 
 You can even step through hash keys using the normal Perl C<keys()> function:
 
-    foreach my $key (keys %$db) {
-        print "$key: " . $db->{$key} . "\n";
-    }
+  foreach my $key (keys %$db) {
+      print "$key: " . $db->{$key} . "\n";
+  }
 
 Remember that Perl's C<keys()> function extracts I<every> key from the hash and
 pushes them onto an array, all before the loop even begins.  If you have an
@@ -927,15 +918,15 @@ extremely large hash, this may exhaust Perl's memory.  Instead, consider using
 Perl's C<each()> function, which pulls keys/values one at a time, using very
 little memory:
 
-    while (my ($key, $value) = each %$db) {
-        print "$key: $value\n";
-    }
+  while (my ($key, $value) = each %$db) {
+      print "$key: $value\n";
+  }
 
 Please note that when using C<each()>, you should always pass a direct
 hash reference, not a lookup.  Meaning, you should B<never> do this:
 
-    # NEVER DO THIS
-    while (my ($key, $value) = each %{$db->{foo}}) { # BAD
+  # NEVER DO THIS
+  while (my ($key, $value) = each %{$db->{foo}}) { # BAD
 
 This causes an infinite loop, because for each iteration, Perl is calling
 FETCH() on the $db handle, resulting in a "new" hash for foo every time, so
@@ -950,20 +941,20 @@ and the C<push()>, C<pop()>, C<shift()>, C<unshift()> and C<splice()> functions.
 The object must have first been created using type C<DBM::Deep-E<gt>TYPE_ARRAY>,
 or simply be a nested array reference inside a hash.  Example:
 
-    my $db = DBM::Deep->new(
-        file => "foo-array.db",
-        type => DBM::Deep->TYPE_ARRAY
-    );
+  my $db = DBM::Deep->new(
+      file => "foo-array.db",
+      type => DBM::Deep->TYPE_ARRAY
+  );
 
-    $db->[0] = "foo";
-    push @$db, "bar", "baz";
-    unshift @$db, "bah";
+  $db->[0] = "foo";
+  push @$db, "bar", "baz";
+  unshift @$db, "bah";
 
-    my $last_elem = pop @$db; # baz
-    my $first_elem = shift @$db; # bah
-    my $second_elem = $db->[1]; # bar
+  my $last_elem = pop @$db; # baz
+  my $first_elem = shift @$db; # bah
+  my $second_elem = $db->[1]; # bar
 
-    my $num_elements = scalar @$db;
+  my $num_elements = scalar @$db;
 
 =head1 OO INTERFACE
 
@@ -985,8 +976,8 @@ Stores a new hash key/value pair, or sets an array element value.  Takes two
 arguments, the hash key or array index, and the new value.  The value can be
 a scalar, hash ref or array ref.  Returns true on success, false on failure.
 
-    $db->put("foo", "bar"); # for hashes
-    $db->put(1, "bar"); # for arrays
+  $db->put("foo", "bar"); # for hashes
+  $db->put(1, "bar"); # for arrays
 
 =item * get() / fetch()
 
@@ -994,16 +985,16 @@ Fetches the value of a hash key or array element.  Takes one argument: the hash
 key or array index.  Returns a scalar, hash ref or array ref, depending on the
 data type stored.
 
-    my $value = $db->get("foo"); # for hashes
-    my $value = $db->get(1); # for arrays
+  my $value = $db->get("foo"); # for hashes
+  my $value = $db->get(1); # for arrays
 
 =item * exists()
 
 Checks if a hash key or array index exists.  Takes one argument: the hash key
 or array index.  Returns true if it exists, false if not.
 
-    if ($db->exists("foo")) { print "yay!\n"; } # for hashes
-    if ($db->exists(1)) { print "yay!\n"; } # for arrays
+  if ($db->exists("foo")) { print "yay!\n"; } # for hashes
+  if ($db->exists(1)) { print "yay!\n"; } # for arrays
 
 =item * delete()
 
@@ -1015,8 +1006,8 @@ internal arrays work.  Please note that the space occupied by the deleted
 key/value or element is B<not> reused again -- see L<UNUSED SPACE RECOVERY>
 below for details and workarounds.
 
-    $db->delete("foo"); # for hashes
-    $db->delete(1); # for arrays
+  $db->delete("foo"); # for hashes
+  $db->delete(1); # for arrays
 
 =item * clear()
 
@@ -1025,7 +1016,7 @@ value.  Please note that the space occupied by the deleted keys/values or
 elements is B<not> reused again -- see L<UNUSED SPACE RECOVERY> below for
 details and workarounds.
 
-    $db->clear(); # hashes or arrays
+  $db->clear(); # hashes or arrays
 
 =item * lock() / unlock()
 
@@ -1055,35 +1046,35 @@ Returns the "first" key in the hash.  As with built-in Perl hashes, keys are
 fetched in an undefined order (which appears random).  Takes no arguments,
 returns the key as a scalar value.
 
-    my $key = $db->first_key();
+  my $key = $db->first_key();
 
 =item * next_key()
 
 Returns the "next" key in the hash, given the previous one as the sole argument.
 Returns undef if there are no more keys to be fetched.
 
-    $key = $db->next_key($key);
+  $key = $db->next_key($key);
 
 =back
 
 Here are some examples of using hashes:
 
-    my $db = DBM::Deep->new( "foo.db" );
+  my $db = DBM::Deep->new( "foo.db" );
 
-    $db->put("foo", "bar");
-    print "foo: " . $db->get("foo") . "\n";
+  $db->put("foo", "bar");
+  print "foo: " . $db->get("foo") . "\n";
 
-    $db->put("baz", {}); # new child hash ref
-    $db->get("baz")->put("buz", "biz");
-    print "buz: " . $db->get("baz")->get("buz") . "\n";
+  $db->put("baz", {}); # new child hash ref
+  $db->get("baz")->put("buz", "biz");
+  print "buz: " . $db->get("baz")->get("buz") . "\n";
 
-    my $key = $db->first_key();
-    while ($key) {
-        print "$key: " . $db->get($key) . "\n";
-        $key = $db->next_key($key);
-    }
+  my $key = $db->first_key();
+  while ($key) {
+      print "$key: " . $db->get($key) . "\n";
+      $key = $db->next_key($key);
+  }
 
-    if ($db->exists("foo")) { $db->delete("foo"); }
+  if ($db->exists("foo")) { $db->delete("foo"); }
 
 =head2 ARRAYS
 
@@ -1097,21 +1088,21 @@ C<unshift()> and C<splice()>.
 
 Returns the number of elements in the array.  Takes no arguments.
 
-    my $len = $db->length();
+  my $len = $db->length();
 
 =item * push()
 
 Adds one or more elements onto the end of the array.  Accepts scalars, hash
 refs or array refs.  No return value.
 
-    $db->push("foo", "bar", {});
+  $db->push("foo", "bar", {});
 
 =item * pop()
 
 Fetches the last element in the array, and deletes it.  Takes no arguments.
 Returns undef if array is empty.  Returns the element value.
 
-    my $elem = $db->pop();
+  my $elem = $db->pop();
 
 =item * shift()
 
@@ -1120,7 +1111,7 @@ remaining elements over to take up the space.  Returns the element value.  This
 method is not recommended with large arrays -- see L<LARGE ARRAYS> below for
 details.
 
-    my $elem = $db->shift();
+  my $elem = $db->shift();
 
 =item * unshift()
 
@@ -1129,7 +1120,7 @@ existing elements over to make room.  Accepts scalars, hash refs or array refs.
 No return value.  This method is not recommended with large arrays -- see
 <LARGE ARRAYS> below for details.
 
-    $db->unshift("foo", "bar", {});
+  $db->unshift("foo", "bar", {});
 
 =item * splice()
 
@@ -1141,37 +1132,37 @@ not recommended with large arrays -- see L<LARGE ARRAYS> below for details.
 
 Here are some examples of using arrays:
 
-    my $db = DBM::Deep->new(
-        file => "foo.db",
-        type => DBM::Deep->TYPE_ARRAY
-    );
+  my $db = DBM::Deep->new(
+      file => "foo.db",
+      type => DBM::Deep->TYPE_ARRAY
+  );
 
-    $db->push("bar", "baz");
-    $db->unshift("foo");
-    $db->put(3, "buz");
+  $db->push("bar", "baz");
+  $db->unshift("foo");
+  $db->put(3, "buz");
 
-    my $len = $db->length();
-    print "length: $len\n"; # 4
+  my $len = $db->length();
+  print "length: $len\n"; # 4
 
-    for (my $k=0; $k<$len; $k++) {
-        print "$k: " . $db->get($k) . "\n";
-    }
+  for (my $k=0; $k<$len; $k++) {
+      print "$k: " . $db->get($k) . "\n";
+  }
 
-    $db->splice(1, 2, "biz", "baf");
+  $db->splice(1, 2, "biz", "baf");
 
-    while (my $elem = shift @$db) {
-        print "shifted: $elem\n";
-    }
+  while (my $elem = shift @$db) {
+      print "shifted: $elem\n";
+  }
 
 =head1 LOCKING
 
 Enable automatic file locking by passing a true value to the C<locking>
 parameter when constructing your DBM::Deep object (see L<SETUP> above).
 
-    my $db = DBM::Deep->new(
-        file => "foo.db",
-        locking => 1
-    );
+  my $db = DBM::Deep->new(
+      file => "foo.db",
+      locking => 1
+  );
 
 This causes DBM::Deep to C<flock()> the underlying filehandle with exclusive
 mode for writes, and shared mode for reads.  This is required if you have
@@ -1187,17 +1178,17 @@ optional lock mode argument (defaults to exclusive mode).  This is particularly
 useful for things like counters, where the current value needs to be fetched,
 then incremented, then stored again.
 
-    $db->lock();
-    my $counter = $db->get("counter");
-    $counter++;
-    $db->put("counter", $counter);
-    $db->unlock();
+  $db->lock();
+  my $counter = $db->get("counter");
+  $counter++;
+  $db->put("counter", $counter);
+  $db->unlock();
 
-    # or...
+  # or...
 
-    $db->lock();
-    $db->{counter}++;
-    $db->unlock();
+  $db->lock();
+  $db->{counter}++;
+  $db->unlock();
 
 You can pass C<lock()> an optional argument, which specifies which mode to use
 (exclusive or shared).  Use one of these two constants:
@@ -1205,9 +1196,9 @@ C<DBM::Deep-E<gt>LOCK_EX> or C<DBM::Deep-E<gt>LOCK_SH>.  These are passed
 directly to C<flock()>, and are the same as the constants defined in Perl's
 L<Fcntl/> module.
 
-    $db->lock( $db->LOCK_SH );
-    # something here
-    $db->unlock();
+  $db->lock( $db->LOCK_SH );
+  # something here
+  $db->unlock();
 
 =head1 IMPORTING/EXPORTING
 
@@ -1222,20 +1213,20 @@ walking the structure and adding keys/elements to the database as you go,
 simply pass a reference to the C<import()> method.  This recursively adds
 everything to an existing DBM::Deep object for you.  Here is an example:
 
-    my $struct = {
-        key1 => "value1",
-        key2 => "value2",
-        array1 => [ "elem0", "elem1", "elem2" ],
-        hash1 => {
-            subkey1 => "subvalue1",
-            subkey2 => "subvalue2"
-        }
-    };
+  my $struct = {
+      key1 => "value1",
+      key2 => "value2",
+      array1 => [ "elem0", "elem1", "elem2" ],
+      hash1 => {
+          subkey1 => "subvalue1",
+          subkey2 => "subvalue2"
+      }
+  };
 
-    my $db = DBM::Deep->new( "foo.db" );
-    $db->import( $struct );
+  my $db = DBM::Deep->new( "foo.db" );
+  $db->import( $struct );
 
-    print $db->{key1} . "\n"; # prints "value1"
+  print $db->{key1} . "\n"; # prints "value1"
 
 This recursively imports the entire C<$struct> object into C<$db>, including
 all nested hashes and arrays.  If the DBM::Deep object contains exsiting data,
@@ -1254,17 +1245,17 @@ a reference to a new in-memory copy of the database.  The export is done
 recursively, so all nested hashes/arrays are all exported to standard Perl
 objects.  Here is an example:
 
-    my $db = DBM::Deep->new( "foo.db" );
+  my $db = DBM::Deep->new( "foo.db" );
 
-    $db->{key1} = "value1";
-    $db->{key2} = "value2";
-    $db->{hash1} = {};
-    $db->{hash1}->{subkey1} = "subvalue1";
-    $db->{hash1}->{subkey2} = "subvalue2";
+  $db->{key1} = "value1";
+  $db->{key2} = "value2";
+  $db->{hash1} = {};
+  $db->{hash1}->{subkey1} = "subvalue1";
+  $db->{hash1}->{subkey2} = "subvalue2";
 
-    my $struct = $db->export();
+  my $struct = $db->export();
 
-    print $struct->{key1} . "\n"; # prints "value1"
+  print $struct->{key1} . "\n"; # prints "value1"
 
 This makes a complete copy of the database in memory, and returns a reference
 to it.  The C<export()> method can be called on any database level (not just
@@ -1313,16 +1304,16 @@ It is passed the transformed value, and expected to return the plain value.
 
 Here are the two ways to setup a filter hook:
 
-    my $db = DBM::Deep->new(
-        file => "foo.db",
-        filter_store_value => \&my_filter_store,
-        filter_fetch_value => \&my_filter_fetch
-    );
+  my $db = DBM::Deep->new(
+      file => "foo.db",
+      filter_store_value => \&my_filter_store,
+      filter_fetch_value => \&my_filter_fetch
+  );
 
-    # or...
+  # or...
 
-    $db->set_filter( "filter_store_value", \&my_filter_store );
-    $db->set_filter( "filter_fetch_value", \&my_filter_fetch );
+  $db->set_filter( "filter_store_value", \&my_filter_store );
+  $db->set_filter( "filter_fetch_value", \&my_filter_fetch );
 
 Your filter function will be called only when dealing with SCALAR keys or
 values.  When nested hashes and arrays are being stored/fetched, filtering
@@ -1330,7 +1321,7 @@ is bypassed.  Filters are called as static functions, passed a single SCALAR
 argument, and expected to return a single SCALAR value.  If you want to
 remove a filter, set the function reference to C<undef>:
 
-    $db->set_filter( "filter_store_value", undef );
+  $db->set_filter( "filter_store_value", undef );
 
 =head2 REAL-TIME ENCRYPTION EXAMPLE
 
@@ -1339,41 +1330,41 @@ do real-time encryption / decryption of keys & values with DBM::Deep Filters.
 Please visit L<http://search.cpan.org/search?module=Crypt::Blowfish> for more
 on I<Crypt::Blowfish>.  You'll also need the I<Crypt::CBC> module.
 
-    use DBM::Deep;
-    use Crypt::Blowfish;
-    use Crypt::CBC;
+  use DBM::Deep;
+  use Crypt::Blowfish;
+  use Crypt::CBC;
 
-    my $cipher = Crypt::CBC->new({
-        'key'             => 'my secret key',
-        'cipher'          => 'Blowfish',
-        'iv'              => '$KJh#(}q',
-        'regenerate_key'  => 0,
-        'padding'         => 'space',
-        'prepend_iv'      => 0
-    });
+  my $cipher = Crypt::CBC->new({
+      'key'             => 'my secret key',
+      'cipher'          => 'Blowfish',
+      'iv'              => '$KJh#(}q',
+      'regenerate_key'  => 0,
+      'padding'         => 'space',
+      'prepend_iv'      => 0
+  });
 
-    my $db = DBM::Deep->new(
-        file => "foo-encrypt.db",
-        filter_store_key => \&my_encrypt,
-        filter_store_value => \&my_encrypt,
-        filter_fetch_key => \&my_decrypt,
-        filter_fetch_value => \&my_decrypt,
-    );
+  my $db = DBM::Deep->new(
+      file => "foo-encrypt.db",
+      filter_store_key => \&my_encrypt,
+      filter_store_value => \&my_encrypt,
+      filter_fetch_key => \&my_decrypt,
+      filter_fetch_value => \&my_decrypt,
+  );
 
-    $db->{key1} = "value1";
-    $db->{key2} = "value2";
-    print "key1: " . $db->{key1} . "\n";
-    print "key2: " . $db->{key2} . "\n";
+  $db->{key1} = "value1";
+  $db->{key2} = "value2";
+  print "key1: " . $db->{key1} . "\n";
+  print "key2: " . $db->{key2} . "\n";
 
-    undef $db;
-    exit;
+  undef $db;
+  exit;
 
-    sub my_encrypt {
-        return $cipher->encrypt( $_[0] );
-    }
-    sub my_decrypt {
-        return $cipher->decrypt( $_[0] );
-    }
+  sub my_encrypt {
+      return $cipher->encrypt( $_[0] );
+  }
+  sub my_decrypt {
+      return $cipher->decrypt( $_[0] );
+  }
 
 =head2 REAL-TIME COMPRESSION EXAMPLE
 
@@ -1382,31 +1373,31 @@ compression / decompression of keys & values with DBM::Deep Filters.
 Please visit L<http://search.cpan.org/search?module=Compress::Zlib> for
 more on I<Compress::Zlib>.
 
-    use DBM::Deep;
-    use Compress::Zlib;
+  use DBM::Deep;
+  use Compress::Zlib;
 
-    my $db = DBM::Deep->new(
-        file => "foo-compress.db",
-        filter_store_key => \&my_compress,
-        filter_store_value => \&my_compress,
-        filter_fetch_key => \&my_decompress,
-        filter_fetch_value => \&my_decompress,
-    );
+  my $db = DBM::Deep->new(
+      file => "foo-compress.db",
+      filter_store_key => \&my_compress,
+      filter_store_value => \&my_compress,
+      filter_fetch_key => \&my_decompress,
+      filter_fetch_value => \&my_decompress,
+  );
 
-    $db->{key1} = "value1";
-    $db->{key2} = "value2";
-    print "key1: " . $db->{key1} . "\n";
-    print "key2: " . $db->{key2} . "\n";
+  $db->{key1} = "value1";
+  $db->{key2} = "value2";
+  print "key1: " . $db->{key1} . "\n";
+  print "key2: " . $db->{key2} . "\n";
 
-    undef $db;
-    exit;
+  undef $db;
+  exit;
 
-    sub my_compress {
-        return Compress::Zlib::memGzip( $_[0] ) ;
-    }
-    sub my_decompress {
-        return Compress::Zlib::memGunzip( $_[0] ) ;
-    }
+  sub my_compress {
+      return Compress::Zlib::memGzip( $_[0] ) ;
+  }
+  sub my_decompress {
+      return Compress::Zlib::memGunzip( $_[0] ) ;
+  }
 
 B<Note:> Filtering of keys only applies to hashes.  Array "keys" are
 actually numerical index numbers, and are not filtered.
@@ -1416,10 +1407,10 @@ actually numerical index numbers, and are not filtered.
 Most DBM::Deep methods return a true value for success, and call die() on
 failure.  You can wrap calls in an eval block to catch the die.
 
-    my $db = DBM::Deep->new( "foo.db" ); # create hash
-    eval { $db->push("foo"); }; # ILLEGAL -- push is array-only call
+  my $db = DBM::Deep->new( "foo.db" ); # create hash
+  eval { $db->push("foo"); }; # ILLEGAL -- push is array-only call
 
-    print $@;           # prints error message
+  print $@;           # prints error message
 
 =head1 LARGEFILE SUPPORT
 
@@ -1428,10 +1419,10 @@ and 64-bit support, you I<may> be able to create databases larger than 2 GB.
 DBM::Deep by default uses 32-bit file offset tags, but these can be changed
 by specifying the 'pack_size' parameter when constructing the file.
 
-    DBM::Deep->new(
-        filename => $filename,
-        pack_size => 'large',
-    );
+  DBM::Deep->new(
+      filename  => $filename,
+      pack_size => 'large',
+  );
 
 This tells DBM::Deep to pack all file offsets with 8-byte (64-bit) quad words
 instead of 32-bit longs.  After setting these values your DB files have a
@@ -1455,7 +1446,7 @@ this does indeed work!
 If you require low-level access to the underlying filehandle that DBM::Deep uses,
 you can call the C<_fh()> method, which returns the handle:
 
-    my $fh = $db->_fh();
+  my $fh = $db->_fh();
 
 This method can be called on the root level of the datbase, or any child
 hashes or arrays.  All levels share a I<root> structure, which contains things
@@ -1463,7 +1454,7 @@ like the filehandle, a reference counter, and all the options specified
 when you created the object.  You can get access to this file object by
 calling the C<_fileobj()> method.
 
-    my $file_obj = $db->_fileobj();
+  my $file_obj = $db->_fileobj();
 
 This is useful for changing options after the object has already been created,
 such as enabling/disabling locking.  You can also store your own temporary user
@@ -1485,28 +1476,28 @@ parameter. Here is a working example that uses a 256-bit hash from the
 I<Digest::SHA256> module.  Please see
 L<http://search.cpan.org/search?module=Digest::SHA256> for more information.
 
-    use DBM::Deep;
-    use Digest::SHA256;
+  use DBM::Deep;
+  use Digest::SHA256;
 
-    my $context = Digest::SHA256::new(256);
+  my $context = Digest::SHA256::new(256);
 
-    my $db = DBM::Deep->new(
-        filename => "foo-sha.db",
-        digest => \&my_digest,
-        hash_size => 32,
-    );
+  my $db = DBM::Deep->new(
+      filename => "foo-sha.db",
+      digest => \&my_digest,
+      hash_size => 32,
+  );
 
-    $db->{key1} = "value1";
-    $db->{key2} = "value2";
-    print "key1: " . $db->{key1} . "\n";
-    print "key2: " . $db->{key2} . "\n";
+  $db->{key1} = "value1";
+  $db->{key2} = "value2";
+  print "key1: " . $db->{key1} . "\n";
+  print "key2: " . $db->{key2} . "\n";
 
-    undef $db;
-    exit;
+  undef $db;
+  exit;
 
-    sub my_digest {
-        return substr( $context->hash($_[0]), 0, 32 );
-    }
+  sub my_digest {
+      return substr( $context->hash($_[0]), 0, 32 );
+  }
 
 B<Note:> Your returned digest strings must be B<EXACTLY> the number
 of bytes you specify in the hash_size parameter (in this case 32).
@@ -1521,13 +1512,13 @@ can have a nested hash key or array element that points to a parent object.
 This relationship is stored in the DB file, and is preserved between sessions.
 Here is an example:
 
-    my $db = DBM::Deep->new( "foo.db" );
+  my $db = DBM::Deep->new( "foo.db" );
 
-    $db->{foo} = "bar";
-    $db->{circle} = $db; # ref to self
+  $db->{foo} = "bar";
+  $db->{circle} = $db; # ref to self
 
-    print $db->{foo} . "\n"; # prints "bar"
-    print $db->{circle}->{foo} . "\n"; # prints "bar" again
+  print $db->{foo} . "\n"; # prints "bar"
+  print $db->{circle}->{foo} . "\n"; # prints "bar" again
 
 B<Note>: Passing the object to a function that recursively walks the
 object tree (such as I<Data::Dumper> or even the built-in C<optimize()> or
@@ -1582,7 +1573,7 @@ and adding new keys, your file will continuously grow.  I am working on this,
 but in the meantime you can call the built-in C<optimize()> method from time to
 time (perhaps in a crontab or something) to recover all your unused space.
 
-    $db->optimize(); # returns true on success
+  $db->optimize(); # returns true on success
 
 This rebuilds the ENTIRE database into a new file, then moves it on top of
 the original.  The new file will have no unused space, thus it will take up as
@@ -1673,7 +1664,7 @@ Beware of copying tied objects in Perl.  Very strange things can happen.
 Instead, use DBM::Deep's C<clone()> method which safely copies the object and
 returns a new, blessed, tied hash or array to the same level in the DB.
 
-    my $copy = $db->clone();
+  my $copy = $db->clone();
 
 B<Note>: Since clone() here is cloning the object, not the database location, any
 modifications to either $db or $copy will be visible to both.

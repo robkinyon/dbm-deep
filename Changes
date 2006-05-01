@@ -1,5 +1,8 @@
 Revision history for DBM::Deep.
 
+0.99_03 ??? ?? ??:??:?? 2006 Pacific
+    - Converted to use FileHandle::Fmode to handle filehandle status checks
+
 0.99_02 Apr 28 05:00:00 2006 Pacific
     - Added missing file to the MANIFEST
 
@@ -18,6 +21,24 @@ Revision history for DBM::Deep.
       - Instead, you will now pass the appropriate values into new()
       - A pack_size parameter has been added to make 64-bit files easier
     - Transactions now work
+
+0.983 Apr 10 20:00:00 2006 Pacific
+    - Added patch inspired by Jeff Janes (Thanks!)
+      - Autovivification now works correctly
+      - The following now works correctly
+        my %hash = ( a => 1 );
+        $db->{hash} = \%hash;
+        $hash{b} = 2;
+        cmp_ok( $db->{hash}{b}, '==', 2 );
+    - (RT#18530) - DBM::Deep now plays nicely with -l
+
+0.982 Mar 08 11:00:00 2006 Pacific
+    - Fixed smoketests that were failing on Win32
+    - Added restriction for Perl 5.6.0 or higher.
+      - Digest::MD5 and Sub::Uplevel (dep of Test::Exception) require 5.6+
+
+0.981 Mar 06 11:00:00 2006 Pacific
+    - (RT#17947) - Fixed test that was failing on older Perls
 
 0.98  Feb 28 11:00:00 2006 Pacific
     - Added in patch by David Cantrell to allow use of DATA filehandle

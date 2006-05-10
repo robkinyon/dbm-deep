@@ -35,7 +35,7 @@ $db->import( $struct );
 
 cmp_deeply(
     $db,
-    noclass({
+    {
         key1 => 'value1',
         key2 => 'value2',
         array1 => [ 'elem0', 'elem1', 'elem2', ],
@@ -44,7 +44,7 @@ cmp_deeply(
             subkey2 => "subvalue2",
             subkey3 => useclass( bless {}, 'Foo' ),
         },
-    }),
+    },
     "Everything matches",
 );
 

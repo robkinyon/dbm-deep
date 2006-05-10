@@ -437,7 +437,6 @@ sub STORE {
     my $self = shift->_get_self;
     my ($key, $value, $orig_key) = @_;
 
-
     if ( !FileHandle::Fmode::is_W( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }

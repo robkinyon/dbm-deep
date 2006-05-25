@@ -82,11 +82,27 @@ sub key_exists {
     return $self->bucket_exists( $tag, $dig_key, $key );
 }
 
-sub XXXget_next_key {
+sub get_next_key {
     my $self = shift;
-    my ($offset, $prev_key) = @_;
+    my ($offset) = @_;
 
-#    my $dig_key = $self->apply_digest( $key );
+    # If the previous key was not specifed, start at the top and
+    # return the first one found.
+    my $temp;
+    if ( @_ > 1 ) {
+        $temp = {
+            prev_md5    => $self->apply_digest($_[1]),
+            return_next => 0,
+        };
+    }
+    else {
+        $temp = {
+            prev_md5    => chr(0) x $self->{hash_size},
+            return_next => 1,
+        };
+    }
+
+    return $self->traverse_index( $temp, $offset, 0 );
 }
 
 ################################################################################
@@ -992,34 +1008,6 @@ sub traverse_index {
     }
 
     return;
-}
-
-sub get_next_key {
-    ##
-    # Locate next key, given digested previous one
-    ##
-    my $self = shift;
-    my ($obj) = @_;
-
-    ##
-    # If the previous key was not specifed, start at the top and
-    # return the first one found.
-    ##
-    my $temp;
-    if ( @_ > 1 ) {
-        $temp = {
-            prev_md5    => $_[1],
-            return_next => 0,
-        };
-    }
-    else {
-        $temp = {
-            prev_md5    => chr(0) x $self->{hash_size},
-            return_next => 1,
-        };
-    }
-
-    return $self->traverse_index( $temp, $obj->_base_offset, 0 );
 }
 
 # Utilities

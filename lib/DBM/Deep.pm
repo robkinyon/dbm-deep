@@ -507,8 +507,6 @@ sub FETCH {
     my ($key, $orig_key) = @_;
     $orig_key = $key unless defined $orig_key;
 
-    my $md5 = $self->_engine->apply_digest($key);
-
     ##
     # Request shared lock for reading
     ##
@@ -552,29 +550,14 @@ sub DELETE {
     ##
     $self->lock( LOCK_EX );
 
-    my $md5 = $self->_engine->apply_digest($key);
-
-    my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );
-    if (!$tag) {
-        $self->unlock();
-        return;
-    }
-
     ##
     # Delete bucket
     ##
-    my $value = $self->_engine->get_bucket_value( $tag, $md5 );
+    my $value = $self->_engine->delete_key( $self->_base_offset, $key, $orig_key );
 
     if (defined $value && !ref($value) && $self->_fileobj->{filter_fetch_value}) {
         $value = $self->_fileobj->{filter_fetch_value}->($value);
     }
-
-    my $result = $self->_engine->delete_bucket( $tag, $md5, $orig_key );
-
-    ##
-    # If this object is an array and the key deleted was on the end of the stack,
-    # decrement the length variable.
-    ##
 
     $self->unlock();
 
@@ -588,27 +571,12 @@ sub EXISTS {
     my $self = shift->_get_self;
     my ($key) = @_;
 
-    my $md5 = $self->_engine->apply_digest($key);
-
     ##
     # Request shared lock for reading
     ##
     $self->lock( LOCK_SH );
 
-    my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );
-    if (!$tag) {
-        $self->unlock();
-
-        ##
-        # For some reason, the built-in exists() function returns '' for false
-        ##
-        return '';
-    }
-
-    ##
-    # Check if bucket exists and return 1 or ''
-    ##
-    my $result = $self->_engine->bucket_exists( $tag, $md5 ) || '';
+    my $result = $self->_engine->key_exists( $self->_base_offset, $key );
 
     $self->unlock();
 
@@ -646,19 +614,16 @@ sub CLEAR {
     if ( $self->_type eq TYPE_HASH ) {
         my $key = $self->first_key;
         while ( $key ) {
+            # Retrieve the key before deleting because we depend on next_key
             my $next_key = $self->next_key( $key );
-            my $md5 = $self->_engine->apply_digest($key);
-            my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );
-            $self->_engine->delete_bucket( $tag, $md5, $key );
+            $self->_engine->delete_key( $self->_base_offset, $key, $key );
             $key = $next_key;
         }
     }
     else {
         my $size = $self->FETCHSIZE;
         for my $key ( 0 .. $size - 1 ) {
-            my $md5 = $self->_engine->apply_digest($key);
-            my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );
-            $self->_engine->delete_bucket( $tag, $md5, $key );
+            $self->_engine->delete_key( $self->_base_offset, $key, $key );
         }
         $self->STORESIZE( 0 );
     }

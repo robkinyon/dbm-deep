@@ -2,9 +2,15 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 5;
+use Test::More;
+
+plan skip_all => "You must set \$ENV{LONG_TESTS} to run the long tests"
+    unless $ENV{LONG_TESTS};
+
 use Test::Deep;
 use t::common qw( new_fh );
+
+plan tests => 5;
 
 use_ok( 'DBM::Deep' );
 

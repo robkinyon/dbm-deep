@@ -2,7 +2,12 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 3;
+use Test::More;
+
+plan skip_all => "You must set \$ENV{LONG_TESTS} to run the long tests"
+    unless $ENV{LONG_TESTS};
+
+plan tests => 3;
 use t::common qw( new_fh );
 
 diag "This test can take up to a minute to run. Please be patient.";

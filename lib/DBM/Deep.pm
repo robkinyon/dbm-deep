@@ -514,17 +514,7 @@ sub FETCH {
     ##
     $self->lock( LOCK_SH );
 
-    my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );#, { create => 1 } );
-    #XXX This needs to autovivify
-    if (!$tag) {
-        $self->unlock();
-        return;
-    }
-
-    ##
-    # Get value from bucket list
-    ##
-    my $result = $self->_engine->get_bucket_value( $tag, $md5, $orig_key );
+    my $result = $self->_engine->read_value( $self->_base_offset, $key, $orig_key );
 
     $self->unlock();
 

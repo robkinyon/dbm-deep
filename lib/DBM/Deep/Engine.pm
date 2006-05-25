@@ -54,20 +54,22 @@ sub write_value {
 
 sub read_value {
     my $self = shift;
-    my ($offset, $key) = @_;
+    my ($offset, $key, $orig_key) = @_;
 
     my $dig_key = $self->apply_digest( $key );
-    my $tag = $self->find_blist( $offset, $dig_key );
-    return $self->get_bucket_value( $tag, $dig_key, $key );
+    my $tag = $self->find_blist( $offset, $dig_key ) or return;
+    return $self->get_bucket_value( $tag, $dig_key, $orig_key );
 }
 
 sub delete_key {
     my $self = shift;
-    my ($offset, $key) = @_;
+    my ($offset, $key, $orig_key) = @_;
 
     my $dig_key = $self->apply_digest( $key );
-    my $tag = $self->find_blist( $offset, $dig_key );
-    return $self->delete_bucket( $tag, $dig_key, $key );
+    my $tag = $self->find_blist( $offset, $dig_key ) or return;
+    my $value = $self->get_bucket_value( $tag, $dig_key, $orig_key );
+    $self->delete_bucket( $tag, $dig_key, $orig_key );
+    return $value;
 }
 
 sub key_exists {
@@ -75,7 +77,8 @@ sub key_exists {
     my ($offset, $key) = @_;
 
     my $dig_key = $self->apply_digest( $key );
-    my $tag = $self->find_blist( $offset, $dig_key );
+    # exists() returns the empty string, not undef
+    my $tag = $self->find_blist( $offset, $dig_key ) or return '';
     return $self->bucket_exists( $tag, $dig_key, $key );
 }
 

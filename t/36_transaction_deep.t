@@ -13,19 +13,19 @@ my $db1 = DBM::Deep->new(
 );
 
 my $x_outer = { a => 'b' };
-my $x_inner = { a => 'c' };;
+my $x_inner = { a => 'c' };
 
 $db1->{x} = $x_outer;
-is( $db1->{x}{a}, 'b', "We're looking at the right value from outer" );
+is( $db1->{x}{a}, 'b', "BEFORE: We're looking at the right value from outer" );
 
 $db1->begin_work;
 
     $db1->{x} = $x_inner;
-    is( $db1->{x}{a}, 'c', "We're looking at the right value from inner" );
-    is( $x_outer->{a}, 'c', "We're looking at the right value from outer" );
+    is( $db1->{x}{a}, 'c', "WITHIN: We're looking at the right value from inner" );
+    is( $x_outer->{a}, 'c', "WITHIN: We're looking at the right value from outer" );
 
 $db1->commit;
 
-is( $db1->{x}{a}, 'c', "Commit means x_inner is still correct" );
-is( $x_outer->{a}, 'c', "outer made the move" );
-is( $x_inner->{a}, 'c', "inner is still good" );
+is( $db1->{x}{a}, 'c', "AFTER: Commit means x_inner is still correct" );
+is( $x_outer->{a}, 'c', "AFTER: outer made the move" );
+is( $x_inner->{a}, 'c', "AFTER: inner made the move" );

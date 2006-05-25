@@ -48,3 +48,6 @@ t/33_transactions.t
 t/34_transaction_arrays.t
 t/35_transaction_multiple.t
 t/36_transaction_deep.t
+t/37_delete_edge_cases.t
+t/38_transaction_add_item.t
+t/39_singletons.t

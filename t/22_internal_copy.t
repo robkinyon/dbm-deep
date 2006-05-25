@@ -45,7 +45,6 @@ is( scalar(keys %{$db->{hash1}}), 1, "... and only 1 key in the original" );
 
 $db->{copy} = $db->{hash2};
 is( $db->{copy}{subkey3}, 'subvalue3', "After the second copy, we're still good" );
-
 my $max_keys = 1000;
 
 my ($fh2, $filename2) = new_fh();

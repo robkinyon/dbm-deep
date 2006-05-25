@@ -134,7 +134,7 @@ sub _init {
 
     $self->_engine->setup_fh( $self );
 
-    $self->{fileobj}->set_db( $self );
+    $self->_fileobj->set_db( $self );
 
     return $self;
 }
@@ -317,9 +317,11 @@ sub clone {
     my $self = shift->_get_self;
 
     return DBM::Deep->new(
-        type => $self->_type,
+        type        => $self->_type,
         base_offset => $self->_base_offset,
-        fileobj => $self->_fileobj,
+        fileobj     => $self->_fileobj,
+        parent      => $self->{parent},
+        parent_key  => $self->{parent_key},
     );
 }
 
@@ -350,20 +352,17 @@ sub clone {
 
 sub begin_work {
     my $self = shift->_get_self;
-    $self->_fileobj->begin_transaction;
-    return 1;
+    return $self->_fileobj->begin_transaction;
 }
 
 sub rollback {
     my $self = shift->_get_self;
-    $self->_fileobj->end_transaction;
-    return 1;
+    return $self->_fileobj->end_transaction;
 }
 
 sub commit {
     my $self = shift->_get_self;
-    $self->_fileobj->commit_transaction;
-    return 1;
+    return $self->_fileobj->commit_transaction;
 }
 
 ##
@@ -436,13 +435,14 @@ sub STORE {
     ##
     my $self = shift->_get_self;
     my ($key, $value, $orig_key) = @_;
+    $orig_key = $key unless defined $orig_key;
 
     if ( !FileHandle::Fmode::is_W( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
     #XXX The second condition needs to disappear
-    if ( defined $orig_key && !( $self->_type eq TYPE_ARRAY && $orig_key eq 'length') ) {
+    if ( !( $self->_type eq TYPE_ARRAY && $orig_key eq 'length') ) {
         my $rhs;
 
         my $r = Scalar::Util::reftype( $value ) || '';
@@ -486,10 +486,6 @@ sub STORE {
     ##
     $self->lock( LOCK_EX );
 
-    my $md5 = $self->_engine->{digest}->($key);
-
-    my $tag = $self->_engine->find_blist( $self->_base_offset, $md5, { create => 1 } );
-
     # User may be storing a hash, in which case we do not want it run
     # through the filtering system
     if ( !ref($value) && $self->_fileobj->{filter_store_value} ) {
@@ -499,7 +495,10 @@ sub STORE {
     ##
     # Add key/value to bucket list
     ##
-    $self->_engine->add_bucket( $tag, $md5, $key, $value, undef, $orig_key ); 
+#    my $md5 = $self->_engine->apply_digest($key);
+#    my $tag = $self->_engine->find_blist( $self->_base_offset, $md5, { create => 1 } );
+#    $self->_engine->add_bucket( $tag, $md5, $key, $value, undef, $orig_key ); 
+    $self->_engine->write_value( $self->_base_offset, $key, $value, $orig_key );
 
     $self->unlock();
 
@@ -512,8 +511,9 @@ sub FETCH {
     ##
     my $self = shift->_get_self;
     my ($key, $orig_key) = @_;
+    $orig_key = $key unless @_ > 1;
 
-    my $md5 = $self->_engine->{digest}->($key);
+    my $md5 = $self->_engine->apply_digest($key);
 
     ##
     # Request shared lock for reading
@@ -547,6 +547,7 @@ sub DELETE {
     ##
     my $self = shift->_get_self;
     my ($key, $orig_key) = @_;
+    $orig_key = $key unless defined $orig_key;
 
     if ( !FileHandle::Fmode::is_W( $self->_fh ) ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
@@ -567,7 +568,7 @@ sub DELETE {
     ##
     $self->lock( LOCK_EX );
 
-    my $md5 = $self->_engine->{digest}->($key);
+    my $md5 = $self->_engine->apply_digest($key);
 
     my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );
     if (!$tag) {
@@ -603,7 +604,7 @@ sub EXISTS {
     my $self = shift->_get_self;
     my ($key) = @_;
 
-    my $md5 = $self->_engine->{digest}->($key);
+    my $md5 = $self->_engine->apply_digest($key);
 
     ##
     # Request shared lock for reading
@@ -662,7 +663,7 @@ sub CLEAR {
         my $key = $self->first_key;
         while ( $key ) {
             my $next_key = $self->next_key( $key );
-            my $md5 = $self->_engine->{digest}->($key);
+            my $md5 = $self->_engine->apply_digest($key);
             my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );
             $self->_engine->delete_bucket( $tag, $md5, $key );
             $key = $next_key;
@@ -670,8 +671,8 @@ sub CLEAR {
     }
     else {
         my $size = $self->FETCHSIZE;
-        for my $key ( map { pack ( $self->_engine->{long_pack}, $_ ) } 0 .. $size - 1 ) {
-            my $md5 = $self->_engine->{digest}->($key);
+        for my $key ( 0 .. $size - 1 ) {
+            my $md5 = $self->_engine->apply_digest($key);
             my $tag = $self->_engine->find_blist( $self->_base_offset, $md5 );
             $self->_engine->delete_bucket( $tag, $md5, $key );
         }

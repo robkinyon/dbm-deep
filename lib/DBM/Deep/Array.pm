@@ -5,7 +5,7 @@ use 5.6.0;
 use strict;
 use warnings;
 
-our $VERSION = '0.99_01';
+our $VERSION = '0.99_03';
 
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative
@@ -50,8 +50,7 @@ sub FETCH {
 
     $self->lock( $self->LOCK_SH );
 
-#    my $orig_key = $key eq 'length' ? undef : $key;
-    my $orig_key = $key;
+    my $orig_key;
     if ( $key =~ /^-?\d+$/ ) {
         if ( $key < 0 ) {
             $key += $self->FETCHSIZE;
@@ -60,8 +59,10 @@ sub FETCH {
                 return;
             }
         }
-
-        $key = pack($self->_engine->{long_pack}, $key);
+        $orig_key = $key;
+    }
+    else {
+        $orig_key = undef;
     }
 
     my $rv = $self->SUPER::FETCH( $key, $orig_key );
@@ -77,30 +78,25 @@ sub STORE {
 
     $self->lock( $self->LOCK_EX );
 
-#    my $orig = $key eq 'length' ? undef : $key;
-    my $orig_key = $key;
-
     my $size;
-    my $numeric_idx;
+    my $idx_is_numeric;
     if ( $key =~ /^\-?\d+$/ ) {
-        $numeric_idx = 1;
+        $idx_is_numeric = 1;
         if ( $key < 0 ) {
             $size = $self->FETCHSIZE;
-            $key += $size;
-            if ( $key < 0 ) {
-                die( "Modification of non-creatable array value attempted, subscript $orig_key" );
+            if ( $key + $size < 0 ) {
+                die( "Modification of non-creatable array value attempted, subscript $key" );
             }
+            $key += $size
         }
-
-        $key = pack($self->_engine->{long_pack}, $key);
     }
 
-    my $rv = $self->SUPER::STORE( $key, $value, $orig_key );
+    my $rv = $self->SUPER::STORE( $key, $value, ($key eq 'length' ? undef : $key) );
 
-    if ( $numeric_idx ) {
+    if ( $idx_is_numeric ) {
         $size = $self->FETCHSIZE unless defined $size;
-        if ( $orig_key >= $size ) {
-            $self->STORESIZE( $orig_key + 1 );
+        if ( $key >= $size ) {
+            $self->STORESIZE( $key + 1 );
         }
     }
 
@@ -123,8 +119,6 @@ sub EXISTS {
                 return;
             }
         }
-
-        $key = pack($self->_engine->{long_pack}, $key);
     }
 
     my $rv = $self->SUPER::EXISTS( $key );
@@ -138,9 +132,6 @@ sub DELETE {
     my $self = shift->_get_self;
     my ($key) = @_;
 
-    my $unpacked_key = $key;
-    my $orig = $key eq 'length' ? undef : $key;
-
     $self->lock( $self->LOCK_EX );
 
     my $size = $self->FETCHSIZE;
@@ -152,14 +143,12 @@ sub DELETE {
                 return;
             }
         }
-
-        $key = pack($self->_engine->{long_pack}, $key);
     }
 
-    my $rv = $self->SUPER::DELETE( $key, $orig );
+    my $rv = $self->SUPER::DELETE( $key );
 
-    if ($rv && $unpacked_key == $size - 1) {
-        $self->STORESIZE( $unpacked_key );
+    if ($rv && $key == $size - 1) {
+        $self->STORESIZE( $key, ($key eq 'length' ? undef : $key) );
     }
 
     $self->unlock;

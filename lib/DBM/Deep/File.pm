@@ -5,7 +5,7 @@ use 5.6.0;
 use strict;
 use warnings;
 
-our $VERSION = q(0.99_01);
+our $VERSION = q(0.99_03);
 
 use Fcntl qw( :DEFAULT :flock :seek );
 

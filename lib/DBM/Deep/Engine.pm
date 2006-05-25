@@ -5,7 +5,7 @@ use 5.6.0;
 use strict;
 use warnings;
 
-our $VERSION = q(0.99_01);
+our $VERSION = q(0.99_03);
 
 use Fcntl qw( :DEFAULT :flock );
 use Scalar::Util ();
@@ -15,6 +15,11 @@ use Scalar::Util ();
 #   - calculate_sizes()
 #   - _get_key_subloc()
 #   - add_bucket() - where the buckets are printed
+#
+# * Every method in here assumes that the _fileobj has been appropriately
+#   safeguarded. This can be anything from flock() to some sort of manual
+#   mutex. But, it's the caller's responsability to make sure that this has
+#   been done.
 
 ##
 # Setup file and tag signatures.  These should never change.
@@ -32,6 +37,61 @@ sub SIG_FREE     () { 'F'    }
 sub SIG_KEYS     () { 'K'    }
 sub SIG_SIZE     () {  1     }
 
+################################################################################
+#
+# This is new code. It is a complete rewrite of the engine based on a new API
+#
+################################################################################
+
+sub write_value {
+    my $self = shift;
+    my ($offset, $key, $value, $orig_key) = @_;
+
+    my $dig_key = $self->apply_digest( $key );
+    my $tag = $self->find_blist( $offset, $dig_key, { create => 1 } );
+    return $self->add_bucket( $tag, $dig_key, $key, $value, undef, $orig_key );
+}
+
+sub read_value {
+    my $self = shift;
+    my ($offset, $key) = @_;
+
+    my $dig_key = $self->apply_digest( $key );
+    my $tag = $self->find_blist( $offset, $dig_key );
+    return $self->get_bucket_value( $tag, $dig_key, $key );
+}
+
+sub delete_key {
+    my $self = shift;
+    my ($offset, $key) = @_;
+
+    my $dig_key = $self->apply_digest( $key );
+    my $tag = $self->find_blist( $offset, $dig_key );
+    return $self->delete_bucket( $tag, $dig_key, $key );
+}
+
+sub key_exists {
+    my $self = shift;
+    my ($offset, $key) = @_;
+
+    my $dig_key = $self->apply_digest( $key );
+    my $tag = $self->find_blist( $offset, $dig_key );
+    return $self->bucket_exists( $tag, $dig_key, $key );
+}
+
+sub XXXget_next_key {
+    my $self = shift;
+    my ($offset, $prev_key) = @_;
+
+#    my $dig_key = $self->apply_digest( $key );
+}
+
+################################################################################
+#
+# Below here is the old code. It will be folded into the code above as it can.
+#
+################################################################################
+
 sub new {
     my $class = shift;
     my ($args) = @_;
@@ -43,10 +103,10 @@ sub new {
         data_pack => 'N',
 
         digest    => \&Digest::MD5::md5,
-        hash_size => 16,
+        hash_size => 16, # In bytes
 
         ##
-        # Maximum number of buckets per blist before another level of indexing is
+        # Number of buckets per blist before another level of indexing is
         # done. Increase this value for slightly greater speed, but larger database
         # files. DO NOT decrease this value below 16, due to risk of recursive
         # reindex overrun.
@@ -91,6 +151,11 @@ sub new {
 }
 
 sub _fileobj { return $_[0]{fileobj} }
+
+sub apply_digest {
+    my $self = shift;
+    return $self->{digest}->(@_);
+}
 
 sub calculate_sizes {
     my $self = shift;
@@ -281,8 +346,7 @@ sub load_tag {
 
     return {
         signature => $sig,
-        #XXX Is this even used?
-        size      => $size,
+        size      => $size,   #XXX Is this even used?
         offset    => $offset + SIG_SIZE + $self->{data_size},
         content   => $fileobj->read_at( undef, $size ),
     };
@@ -366,7 +430,7 @@ sub add_bucket {
                         pack($self->{long_pack}, $location2 ),
                         pack( 'C C', $trans_id, 0 ),
                     );
-                    $self->write_value( $location2, $plain_key, $old_value, $orig_key );
+                    $self->_write_value( $location2, $plain_key, $old_value, $orig_key );
                 }
             }
         }
@@ -412,12 +476,12 @@ sub add_bucket {
         }
     }
 
-    $self->write_value( $location, $plain_key, $value, $orig_key );
+    $self->_write_value( $location, $plain_key, $value, $orig_key );
 
     return 1;
 }
 
-sub write_value {
+sub _write_value {
     my $self = shift;
     my ($location, $key, $value, $orig_key) = @_;
 
@@ -594,6 +658,7 @@ sub read_from_loc {
     # If value is a hash or array, return new DBM::Deep object with correct offset
     ##
     if (($signature eq SIG_HASH) || ($signature eq SIG_ARRAY)) {
+        #XXX This needs to be a singleton
         my $new_obj = DBM::Deep->new({
             type        => $signature,
             base_offset => $subloc,
@@ -726,7 +791,7 @@ sub delete_bucket {
                     pack($self->{long_pack}, $location2 ),
                     pack( 'C C', $trans_id, 0 ),
                 );
-                $self->write_value( $location2, $orig_key, $value, $orig_key );
+                $self->_write_value( $location2, $orig_key, $value, $orig_key );
             }
         }
 

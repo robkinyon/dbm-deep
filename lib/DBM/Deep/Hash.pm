@@ -5,7 +5,7 @@ use 5.6.0;
 use strict;
 use warnings;
 
-our $VERSION = q(0.99_01);
+our $VERSION = q(0.99_03);
 
 use base 'DBM::Deep';
 
@@ -111,7 +111,7 @@ sub NEXTKEY {
         ? $self->_fileobj->{filter_store_key}->($_[0])
         : $_[0];
 
-	my $prev_md5 = $self->_engine->{digest}->($prev_key);
+	my $prev_md5 = $self->_engine->apply_digest($prev_key);
 
 	##
 	# Request shared lock for reading

@@ -486,18 +486,12 @@ sub STORE {
     ##
     $self->lock( LOCK_EX );
 
-    # User may be storing a hash, in which case we do not want it run
-    # through the filtering system
+    # User may be storing a complex value, in which case we do not want it run
+    # through the filtering system.
     if ( !ref($value) && $self->_fileobj->{filter_store_value} ) {
         $value = $self->_fileobj->{filter_store_value}->( $value );
     }
 
-    ##
-    # Add key/value to bucket list
-    ##
-#    my $md5 = $self->_engine->apply_digest($key);
-#    my $tag = $self->_engine->find_blist( $self->_base_offset, $md5, { create => 1 } );
-#    $self->_engine->add_bucket( $tag, $md5, $key, $value, undef, $orig_key ); 
     $self->_engine->write_value( $self->_base_offset, $key, $value, $orig_key );
 
     $self->unlock();
@@ -511,7 +505,7 @@ sub FETCH {
     ##
     my $self = shift->_get_self;
     my ($key, $orig_key) = @_;
-    $orig_key = $key unless @_ > 1;
+    $orig_key = $key unless defined $orig_key;
 
     my $md5 = $self->_engine->apply_digest($key);
 

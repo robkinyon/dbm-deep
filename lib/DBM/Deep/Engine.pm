@@ -575,6 +575,7 @@ sub _write_value {
             parent_key  => $orig_key,
         };
         %$value = %x;
+        bless $value, 'DBM::Deep::Hash' unless Scalar::Util::blessed( $value );
     }
     elsif ($r eq 'ARRAY') {
         my @x = @$value;
@@ -585,6 +586,7 @@ sub _write_value {
             parent_key  => $orig_key,
         };
         @$value = @x;
+        bless $value, 'DBM::Deep::Array' unless Scalar::Util::blessed( $value );
     }
 
     return 1;
@@ -678,6 +680,31 @@ sub read_from_loc {
     ##
     if (($signature eq SIG_HASH) || ($signature eq SIG_ARRAY)) {
         #XXX This needs to be a singleton
+#        my $new_obj;
+#        my $is_autobless;
+#        if ( $signature eq SIG_HASH ) {
+#            $new_obj = {};
+#            tie %$new_obj, 'DBM::Deep', {
+#                base_offset => $subloc,
+#                fileobj     => $self->_fileobj,
+#                parent      => $self->{obj},
+#                parent_key  => $orig_key,
+#            };
+#            $is_autobless = tied(%$new_obj)->_fileobj->{autobless};
+#        }
+#        else {
+#            $new_obj = [];
+#            tie @$new_obj, 'DBM::Deep', {
+#                base_offset => $subloc,
+#                fileobj     => $self->_fileobj,
+#                parent      => $self->{obj},
+#                parent_key  => $orig_key,
+#            };
+#            $is_autobless = tied(@$new_obj)->_fileobj->{autobless};
+#        }
+#
+#        if ($is_autobless) {
+
         my $new_obj = DBM::Deep->new({
             type        => $signature,
             base_offset => $subloc,

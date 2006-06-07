@@ -108,8 +108,8 @@ sub _init {
     my $class = shift;
     my ($args) = @_;
 
-    $args->{fileobj} = DBM::Deep::File->new( $args )
-        unless exists $args->{fileobj};
+    $args->{storage} = DBM::Deep::File->new( $args )
+        unless exists $args->{storage};
 
     # locking implicitly enables autoflush
     if ($args->{locking}) { $args->{autoflush} = 1; }
@@ -122,7 +122,7 @@ sub _init {
         parent      => undef,
         parent_key  => undef,
 
-        fileobj     => undef,
+        storage     => undef,
     }, $class;
     $self->{engine} = DBM::Deep::Engine->new( { %{$args}, obj => $self } );
 
@@ -134,7 +134,7 @@ sub _init {
 
     $self->_engine->setup_fh( $self );
 
-    $self->_fileobj->set_db( $self );
+    $self->_storage->set_db( $self );
 
     return $self;
 }
@@ -153,12 +153,12 @@ sub TIEARRAY {
 
 sub lock {
     my $self = shift->_get_self;
-    return $self->_fileobj->lock( $self, @_ );
+    return $self->_storage->lock( $self, @_ );
 }
 
 sub unlock {
     my $self = shift->_get_self;
-    return $self->_fileobj->unlock( $self, @_ );
+    return $self->_storage->unlock( $self, @_ );
 }
 
 sub _copy_value {
@@ -259,14 +259,14 @@ sub optimize {
     my $self = shift->_get_self;
 
 #XXX Need to create a new test for this
-#    if ($self->_fileobj->{links} > 1) {
+#    if ($self->_storage->{links} > 1) {
 #        $self->_throw_error("Cannot optimize: reference count is greater than 1");
 #    }
 
     #XXX Do we have to lock the tempfile?
 
     my $db_temp = DBM::Deep->new(
-        file => $self->_fileobj->{file} . '.tmp',
+        file => $self->_storage->{file} . '.tmp',
         type => $self->_type
     );
 
@@ -281,8 +281,8 @@ sub optimize {
     my $perms = $stats[2] & 07777;
     my $uid = $stats[4];
     my $gid = $stats[5];
-    chown( $uid, $gid, $self->_fileobj->{file} . '.tmp' );
-    chmod( $perms, $self->_fileobj->{file} . '.tmp' );
+    chown( $uid, $gid, $self->_storage->{file} . '.tmp' );
+    chmod( $perms, $self->_storage->{file} . '.tmp' );
 
     # q.v. perlport for more information on this variable
     if ( $^O eq 'MSWin32' || $^O eq 'cygwin' ) {
@@ -293,18 +293,18 @@ sub optimize {
         # with a soft copy.
         ##
         $self->unlock();
-        $self->_fileobj->close;
+        $self->_storage->close;
     }
 
-    if (!rename $self->_fileobj->{file} . '.tmp', $self->_fileobj->{file}) {
-        unlink $self->_fileobj->{file} . '.tmp';
+    if (!rename $self->_storage->{file} . '.tmp', $self->_storage->{file}) {
+        unlink $self->_storage->{file} . '.tmp';
         $self->unlock();
         $self->_throw_error("Optimize failed: Cannot copy temp file over original: $!");
     }
 
     $self->unlock();
-    $self->_fileobj->close;
-    $self->_fileobj->open;
+    $self->_storage->close;
+    $self->_storage->open;
     $self->_engine->setup_fh( $self );
 
     return 1;
@@ -319,7 +319,7 @@ sub clone {
     return DBM::Deep->new(
         type        => $self->_type,
         base_offset => $self->_base_offset,
-        fileobj     => $self->_fileobj,
+        storage     => $self->_storage,
         parent      => $self->{parent},
         parent_key  => $self->{parent_key},
     );
@@ -342,7 +342,7 @@ sub clone {
         my $func = shift;
 
         if ( $is_legal_filter{$type} ) {
-            $self->_fileobj->{"filter_$type"} = $func;
+            $self->_storage->{"filter_$type"} = $func;
             return 1;
         }
 
@@ -352,17 +352,17 @@ sub clone {
 
 sub begin_work {
     my $self = shift->_get_self;
-    return $self->_fileobj->begin_transaction;
+    return $self->_storage->begin_transaction;
 }
 
 sub rollback {
     my $self = shift->_get_self;
-    return $self->_fileobj->end_transaction;
+    return $self->_storage->end_transaction;
 }
 
 sub commit {
     my $self = shift->_get_self;
-    return $self->_fileobj->commit_transaction;
+    return $self->_storage->commit_transaction;
 }
 
 ##
@@ -374,9 +374,9 @@ sub _engine {
     return $self->{engine};
 }
 
-sub _fileobj {
+sub _storage {
     my $self = $_[0]->_get_self;
-    return $self->{fileobj};
+    return $self->{storage};
 }
 
 sub _type {
@@ -391,7 +391,7 @@ sub _base_offset {
 
 sub _fh {
     my $self = $_[0]->_get_self;
-    return $self->_fileobj->{fh};
+    return $self->_storage->{fh};
 }
 
 ##
@@ -478,7 +478,7 @@ sub STORE {
             $lhs = "\$db->put(q{$orig_key},$rhs);";
         }
 
-        $self->_fileobj->audit($lhs);
+        $self->_storage->audit($lhs);
     }
 
     ##
@@ -488,8 +488,8 @@ sub STORE {
 
     # User may be storing a complex value, in which case we do not want it run
     # through the filtering system.
-    if ( !ref($value) && $self->_fileobj->{filter_store_value} ) {
-        $value = $self->_fileobj->{filter_store_value}->( $value );
+    if ( !ref($value) && $self->_storage->{filter_store_value} ) {
+        $value = $self->_storage->{filter_store_value}->( $value );
     }
 
     $self->_engine->write_value( $self->_base_offset, $key, $value, $orig_key );
@@ -518,8 +518,8 @@ sub FETCH {
 
     # Filters only apply to scalar values, so the ref check is making
     # sure the fetched bucket is a scalar, not a child hash or array.
-    return ($result && !ref($result) && $self->_fileobj->{filter_fetch_value})
-        ? $self->_fileobj->{filter_fetch_value}->($result)
+    return ($result && !ref($result) && $self->_storage->{filter_fetch_value})
+        ? $self->_storage->{filter_fetch_value}->($result)
         : $result;
 }
 
@@ -538,10 +538,10 @@ sub DELETE {
     if ( defined $orig_key ) {
         my $lhs = $self->_find_parent;
         if ( $lhs ) {
-            $self->_fileobj->audit( "delete $lhs;" );
+            $self->_storage->audit( "delete $lhs;" );
         }
         else {
-            $self->_fileobj->audit( "\$db->delete('$orig_key');" );
+            $self->_storage->audit( "\$db->delete('$orig_key');" );
         }
     }
 
@@ -555,8 +555,8 @@ sub DELETE {
     ##
     my $value = $self->_engine->delete_key( $self->_base_offset, $key, $orig_key );
 
-    if (defined $value && !ref($value) && $self->_fileobj->{filter_fetch_value}) {
-        $value = $self->_fileobj->{filter_fetch_value}->($value);
+    if (defined $value && !ref($value) && $self->_storage->{filter_fetch_value}) {
+        $value = $self->_storage->{filter_fetch_value}->($value);
     }
 
     $self->unlock();
@@ -603,7 +603,7 @@ sub CLEAR {
             $lhs = '@{' . $lhs . '}';
         }
 
-        $self->_fileobj->audit( "$lhs = ();" );
+        $self->_storage->audit( "$lhs = ();" );
     }
 
     ##
@@ -1418,9 +1418,9 @@ This method can be called on the root level of the datbase, or any child
 hashes or arrays.  All levels share a I<root> structure, which contains things
 like the filehandle, a reference counter, and all the options specified
 when you created the object.  You can get access to this file object by
-calling the C<_fileobj()> method.
+calling the C<_storage()> method.
 
-  my $file_obj = $db->_fileobj();
+  my $file_obj = $db->_storage();
 
 This is useful for changing options after the object has already been created,
 such as enabling/disabling locking.  You can also store your own temporary user

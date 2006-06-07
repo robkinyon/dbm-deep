@@ -46,8 +46,8 @@ sub TIEHASH {
 
 sub FETCH {
     my $self = shift->_get_self;
-    my $key = ($self->_fileobj->{filter_store_key})
-        ? $self->_fileobj->{filter_store_key}->($_[0])
+    my $key = ($self->_storage->{filter_store_key})
+        ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
 
     return $self->SUPER::FETCH( $key, $_[0] );
@@ -55,8 +55,8 @@ sub FETCH {
 
 sub STORE {
     my $self = shift->_get_self;
-	my $key = ($self->_fileobj->{filter_store_key})
-        ? $self->_fileobj->{filter_store_key}->($_[0])
+	my $key = ($self->_storage->{filter_store_key})
+        ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
     my $value = $_[1];
 
@@ -65,8 +65,8 @@ sub STORE {
 
 sub EXISTS {
     my $self = shift->_get_self;
-	my $key = ($self->_fileobj->{filter_store_key})
-        ? $self->_fileobj->{filter_store_key}->($_[0])
+	my $key = ($self->_storage->{filter_store_key})
+        ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
 
     return $self->SUPER::EXISTS( $key );
@@ -74,8 +74,8 @@ sub EXISTS {
 
 sub DELETE {
     my $self = shift->_get_self;
-	my $key = ($self->_fileobj->{filter_store_key})
-        ? $self->_fileobj->{filter_store_key}->($_[0])
+	my $key = ($self->_storage->{filter_store_key})
+        ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
 
     return $self->SUPER::DELETE( $key, $_[0] );
@@ -96,8 +96,8 @@ sub FIRSTKEY {
 	
 	$self->unlock();
 	
-	return ($result && $self->_fileobj->{filter_fetch_key})
-        ? $self->_fileobj->{filter_fetch_key}->($result)
+	return ($result && $self->_storage->{filter_fetch_key})
+        ? $self->_storage->{filter_fetch_key}->($result)
         : $result;
 }
 
@@ -107,8 +107,8 @@ sub NEXTKEY {
 	##
     my $self = shift->_get_self;
 
-	my $prev_key = ($self->_fileobj->{filter_store_key})
-        ? $self->_fileobj->{filter_store_key}->($_[0])
+	my $prev_key = ($self->_storage->{filter_store_key})
+        ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
 
 	##
@@ -120,8 +120,8 @@ sub NEXTKEY {
 	
 	$self->unlock();
 	
-	return ($result && $self->_fileobj->{filter_fetch_key})
-        ? $self->_fileobj->{filter_fetch_key}->($result)
+	return ($result && $self->_storage->{filter_fetch_key})
+        ? $self->_storage->{filter_fetch_key}->($result)
         : $result;
 }
 

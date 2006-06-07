@@ -161,12 +161,12 @@ sub FETCHSIZE {
 
     $self->lock( $self->LOCK_SH );
 
-    my $SAVE_FILTER = $self->_fileobj->{filter_fetch_value};
-    $self->_fileobj->{filter_fetch_value} = undef;
+    my $SAVE_FILTER = $self->_storage->{filter_fetch_value};
+    $self->_storage->{filter_fetch_value} = undef;
 
     my $packed_size = $self->FETCH('length');
 
-    $self->_fileobj->{filter_fetch_value} = $SAVE_FILTER;
+    $self->_storage->{filter_fetch_value} = $SAVE_FILTER;
 
     $self->unlock;
 
@@ -183,12 +183,12 @@ sub STORESIZE {
 
     $self->lock( $self->LOCK_EX );
 
-    my $SAVE_FILTER = $self->_fileobj->{filter_store_value};
-    $self->_fileobj->{filter_store_value} = undef;
+    my $SAVE_FILTER = $self->_storage->{filter_store_value};
+    $self->_storage->{filter_store_value} = undef;
 
     my $result = $self->STORE('length', pack($self->_engine->{long_pack}, $new_length), 'length');
 
-    $self->_fileobj->{filter_store_value} = $SAVE_FILTER;
+    $self->_storage->{filter_store_value} = $SAVE_FILTER;
 
     $self->unlock;
 

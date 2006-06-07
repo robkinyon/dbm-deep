@@ -16,7 +16,7 @@ use Scalar::Util ();
 #   - _get_key_subloc()
 #   - add_bucket() - where the buckets are printed
 #
-# * Every method in here assumes that the _fileobj has been appropriately
+# * Every method in here assumes that the _storage has been appropriately
 #   safeguarded. This can be anything from flock() to some sort of manual
 #   mutex. But, it's the caller's responsability to make sure that this has
 #   been done.
@@ -43,15 +43,6 @@ sub SIG_SIZE     () {  1     }
 #
 ################################################################################
 
-sub write_value {
-    my $self = shift;
-    my ($offset, $key, $value, $orig_key) = @_;
-
-    my $dig_key = $self->apply_digest( $key );
-    my $tag = $self->find_blist( $offset, $dig_key, { create => 1 } );
-    return $self->add_bucket( $tag, $dig_key, $key, $value, undef, $orig_key );
-}
-
 sub read_value {
     my $self = shift;
     my ($offset, $key, $orig_key) = @_;
@@ -61,16 +52,39 @@ sub read_value {
     return $self->get_bucket_value( $tag, $dig_key, $orig_key );
 }
 
-sub delete_key {
+=pod
+sub read_value {
     my $self = shift;
-    my ($offset, $key, $orig_key) = @_;
+    my ($trans_id, $base_offset, $key) = @_;
+    
+    my ($_val_offset, $_is_del) = $self->_find_value_offset({
+        offset     => $base_offset,
+        trans_id   => $trans_id,
+        allow_head => 1,
+    });
+    die "Attempt to use a deleted value" if $_is_del;
+    die "Internal error!" if !$_val_offset;
 
-    my $dig_key = $self->apply_digest( $key );
-    my $tag = $self->find_blist( $offset, $dig_key ) or return;
-    my $value = $self->get_bucket_value( $tag, $dig_key, $orig_key );
-    $self->delete_bucket( $tag, $dig_key, $orig_key );
-    return $value;
+    my ($key_offset) = $self->_find_key_offset({
+        offset  => $_val_offset,
+        key_md5 => $self->_apply_digest( $key ),
+        create  => 0,
+    });
+    return if !$key_offset;
+
+    my ($val_offset, $is_del) = $self->_find_value_offset({
+        offset     => $key_offset,
+        trans_id   => $trans_id,
+        allow_head => 1,
+    });
+    return if $is_del;
+    die "Internal error!" if !$val_offset;
+
+    return $self->_read_value({
+        offset => $val_offset,
+    });
 }
+=cut
 
 sub key_exists {
     my $self = shift;
@@ -81,6 +95,39 @@ sub key_exists {
     my $tag = $self->find_blist( $offset, $dig_key ) or return '';
     return $self->bucket_exists( $tag, $dig_key, $key );
 }
+
+=pod
+sub key_exists {
+    my $self = shift;
+    my ($trans_id, $base_offset, $key) = @_;
+    
+    my ($_val_offset, $_is_del) = $self->_find_value_offset({
+        offset     => $base_offset,
+        trans_id   => $trans_id,
+        allow_head => 1,
+    });
+    die "Attempt to use a deleted value" if $_is_del;
+    die "Internal error!" if !$_val_offset;
+
+    my ($key_offset) = $self->_find_key_offset({
+        offset  => $_val_offset,
+        key_md5 => $self->_apply_digest( $key ),
+        create  => 0,
+    });
+    return if !$key_offset;
+
+    my ($val_offset, $is_del) = $self->_find_value_offset({
+        offset     => $key_offset,
+        trans_id   => $trans_id,
+        allow_head => 1,
+    });
+
+    return 1 if $is_del;
+
+    die "Internal error!" if !$_val_offset;
+    return '';
+}
+=cut
 
 sub get_next_key {
     my $self = shift;
@@ -104,6 +151,95 @@ sub get_next_key {
 
     return $self->traverse_index( $temp, $offset, 0 );
 }
+
+sub delete_key {
+    my $self = shift;
+    my ($offset, $key, $orig_key) = @_;
+
+    my $dig_key = $self->apply_digest( $key );
+    my $tag = $self->find_blist( $offset, $dig_key ) or return;
+    my $value = $self->get_bucket_value( $tag, $dig_key, $orig_key );
+    $self->delete_bucket( $tag, $dig_key, $orig_key );
+    return $value;
+}
+
+=pod
+sub delete_key {
+    my $self = shift;
+    my ($trans_id, $base_offset, $key) = @_;
+
+    my ($_val_offset, $_is_del) = $self->_find_value_offset({
+        offset     => $base_offset,
+        trans_id   => $trans_id,
+        allow_head => 1,
+    });
+    die "Attempt to use a deleted value" if $_is_del;
+    die "Internal error!" if !$_val_offset;
+
+    my ($key_offset) = $self->_find_key_offset({
+        offset  => $_val_offset,
+        key_md5 => $self->_apply_digest( $key ),
+        create  => 0,
+    });
+    return if !$key_offset;
+
+    if ( $trans_id ) {
+        $self->_mark_as_deleted({
+            offset   => $key_offset,
+            trans_id => $trans_id,
+        });
+    }
+    else {
+        my $value = $self->read_value( $trans_id, $base_offset, $key );
+        if ( @transactions ) {
+            foreach my $other_trans_id ( @transactions ) {
+                #XXX Finish this!
+                # next if the $trans_id has an entry in the keyloc
+                # store $value for $other_trans_id
+            }
+        }
+        else {
+            $self->_remove_key_offset({
+                offset  => $_val_offset,
+                key_md5 => $self->_apply_digest( $key ),
+            });
+        }
+    }
+}
+=cut
+
+sub write_value {
+    my $self = shift;
+    my ($offset, $key, $value, $orig_key) = @_;
+
+    my $dig_key = $self->apply_digest( $key );
+    my $tag = $self->find_blist( $offset, $dig_key, { create => 1 } );
+    return $self->add_bucket( $tag, $dig_key, $key, $value, undef, $orig_key );
+}
+
+=pod
+sub write_value {
+    my $self = shift;
+    my ($trans_id, $base_offset, $key) = @_;
+
+    my ($_val_offset, $_is_del) = $self->_find_value_offset({
+        offset     => $base_offset,
+        trans_id   => $trans_id,
+        allow_head => 1,
+    });
+    die "Attempt to use a deleted value" if $_is_del;
+    die "Internal error!" if !$_val_offset;
+
+    my ($key_offset, $is_new) = $self->_find_key_offset({
+        offset  => $_val_offset,
+        key_md5 => $self->_apply_digest( $key ),
+        create  => 1,
+    });
+    die "Cannot find/create new key offset!" if !$key_offset;
+
+
+}
+=cut
 
 ################################################################################
 #
@@ -132,7 +268,7 @@ sub new {
         ##
         max_buckets => 16,
 
-        fileobj => undef,
+        storage => undef,
         obj     => undef,
     }, $class;
 
@@ -169,7 +305,7 @@ sub new {
     return $self;
 }
 
-sub _fileobj { return $_[0]{fileobj} }
+sub _storage { return $_[0]{storage} }
 
 sub apply_digest {
     my $self = shift;
@@ -197,9 +333,9 @@ sub calculate_sizes {
 sub write_file_header {
     my $self = shift;
 
-    my $loc = $self->_fileobj->request_space( length( SIG_FILE ) + 33 );
+    my $loc = $self->_storage->request_space( length( SIG_FILE ) + 33 );
 
-    $self->_fileobj->print_at( $loc,
+    $self->_storage->print_at( $loc,
         SIG_FILE,
         SIG_HEADER,
         pack('N', 1),  # header version
@@ -212,7 +348,7 @@ sub write_file_header {
         pack('n', $self->{max_buckets}),
     );
 
-    $self->_fileobj->set_transaction_offset( 13 );
+    $self->_storage->set_transaction_offset( 13 );
 
     return;
 }
@@ -220,7 +356,7 @@ sub write_file_header {
 sub read_file_header {
     my $self = shift;
 
-    my $buffer = $self->_fileobj->read_at( 0, length(SIG_FILE) + 9 );
+    my $buffer = $self->_storage->read_at( 0, length(SIG_FILE) + 9 );
     return unless length($buffer);
 
     my ($file_signature, $sig_header, $header_version, $size) = unpack(
@@ -228,22 +364,22 @@ sub read_file_header {
     );
 
     unless ( $file_signature eq SIG_FILE ) {
-        $self->_fileobj->close;
+        $self->_storage->close;
         $self->_throw_error( "Signature not found -- file is not a Deep DB" );
     }
 
     unless ( $sig_header eq SIG_HEADER ) {
-        $self->_fileobj->close;
+        $self->_storage->close;
         $self->_throw_error( "Old file version found." );
     }
 
-    my $buffer2 = $self->_fileobj->read_at( undef, $size );
+    my $buffer2 = $self->_storage->read_at( undef, $size );
     my ($a1, $a2, $a3, $a4, @values) = unpack( 'N4 n A n A n', $buffer2 );
 
-    $self->_fileobj->set_transaction_offset( 13 );
+    $self->_storage->set_transaction_offset( 13 );
 
     if ( @values < 5 || grep { !defined } @values ) {
-        $self->_fileobj->close;
+        $self->_storage->close;
         $self->_throw_error("Corrupted file - bad header");
     }
 
@@ -258,7 +394,7 @@ sub setup_fh {
     my ($obj) = @_;
 
     # Need to remove use of $fh here
-    my $fh = $self->_fileobj->{fh};
+    my $fh = $self->_storage->{fh};
     flock $fh, LOCK_EX;
 
     #XXX The duplication of calculate_sizes needs to go away
@@ -271,11 +407,11 @@ sub setup_fh {
         # File is empty -- write header and master index
         ##
         if (!$bytes_read) {
-            $self->_fileobj->audit( "# Database created on" );
+            $self->_storage->audit( "# Database created on" );
 
             $self->write_file_header;
 
-            $obj->{base_offset} = $self->_fileobj->request_space(
+            $obj->{base_offset} = $self->_storage->request_space(
                 $self->tag_size( $self->{index_size} ),
             );
 
@@ -312,7 +448,7 @@ sub setup_fh {
     }
 
     #XXX We have to make sure we don't mess up when autoflush isn't turned on
-    $self->_fileobj->set_inode;
+    $self->_storage->set_inode;
 
     flock $fh, LOCK_UN;
 
@@ -333,7 +469,7 @@ sub write_tag {
     my ($offset, $sig, $content) = @_;
     my $size = length( $content );
 
-    $self->_fileobj->print_at(
+    $self->_storage->print_at(
         $offset, 
         $sig, pack($self->{data_pack}, $size), $content,
     );
@@ -356,25 +492,25 @@ sub load_tag {
     my $self = shift;
     my ($offset) = @_;
 
-    my $fileobj = $self->_fileobj;
+    my $storage = $self->_storage;
 
     my ($sig, $size) = unpack(
         "A $self->{data_pack}",
-        $fileobj->read_at( $offset, SIG_SIZE + $self->{data_size} ),
+        $storage->read_at( $offset, SIG_SIZE + $self->{data_size} ),
     );
 
     return {
         signature => $sig,
         size      => $size,   #XXX Is this even used?
         offset    => $offset + SIG_SIZE + $self->{data_size},
-        content   => $fileobj->read_at( undef, $size ),
+        content   => $storage->read_at( undef, $size ),
     };
 }
 
 sub find_keyloc {
     my $self = shift;
     my ($tag, $transaction_id) = @_;
-    $transaction_id = $self->_fileobj->transaction_id
+    $transaction_id = $self->_storage->transaction_id
         unless defined $transaction_id;
 
     for ( my $i = 0; $i < $self->{max_buckets}; $i++ ) {
@@ -416,14 +552,14 @@ sub add_bucket {
         );
     }
 
-    my $fileobj = $self->_fileobj;
+    my $storage = $self->_storage;
 
     #ACID - This is a mutation. Must only find the exact transaction
     my ($keyloc, $offset) = $self->_find_in_buckets( $tag, $md5, 1 );
 
     my @transactions;
-    if ( $fileobj->transaction_id == 0 ) {
-        @transactions = $fileobj->current_transactions;
+    if ( $storage->transaction_id == 0 ) {
+        @transactions = $storage->current_transactions;
     }
 
 #    $self->_release_space( $size, $subloc );
@@ -444,8 +580,8 @@ sub add_bucket {
             for my $trans_id ( @transactions ) {
                 my ($loc, $is_deleted, $offset2) = $self->find_keyloc( $keytag, $trans_id );
                 unless ($loc) {
-                    my $location2 = $fileobj->request_space( $old_size );
-                    $fileobj->print_at( $keytag->{offset} + $offset2,
+                    my $location2 = $storage->request_space( $old_size );
+                    $storage->print_at( $keytag->{offset} + $offset2,
                         pack($self->{long_pack}, $location2 ),
                         pack( 'C C', $trans_id, 0 ),
                     );
@@ -454,20 +590,20 @@ sub add_bucket {
             }
         }
 
-        $location = $self->_fileobj->request_space( $size );
+        $location = $self->_storage->request_space( $size );
         #XXX This needs to be transactionally-aware in terms of which keytag->{offset} to use
-        $fileobj->print_at( $keytag->{offset} + $offset,
+        $storage->print_at( $keytag->{offset} + $offset,
             pack($self->{long_pack}, $location ),
-            pack( 'C C', $fileobj->transaction_id, 0 ),
+            pack( 'C C', $storage->transaction_id, 0 ),
         );
     }
     # Adding a new md5
     else {
-        my $keyloc = $fileobj->request_space( $self->tag_size( $self->{keyloc_size} ) );
+        my $keyloc = $storage->request_space( $self->tag_size( $self->{keyloc_size} ) );
 
         # The bucket fit into list
         if ( defined $offset ) {
-            $fileobj->print_at( $tag->{offset} + $offset,
+            $storage->print_at( $tag->{offset} + $offset,
                 $md5, pack( $self->{long_pack}, $keyloc ),
             );
         }
@@ -480,15 +616,15 @@ sub add_bucket {
             $keyloc, SIG_KEYS, chr(0)x$self->{keyloc_size},
         );
 
-        $location = $self->_fileobj->request_space( $size );
-        $fileobj->print_at( $keytag->{offset},
+        $location = $self->_storage->request_space( $size );
+        $storage->print_at( $keytag->{offset},
             pack( $self->{long_pack}, $location ),
-            pack( 'C C', $fileobj->transaction_id, 0 ),
+            pack( 'C C', $storage->transaction_id, 0 ),
         );
 
         my $offset = 1;
         for my $trans_id ( @transactions ) {
-            $fileobj->print_at( $keytag->{offset} + $self->{key_size} * $offset++,
+            $storage->print_at( $keytag->{offset} + $self->{key_size} * $offset++,
                 pack( $self->{long_pack}, 0 ),
                 pack( 'C C', $trans_id, 1 ),
             );
@@ -504,10 +640,10 @@ sub _write_value {
     my $self = shift;
     my ($location, $key, $value, $orig_key) = @_;
 
-    my $fileobj = $self->_fileobj;
+    my $storage = $self->_storage;
 
     my $dbm_deep_obj = _get_dbm_object( $value );
-    if ( $dbm_deep_obj && $dbm_deep_obj->_fileobj ne $fileobj ) {
+    if ( $dbm_deep_obj && $dbm_deep_obj->_storage ne $storage ) {
         $self->_throw_error( "Cannot cross-reference. Use export() instead" );
     }
 
@@ -541,7 +677,7 @@ sub _write_value {
     ##
     # Plain key is stored AFTER value, as keys are typically fetched less often.
     ##
-    $fileobj->print_at( undef, pack($self->{data_pack}, length($key)) . $key );
+    $storage->print_at( undef, pack($self->{data_pack}, length($key)) . $key );
 
     # Internal references don't care about autobless
     return 1 if $dbm_deep_obj;
@@ -549,12 +685,12 @@ sub _write_value {
     ##
     # If value is blessed, preserve class name
     ##
-    if ( $fileobj->{autobless} ) {
+    if ( $storage->{autobless} ) {
         if ( defined( my $c = Scalar::Util::blessed($value) ) ) {
-            $fileobj->print_at( undef, chr(1), pack($self->{data_pack}, length($c)) . $c );
+            $storage->print_at( undef, chr(1), pack($self->{data_pack}, length($c)) . $c );
         }
         else {
-            $fileobj->print_at( undef, chr(0) );
+            $storage->print_at( undef, chr(0) );
         }
     }
 
@@ -570,7 +706,7 @@ sub _write_value {
         my %x = %$value;
         tie %$value, 'DBM::Deep', {
             base_offset => $location,
-            fileobj     => $fileobj,
+            storage     => $storage,
             parent      => $self->{obj},
             parent_key  => $orig_key,
         };
@@ -581,7 +717,7 @@ sub _write_value {
         my @x = @$value;
         tie @$value, 'DBM::Deep', {
             base_offset => $location,
-            fileobj     => $fileobj,
+            storage     => $storage,
             parent      => $self->{obj},
             parent_key  => $orig_key,
         };
@@ -596,13 +732,13 @@ sub split_index {
     my $self = shift;
     my ($tag, $md5, $keyloc) = @_;
 
-    my $fileobj = $self->_fileobj;
+    my $storage = $self->_storage;
 
-    my $loc = $fileobj->request_space(
+    my $loc = $storage->request_space(
         $self->tag_size( $self->{index_size} ),
     );
 
-    $fileobj->print_at( $tag->{ref_loc}, pack($self->{long_pack}, $loc) );
+    $storage->print_at( $tag->{ref_loc}, pack($self->{long_pack}, $loc) );
 
     my $index_tag = $self->write_tag(
         $loc, SIG_INDEX,
@@ -625,14 +761,14 @@ sub split_index {
         my $num = ord(substr($key, $tag->{ch} + 1, 1));
 
         if ($newloc[$num]) {
-            my $subkeys = $fileobj->read_at( $newloc[$num], $self->{bucket_list_size} );
+            my $subkeys = $storage->read_at( $newloc[$num], $self->{bucket_list_size} );
 
             # This is looking for the first empty spot
             my ($subloc, $offset) = $self->_find_in_buckets(
                 { content => $subkeys }, '',
             );
 
-            $fileobj->print_at(
+            $storage->print_at(
                 $newloc[$num] + $offset,
                 $key, pack($self->{long_pack}, $old_subloc),
             );
@@ -640,11 +776,11 @@ sub split_index {
             next;
         }
 
-        my $loc = $fileobj->request_space(
+        my $loc = $storage->request_space(
             $self->tag_size( $self->{bucket_list_size} ),
         );
 
-        $fileobj->print_at(
+        $storage->print_at(
             $index_tag->{offset} + ($num * $self->{long_size}),
             pack($self->{long_pack}, $loc),
         );
@@ -654,7 +790,7 @@ sub split_index {
             chr(0)x$self->{bucket_list_size},
         );
 
-        $fileobj->print_at( $blist_tag->{offset}, $key . pack($self->{long_pack}, $old_subloc) );
+        $storage->print_at( $blist_tag->{offset}, $key . pack($self->{long_pack}, $old_subloc) );
 
         $newloc[$num] = $blist_tag->{offset};
     }
@@ -671,9 +807,9 @@ sub read_from_loc {
     my $self = shift;
     my ($subloc, $orig_key) = @_;
 
-    my $fileobj = $self->_fileobj;
+    my $storage = $self->_storage;
 
-    my $signature = $fileobj->read_at( $subloc, SIG_SIZE );
+    my $signature = $storage->read_at( $subloc, SIG_SIZE );
 
     ##
     # If value is a hash or array, return new DBM::Deep object with correct offset
@@ -686,21 +822,21 @@ sub read_from_loc {
 #            $new_obj = {};
 #            tie %$new_obj, 'DBM::Deep', {
 #                base_offset => $subloc,
-#                fileobj     => $self->_fileobj,
+#                storage     => $self->_storage,
 #                parent      => $self->{obj},
 #                parent_key  => $orig_key,
 #            };
-#            $is_autobless = tied(%$new_obj)->_fileobj->{autobless};
+#            $is_autobless = tied(%$new_obj)->_storage->{autobless};
 #        }
 #        else {
 #            $new_obj = [];
 #            tie @$new_obj, 'DBM::Deep', {
 #                base_offset => $subloc,
-#                fileobj     => $self->_fileobj,
+#                storage     => $self->_storage,
 #                parent      => $self->{obj},
 #                parent_key  => $orig_key,
 #            };
-#            $is_autobless = tied(@$new_obj)->_fileobj->{autobless};
+#            $is_autobless = tied(@$new_obj)->_storage->{autobless};
 #        }
 #
 #        if ($is_autobless) {
@@ -708,31 +844,31 @@ sub read_from_loc {
         my $new_obj = DBM::Deep->new({
             type        => $signature,
             base_offset => $subloc,
-            fileobj     => $self->_fileobj,
+            storage     => $self->_storage,
             parent      => $self->{obj},
             parent_key  => $orig_key,
         });
 
-        if ($new_obj->_fileobj->{autobless}) {
+        if ($new_obj->_storage->{autobless}) {
             ##
             # Skip over value and plain key to see if object needs
             # to be re-blessed
             ##
-            $fileobj->increment_pointer( $self->{data_size} + $self->{index_size} );
+            $storage->increment_pointer( $self->{data_size} + $self->{index_size} );
 
-            my $size = $fileobj->read_at( undef, $self->{data_size} );
+            my $size = $storage->read_at( undef, $self->{data_size} );
             $size = unpack($self->{data_pack}, $size);
-            if ($size) { $fileobj->increment_pointer( $size ); }
+            if ($size) { $storage->increment_pointer( $size ); }
 
-            my $bless_bit = $fileobj->read_at( undef, 1 );
+            my $bless_bit = $storage->read_at( undef, 1 );
             if ( ord($bless_bit) ) {
                 my $size = unpack(
                     $self->{data_pack},
-                    $fileobj->read_at( undef, $self->{data_size} ),
+                    $storage->read_at( undef, $self->{data_size} ),
                 );
 
                 if ( $size ) {
-                    $new_obj = bless $new_obj, $fileobj->read_at( undef, $size );
+                    $new_obj = bless $new_obj, $storage->read_at( undef, $size );
                 }
             }
         }
@@ -740,11 +876,11 @@ sub read_from_loc {
         return $new_obj;
     }
     elsif ( $signature eq SIG_INTERNAL ) {
-        my $size = $fileobj->read_at( undef, $self->{data_size} );
+        my $size = $storage->read_at( undef, $self->{data_size} );
         $size = unpack($self->{data_pack}, $size);
 
         if ( $size ) {
-            my $new_loc = $fileobj->read_at( undef, $size );
+            my $new_loc = $storage->read_at( undef, $size );
             $new_loc = unpack( $self->{long_pack}, $new_loc ); 
             return $self->read_from_loc( $new_loc, $orig_key );
         }
@@ -756,10 +892,10 @@ sub read_from_loc {
     # Otherwise return actual value
     ##
     elsif ( $signature eq SIG_DATA ) {
-        my $size = $fileobj->read_at( undef, $self->{data_size} );
+        my $size = $storage->read_at( undef, $self->{data_size} );
         $size = unpack($self->{data_pack}, $size);
 
-        my $value = $size ? $fileobj->read_at( undef, $size ) : '';
+        my $value = $size ? $storage->read_at( undef, $size ) : '';
         return $value;
     }
 
@@ -812,14 +948,14 @@ sub delete_bucket {
 
     return if !$keyloc;
 
-    my $fileobj = $self->_fileobj;
+    my $storage = $self->_storage;
 
     my @transactions;
-    if ( $fileobj->transaction_id == 0 ) {
-        @transactions = $fileobj->current_transactions;
+    if ( $storage->transaction_id == 0 ) {
+        @transactions = $storage->current_transactions;
     }
 
-    if ( $fileobj->transaction_id == 0 ) {
+    if ( $storage->transaction_id == 0 ) {
         my $keytag = $self->load_tag( $keyloc );
 
         my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
@@ -832,8 +968,8 @@ sub delete_bucket {
         for my $trans_id ( @transactions ) {
             my ($loc, $is_deleted, $offset2) = $self->find_keyloc( $keytag, $trans_id );
             unless ($loc) {
-                my $location2 = $fileobj->request_space( $size );
-                $fileobj->print_at( $keytag->{offset} + $offset2,
+                my $location2 = $storage->request_space( $size );
+                $storage->print_at( $keytag->{offset} + $offset2,
                     pack($self->{long_pack}, $location2 ),
                     pack( 'C C', $trans_id, 0 ),
                 );
@@ -843,7 +979,7 @@ sub delete_bucket {
 
         $keytag = $self->load_tag( $keyloc );
         ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
-        $fileobj->print_at( $keytag->{offset} + $offset,
+        $storage->print_at( $keytag->{offset} + $offset,
             substr( $keytag->{content}, $offset + $self->{key_size} ),
             chr(0) x $self->{key_size},
         );
@@ -853,9 +989,9 @@ sub delete_bucket {
 
         my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
 
-        $fileobj->print_at( $keytag->{offset} + $offset,
+        $storage->print_at( $keytag->{offset} + $offset,
             pack($self->{long_pack}, 0 ),
-            pack( 'C C', $fileobj->transaction_id, 1 ),
+            pack( 'C C', $storage->transaction_id, 1 ),
         );
     }
 
@@ -903,11 +1039,11 @@ sub find_blist {
         if (!$tag) {
             return if !$args->{create};
 
-            my $loc = $self->_fileobj->request_space(
+            my $loc = $self->_storage->request_space(
                 $self->tag_size( $self->{bucket_list_size} ),
             );
 
-            $self->_fileobj->print_at( $ref_loc, pack($self->{long_pack}, $loc) );
+            $self->_storage->print_at( $ref_loc, pack($self->{long_pack}, $loc) );
 
             $tag = $self->write_tag(
                 $loc, SIG_BLIST,
@@ -989,7 +1125,7 @@ sub traverse_index {
         ##
         # Iterate through buckets, looking for a key match
         ##
-        my $transaction_id = $self->_fileobj->transaction_id;
+        my $transaction_id = $self->_storage->transaction_id;
         for (my $i = 0; $i < $self->{max_buckets}; $i++) {
             my ($key, $keyloc) = $self->_get_key_subloc( $keys, $i );
 
@@ -1005,7 +1141,7 @@ sub traverse_index {
             }
             # Seek to bucket location and skip over signature
             elsif ($xxxx->{return_next}) {
-                my $fileobj = $self->_fileobj;
+                my $storage = $self->_storage;
 
                 my $keytag = $self->load_tag( $keyloc );
                 my ($subloc, $is_deleted) = $self->find_keyloc( $keytag );
@@ -1015,18 +1151,18 @@ sub traverse_index {
                 next if $is_deleted;
 
                 # Skip over value to get to plain key
-                my $sig = $fileobj->read_at( $subloc, SIG_SIZE );
+                my $sig = $storage->read_at( $subloc, SIG_SIZE );
 
-                my $size = $fileobj->read_at( undef, $self->{data_size} );
+                my $size = $storage->read_at( undef, $self->{data_size} );
                 $size = unpack($self->{data_pack}, $size);
-                if ($size) { $fileobj->increment_pointer( $size ); }
+                if ($size) { $storage->increment_pointer( $size ); }
 
                 # Read in plain key and return as scalar
-                $size = $fileobj->read_at( undef, $self->{data_size} );
+                $size = $storage->read_at( undef, $self->{data_size} );
                 $size = unpack($self->{data_pack}, $size);
 
                 my $plain_key;
-                if ($size) { $plain_key = $fileobj->read_at( undef, $size); }
+                if ($size) { $plain_key = $storage->read_at( undef, $size); }
                 return $plain_key;
             }
         }
@@ -1085,7 +1221,7 @@ sub _release_space {
 
     my $next_loc = 0;
 
-    $self->_fileobj->print_at( $loc,
+    $self->_storage->print_at( $loc,
         SIG_FREE, 
         pack($self->{long_pack}, $size ),
         pack($self->{long_pack}, $next_loc ),
@@ -1151,12 +1287,12 @@ sub _length_needed {
             + $self->{data_size} # size for key
             + length( $key );    # length of key
 
-    if ( $is_dbm_deep && $value->_fileobj eq $self->_fileobj ) {
+    if ( $is_dbm_deep && $value->_storage eq $self->_storage ) {
         # long_size is for the internal reference
         return $len + $self->{long_size};
     }
 
-    if ( $self->_fileobj->{autobless} ) {
+    if ( $self->_storage->{autobless} ) {
         # This is for the bit saying whether or not this thing is blessed.
         $len += 1;
     }
@@ -1173,7 +1309,7 @@ sub _length_needed {
 
     # if autobless is enabled, must also take into consideration
     # the class name as it is stored after the key.
-    if ( $self->_fileobj->{autobless} ) {
+    if ( $self->_storage->{autobless} ) {
         my $c = Scalar::Util::blessed($value);
         if ( defined $c && !$is_dbm_deep ) {
             $len += $self->{data_size} + length($c);

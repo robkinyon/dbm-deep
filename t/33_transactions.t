@@ -147,7 +147,7 @@ SKIP: {
 
     $db1->begin_work;
 
-        cmp_ok( $db1->_fileobj->transaction_id, '==', 1, "Transaction ID has been reset after optimize" );
+        cmp_ok( $db1->_storage->transaction_id, '==', 1, "Transaction ID has been reset after optimize" );
 
     $db1->rollback;
 }

@@ -37,6 +37,9 @@ sub SIG_FREE     () { 'F'    }
 sub SIG_KEYS     () { 'K'    }
 sub SIG_SIZE     () {  1     }
 
+# This is the transaction ID for the HEAD
+sub HEAD () { 0 }
+
 ################################################################################
 #
 # This is new code. It is a complete rewrite of the engine based on a new API
@@ -52,40 +55,6 @@ sub read_value {
     return $self->get_bucket_value( $tag, $dig_key, $orig_key );
 }
 
-=pod
-sub read_value {
-    my $self = shift;
-    my ($trans_id, $base_offset, $key) = @_;
-    
-    my ($_val_offset, $_is_del) = $self->_find_value_offset({
-        offset     => $base_offset,
-        trans_id   => $trans_id,
-        allow_head => 1,
-    });
-    die "Attempt to use a deleted value" if $_is_del;
-    die "Internal error!" if !$_val_offset;
-
-    my ($key_offset) = $self->_find_key_offset({
-        offset  => $_val_offset,
-        key_md5 => $self->_apply_digest( $key ),
-        create  => 0,
-    });
-    return if !$key_offset;
-
-    my ($val_offset, $is_del) = $self->_find_value_offset({
-        offset     => $key_offset,
-        trans_id   => $trans_id,
-        allow_head => 1,
-    });
-    return if $is_del;
-    die "Internal error!" if !$val_offset;
-
-    return $self->_read_value({
-        offset => $val_offset,
-    });
-}
-=cut
-
 sub key_exists {
     my $self = shift;
     my ($offset, $key) = @_;
@@ -95,39 +64,6 @@ sub key_exists {
     my $tag = $self->find_blist( $offset, $dig_key ) or return '';
     return $self->bucket_exists( $tag, $dig_key, $key );
 }
-
-=pod
-sub key_exists {
-    my $self = shift;
-    my ($trans_id, $base_offset, $key) = @_;
-    
-    my ($_val_offset, $_is_del) = $self->_find_value_offset({
-        offset     => $base_offset,
-        trans_id   => $trans_id,
-        allow_head => 1,
-    });
-    die "Attempt to use a deleted value" if $_is_del;
-    die "Internal error!" if !$_val_offset;
-
-    my ($key_offset) = $self->_find_key_offset({
-        offset  => $_val_offset,
-        key_md5 => $self->_apply_digest( $key ),
-        create  => 0,
-    });
-    return if !$key_offset;
-
-    my ($val_offset, $is_del) = $self->_find_value_offset({
-        offset     => $key_offset,
-        trans_id   => $trans_id,
-        allow_head => 1,
-    });
-
-    return 1 if $is_del;
-
-    die "Internal error!" if !$_val_offset;
-    return '';
-}
-=cut
 
 sub get_next_key {
     my $self = shift;
@@ -163,51 +99,6 @@ sub delete_key {
     return $value;
 }
 
-=pod
-sub delete_key {
-    my $self = shift;
-    my ($trans_id, $base_offset, $key) = @_;
-
-    my ($_val_offset, $_is_del) = $self->_find_value_offset({
-        offset     => $base_offset,
-        trans_id   => $trans_id,
-        allow_head => 1,
-    });
-    die "Attempt to use a deleted value" if $_is_del;
-    die "Internal error!" if !$_val_offset;
-
-    my ($key_offset) = $self->_find_key_offset({
-        offset  => $_val_offset,
-        key_md5 => $self->_apply_digest( $key ),
-        create  => 0,
-    });
-    return if !$key_offset;
-
-    if ( $trans_id ) {
-        $self->_mark_as_deleted({
-            offset   => $key_offset,
-            trans_id => $trans_id,
-        });
-    }
-    else {
-        my $value = $self->read_value( $trans_id, $base_offset, $key );
-        if ( @transactions ) {
-            foreach my $other_trans_id ( @transactions ) {
-                #XXX Finish this!
-                # next if the $trans_id has an entry in the keyloc
-                # store $value for $other_trans_id
-            }
-        }
-        else {
-            $self->_remove_key_offset({
-                offset  => $_val_offset,
-                key_md5 => $self->_apply_digest( $key ),
-            });
-        }
-    }
-}
-=cut
-
 sub write_value {
     my $self = shift;
     my ($offset, $key, $value, $orig_key) = @_;
@@ -216,30 +107,6 @@ sub write_value {
     my $tag = $self->find_blist( $offset, $dig_key, { create => 1 } );
     return $self->add_bucket( $tag, $dig_key, $key, $value, undef, $orig_key );
 }
-
-=pod
-sub write_value {
-    my $self = shift;
-    my ($trans_id, $base_offset, $key) = @_;
-
-    my ($_val_offset, $_is_del) = $self->_find_value_offset({
-        offset     => $base_offset,
-        trans_id   => $trans_id,
-        allow_head => 1,
-    });
-    die "Attempt to use a deleted value" if $_is_del;
-    die "Internal error!" if !$_val_offset;
-
-    my ($key_offset, $is_new) = $self->_find_key_offset({
-        offset  => $_val_offset,
-        key_md5 => $self->_apply_digest( $key ),
-        create  => 1,
-    });
-    die "Cannot find/create new key offset!" if !$key_offset;
-
-
-}
-=cut
 
 ################################################################################
 #
@@ -502,6 +369,7 @@ sub load_tag {
     return {
         signature => $sig,
         size      => $size,   #XXX Is this even used?
+        start     => $offset,
         offset    => $offset + SIG_SIZE + $self->{data_size},
         content   => $storage->read_at( undef, $size ),
     };
@@ -519,13 +387,8 @@ sub find_keyloc {
             substr( $tag->{content}, $i * $self->{key_size}, $self->{key_size} ),
         );
 
-        if ( $loc == 0 ) {
-            return ( $loc, $is_deleted, $i * $self->{key_size} );
-        }
-
-        next if $transaction_id != $trans_id;
-
-        return ( $loc, $is_deleted, $i * $self->{key_size} );
+        next if $loc != HEAD && $transaction_id != $trans_id;
+        return( $loc, $is_deleted, $i * $self->{key_size} );
     }
 
     return;
@@ -797,7 +660,7 @@ sub split_index {
 
     $self->_release_space(
         $self->tag_size( $self->{bucket_list_size} ),
-        $tag->{offset} - SIG_SIZE - $self->{data_size},
+        $tag->{start},
     );
 
     return 1;
@@ -1029,8 +892,8 @@ sub find_blist {
     my $tag = $self->load_tag( $offset )
         or $self->_throw_error( "INTERNAL ERROR - Cannot find tag" );
 
-    my $ch = 0;
-    while ($tag->{signature} ne SIG_BLIST) {
+    #XXX What happens when $ch >= $self->{hash_size} ??
+    for (my $ch = 0; $tag->{signature} ne SIG_BLIST; $ch++) {
         my $num = ord substr($md5, $ch, 1);
 
         my $ref_loc = $tag->{offset} + ($num * $self->{long_size});
@@ -1056,7 +919,7 @@ sub find_blist {
             last;
         }
 
-        $tag->{ch} = $ch++;
+        $tag->{ch} = $ch;
         $tag->{ref_loc} = $ref_loc;
     }
 
@@ -1201,15 +1064,8 @@ sub _find_in_buckets {
             $tag->{content}, $i,
         );
 
-        my @rv = ($subloc, $i * $self->{bucket_size});
-
-        unless ( $subloc ) {
-            return @rv;
-        }
-
-        next BUCKET if $key ne $md5;
-
-        return @rv;
+        next BUCKET if $subloc && $key ne $md5;
+        return( $subloc, $i * $self->{bucket_size} );
     }
 
     return;

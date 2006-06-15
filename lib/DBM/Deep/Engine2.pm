@@ -227,11 +227,17 @@ sub write_value {
         }
     }
 
-    #XXX Write this
-    $self->_write_value({
-        tag    => $key_tag,
-        value  => $value,
+    my $value_loc = $self->_storage->request_space( 
+        $self->_length_needed( $value, $key ),
+    );
+
+    $self->_add_key_offset({
+        tag      => $key_tag,
+        trans_id => $trans_id,
+        loc      => $value_loc,
     });
+
+    $self->_write_value( $value_loc, $key, $value, $key );
 
     return 1;
 }
@@ -239,6 +245,8 @@ sub write_value {
 sub _find_value_offset {
     my $self = shift;
     my ($args) = @_;
+
+    use Data::Dumper;warn Dumper $args;
 
     my $key_tag = $self->load_tag( $args->{offset} );
 
@@ -268,8 +276,6 @@ sub _find_key_offset {
 
     my $bucket_tag = $self->load_tag( $args->{offset} )
         or $self->_throw_error( "INTERNAL ERROR - Cannot find tag" );
-
-    # $bucket_tag->{ref_loc} and $bucket_tag->{ch} are used in split_index()
 
     #XXX What happens when $ch >= $self->{hash_size} ??
     for (my $ch = 0; $bucket_tag->{signature} ne SIG_BLIST; $ch++) {
@@ -322,18 +328,47 @@ sub _find_key_offset {
         return( $keytag_loc, $bucket_tag );
     }
     else {
+        my ($key, $subloc, $index);
         BUCKET:
         for ( my $i = 0; $i < $self->{max_buckets}; $i++ ) {
-            my ($key, $subloc) = $self->_get_key_subloc(
+            ($key, $subloc) = $self->_get_key_subloc(
                 $bucket_tag->{content}, $i,
             );
 
             next BUCKET if $subloc && $key ne $args->{key_md5};
-            #XXX Right here, I need to create a new value, if I can
-            return( $subloc, $bucket_tag );
+
+            # Keep track of where we are, in case we need to create a new
+            # entry.
+            $index = $i;
+            last;
         }
-        # Right here, it looks like split_index needs to happen
-        # What happens here?
+
+        # Either we have a subloc to return or we don't want to create a new
+        # entry. Either way, we need to return now.
+        return ($subloc, $bucket_tag) if $subloc || !$args->{create};
+
+        my $keytag_loc = $self->_storage->request_space(
+            $self->tag_size( $self->{keyloc_size} ),
+        );
+
+        # There's space left in this bucket
+        if ( defined $index ) {
+            substr( $bucket_tag->{content}, $index * $self->{key_size}, $self->{key_size} ) =
+                $args->{key_md5} . pack( "$self->{long_pack}", $keytag_loc );
+
+            $self->_storage->print_at( $bucket_tag->{offset}, $bucket_tag->{content} );
+        }
+        # We need to split the index
+        else {
+            $self->split_index( $bucket_tag, $args->{key_md5}, $keytag_loc );
+        }
+
+        $self->write_tag(
+            $keytag_loc, SIG_KEYS,
+            chr(0)x$self->{keyloc_size},
+        );
+
+        return( $keytag_loc, $bucket_tag );
     }
 
     return;
@@ -362,7 +397,7 @@ sub _mark_as_deleted {
             substr( $args->{tag}{content}, $i * $self->{key_size}, $self->{key_size} ) = pack(
                 "$self->{long_pack} C C",
                 $loc, $trans_id, 1,
-            )
+            );
         }
     }
 
@@ -419,11 +454,37 @@ sub _remove_key_offset {
     return 1;
 }
 
-sub _write_value {
+sub _add_key_offset {
     my $self = shift;
     my ($args) = @_;
 
+    my $is_changed;
+    for ( my $i = 0; $i < $self->{max_buckets}; $i++ ) {
+        my ($loc, $trans_id, $is_deleted) = unpack(
+            "$self->{long_pack} C C",
+            substr( $args->{tag}{content}, $i * $self->{key_size}, $self->{key_size} ),
+        );
 
+        if ( $trans_id == $args->{trans_id} || (!$loc && !$is_deleted) ) {
+            substr( $args->{tag}{content}, $i * $self->{key_size}, $self->{key_size} ) = pack(
+                "$self->{long_pack} C C",
+                $args->{loc}, $args->{trans_id}, 0,
+            );
+            $is_changed = 1;
+            last;
+        }
+    }
+
+    if ( $is_changed ) {
+        $self->_storage->print_at(
+            $args->{tag}{offset}, $args->{tag}{content},
+        );
+    }
+    else {
+        die "Why didn't _add_key_offset() change something?!\n";
+    }
+
+    return 1;
 }
 
 sub setup_fh {

@@ -492,7 +492,7 @@ sub STORE {
         $value = $self->_storage->{filter_store_value}->( $value );
     }
 
-    $self->_engine->write_value( $self->_base_offset, $key, $value, $orig_key );
+    $self->_engine->write_value( $self->_storage->transaction_id, $self->_base_offset, $key, $value, $orig_key );
 
     $self->unlock();
 
@@ -512,7 +512,7 @@ sub FETCH {
     ##
     $self->lock( LOCK_SH );
 
-    my $result = $self->_engine->read_value( $self->_base_offset, $key, $orig_key );
+    my $result = $self->_engine->read_value( $self->_storage->transaction_id, $self->_base_offset, $key, $orig_key );
 
     $self->unlock();
 
@@ -553,7 +553,7 @@ sub DELETE {
     ##
     # Delete bucket
     ##
-    my $value = $self->_engine->delete_key( $self->_base_offset, $key, $orig_key );
+    my $value = $self->_engine->delete_key( $self->_storage->transaction_id, $self->_base_offset, $key, $orig_key );
 
     if (defined $value && !ref($value) && $self->_storage->{filter_fetch_value}) {
         $value = $self->_storage->{filter_fetch_value}->($value);
@@ -576,7 +576,7 @@ sub EXISTS {
     ##
     $self->lock( LOCK_SH );
 
-    my $result = $self->_engine->key_exists( $self->_base_offset, $key );
+    my $result = $self->_engine->key_exists( $self->_storage->transaction_id, $self->_base_offset, $key );
 
     $self->unlock();
 
@@ -616,14 +616,14 @@ sub CLEAR {
         while ( $key ) {
             # Retrieve the key before deleting because we depend on next_key
             my $next_key = $self->next_key( $key );
-            $self->_engine->delete_key( $self->_base_offset, $key, $key );
+            $self->_engine->delete_key( $self->_storage->transaction_id, $self->_base_offset, $key, $key );
             $key = $next_key;
         }
     }
     else {
         my $size = $self->FETCHSIZE;
         for my $key ( 0 .. $size - 1 ) {
-            $self->_engine->delete_key( $self->_base_offset, $key, $key );
+            $self->_engine->delete_key( $self->_storage->transaction_id, $self->_base_offset, $key, $key );
         }
         $self->STORESIZE( 0 );
     }

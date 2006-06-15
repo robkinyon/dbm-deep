@@ -92,7 +92,7 @@ sub FIRSTKEY {
 	##
 	$self->lock( $self->LOCK_SH );
 	
-	my $result = $self->_engine->get_next_key($self->_base_offset);
+	my $result = $self->_engine->get_next_key($self->_storage->transaction_id, $self->_base_offset);
 	
 	$self->unlock();
 	
@@ -116,7 +116,7 @@ sub NEXTKEY {
 	##
 	$self->lock( $self->LOCK_SH );
 	
-	my $result = $self->_engine->get_next_key( $self->_base_offset, $prev_key );
+	my $result = $self->_engine->get_next_key( $self->_storage->transaction_id, $self->_base_offset, $prev_key );
 	
 	$self->unlock();
 	

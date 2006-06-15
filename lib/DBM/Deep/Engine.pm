@@ -48,18 +48,18 @@ sub HEAD () { 0 }
 
 sub read_value {
     my $self = shift;
-    my ($offset, $key, $orig_key) = @_;
+    my ($trans_id, $offset, $key, $orig_key) = @_;
 
-    my $dig_key = $self->apply_digest( $key );
+    my $dig_key = $self->_apply_digest( $key );
     my $tag = $self->find_blist( $offset, $dig_key ) or return;
     return $self->get_bucket_value( $tag, $dig_key, $orig_key );
 }
 
 sub key_exists {
     my $self = shift;
-    my ($offset, $key) = @_;
+    my ($trans_id, $offset, $key) = @_;
 
-    my $dig_key = $self->apply_digest( $key );
+    my $dig_key = $self->_apply_digest( $key );
     # exists() returns the empty string, not undef
     my $tag = $self->find_blist( $offset, $dig_key ) or return '';
     return $self->bucket_exists( $tag, $dig_key, $key );
@@ -67,14 +67,14 @@ sub key_exists {
 
 sub get_next_key {
     my $self = shift;
-    my ($offset) = @_;
+    my ($trans_id, $offset) = @_;
 
     # If the previous key was not specifed, start at the top and
     # return the first one found.
     my $temp;
-    if ( @_ > 1 ) {
+    if ( @_ > 2 ) {
         $temp = {
-            prev_md5    => $self->apply_digest($_[1]),
+            prev_md5    => $self->_apply_digest($_[2]),
             return_next => 0,
         };
     }
@@ -90,9 +90,9 @@ sub get_next_key {
 
 sub delete_key {
     my $self = shift;
-    my ($offset, $key, $orig_key) = @_;
+    my ($trans_id, $offset, $key, $orig_key) = @_;
 
-    my $dig_key = $self->apply_digest( $key );
+    my $dig_key = $self->_apply_digest( $key );
     my $tag = $self->find_blist( $offset, $dig_key ) or return;
     my $value = $self->get_bucket_value( $tag, $dig_key, $orig_key );
     $self->delete_bucket( $tag, $dig_key, $orig_key );
@@ -101,9 +101,9 @@ sub delete_key {
 
 sub write_value {
     my $self = shift;
-    my ($offset, $key, $value, $orig_key) = @_;
+    my ($trans_id, $offset, $key, $value, $orig_key) = @_;
 
-    my $dig_key = $self->apply_digest( $key );
+    my $dig_key = $self->_apply_digest( $key );
     my $tag = $self->find_blist( $offset, $dig_key, { create => 1 } );
     return $self->add_bucket( $tag, $dig_key, $key, $value, undef, $orig_key );
 }
@@ -174,7 +174,7 @@ sub new {
 
 sub _storage { return $_[0]{storage} }
 
-sub apply_digest {
+sub _apply_digest {
     my $self = shift;
     return $self->{digest}->(@_);
 }

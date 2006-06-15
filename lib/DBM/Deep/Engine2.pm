@@ -39,6 +39,7 @@ sub read_value {
     my $self = shift;
     my ($trans_id, $base_offset, $key) = @_;
     
+#    print "Trying to read $key from $base_offset ($trans_id)\n" if $key > 400;
     my ($_val_offset, $_is_del) = $self->_find_value_offset({
         offset     => $base_offset,
         trans_id   => $trans_id,
@@ -47,14 +48,14 @@ sub read_value {
     die "Attempt to use a deleted value" if $_is_del;
     die "Internal error!" if !$_val_offset;
 
-    my ($key_offset) = $self->_find_key_offset({
+    my ($key_tag) = $self->_find_key_offset({
         offset  => $_val_offset,
         key_md5 => $self->_apply_digest( $key ),
     });
-    return if !$key_offset;
+    return if !$key_tag;
 
     my ($val_offset, $is_del) = $self->_find_value_offset({
-        offset     => $key_offset,
+        offset     => $key_tag->{start},
         trans_id   => $trans_id,
         allow_head => 1,
     });
@@ -62,7 +63,7 @@ sub read_value {
     die "Internal error!" if !$val_offset;
 
     return $self->_read_value({
-        keyloc => $key_offset,
+        keyloc => $key_tag->{start},
         offset => $val_offset,
     });
 }
@@ -79,21 +80,21 @@ sub key_exists {
     die "Attempt to use a deleted value" if $_is_del;
     die "Internal error!" if !$_val_offset;
 
-    my ($key_offset) = $self->_find_key_offset({
+    my ($key_tag) = $self->_find_key_offset({
         offset  => $_val_offset,
         key_md5 => $self->_apply_digest( $key ),
     });
-    return '' if !$key_offset;
+    return '' if !$key_tag->{start};
 
     my ($val_offset, $is_del) = $self->_find_value_offset({
-        offset     => $key_offset,
+        offset     => $key_tag->{start},
         trans_id   => $trans_id,
         allow_head => 1,
     });
+    die "Internal error!" if !$_val_offset;
 
     return '' if $is_del;
 
-    die "Internal error!" if !$_val_offset;
     return 1;
 }
 
@@ -140,13 +141,11 @@ sub delete_key {
     die "Attempt to use a deleted value" if $_is_del;
     die "Internal error!" if !$_val_offset;
 
-    my ($key_offset, $bucket_tag) = $self->_find_key_offset({
+    my ($key_tag, $bucket_tag) = $self->_find_key_offset({
         offset  => $_val_offset,
         key_md5 => $self->_apply_digest( $key ),
     });
-    return if !$key_offset;
-
-    my $key_tag = $self->load_tag( $key_offset );
+    return if !$key_tag->{start};
 
     my $value = $self->read_value( $trans_id, $base_offset, $key );
     if ( $trans_id ) {
@@ -204,17 +203,15 @@ sub write_value {
     die "Attempt to use a deleted value" if $_is_del;
     die "Internal error!" if !$_val_offset;
 
-    my ($key_offset, $bucket_tag) = $self->_find_key_offset({
+    my ($key_tag, $bucket_tag) = $self->_find_key_offset({
         offset  => $_val_offset,
         key_md5 => $self->_apply_digest( $key ),
         create  => 1,
     });
-    die "Cannot find/create new key offset!" if !$key_offset;
-
-    my $key_tag = $self->load_tag( $key_offset );
+    die "Cannot find/create new key offset!" if !$key_tag->{start};
 
     if ( $trans_id ) {
-        if ( $bucket_tag->{is_new} ) {
+        if ( $key_tag->{is_new} ) {
             # Must mark the HEAD as deleted because it doesn't exist
             $self->_mark_as_deleted({
                 tag      => $key_tag,
@@ -225,7 +222,7 @@ sub write_value {
     else {
         # If the HEAD isn't new, then we must take other transactions
         # into account. If it is, then there can be no other transactions.
-        if ( !$bucket_tag->{is_new} ) {
+        if ( !$key_tag->{is_new} ) {
             my $old_value = $self->read_value( $trans_id, $base_offset, $key );
             if ( my @transactions = $self->_storage->current_transactions ) {
                 foreach my $other_trans_id ( @transactions ) {
@@ -249,7 +246,7 @@ sub write_value {
         loc      => $value_loc,
     });
 
-    $self->_write_value( $key_offset, $value_loc, $key, $value, $key );
+    $self->_write_value( $key_tag->{start}, $value_loc, $key, $value, $key );
 
     return 1;
 }
@@ -320,6 +317,7 @@ sub _find_key_offset {
 
     # Need to create a new keytag, too
     if ( $bucket_tag->{is_new} ) {
+#        print "Creating new keytag\n";
         my $keytag_loc = $self->_storage->request_space(
             $self->tag_size( $self->{keyloc_size} ),
         );
@@ -329,12 +327,12 @@ sub _find_key_offset {
 
         $self->_storage->print_at( $bucket_tag->{offset}, $bucket_tag->{content} );
 
-        $self->write_tag(
+        my $key_tag = $self->write_tag(
             $keytag_loc, SIG_KEYS,
             chr(0)x$self->{keyloc_size},
         );
 
-        return( $keytag_loc, $bucket_tag );
+        return( $key_tag, $bucket_tag );
     }
     else {
         my ($key, $subloc, $index);
@@ -352,9 +350,11 @@ sub _find_key_offset {
             last;
         }
 
-        # Either we have a subloc to return or we don't want to create a new
-        # entry. Either way, we need to return now.
-        return ($subloc, $bucket_tag) if $subloc || !$args->{create};
+        # If we have a subloc to return or we don't want to create a new
+        # entry, we need to return now.
+        $args->{create} ||= 0;
+#        print "Found ($subloc) at $index ($args->{create})\n";
+        return ($self->load_tag( $subloc ), $bucket_tag) if $subloc || !$args->{create};
 
         my $keytag_loc = $self->_storage->request_space(
             $self->tag_size( $self->{keyloc_size} ),
@@ -362,6 +362,7 @@ sub _find_key_offset {
 
         # There's space left in this bucket
         if ( defined $index ) {
+#            print "There's space left in the bucket for $keytag_loc\n";
             substr( $bucket_tag->{content}, $index * $self->{key_size}, $self->{key_size} ) =
                 $args->{key_md5} . pack( "$self->{long_pack}", $keytag_loc );
 
@@ -369,15 +370,16 @@ sub _find_key_offset {
         }
         # We need to split the index
         else {
+#            print "Splitting the index for $keytag_loc\n";
             $self->split_index( $bucket_tag, $args->{key_md5}, $keytag_loc );
         }
 
-        $self->write_tag(
+        my $key_tag = $self->write_tag(
             $keytag_loc, SIG_KEYS,
             chr(0)x$self->{keyloc_size},
         );
 
-        return( $keytag_loc, $bucket_tag );
+        return( $key_tag, $bucket_tag );
     }
 
     return;
@@ -524,6 +526,7 @@ sub setup_fh {
             $obj->{base_offset} = $self->_storage->request_space(
                 $self->tag_size( $self->{keyloc_size} ),
             );
+            warn "INITIAL BASE OFFSET: $obj->{base_offset}\n";
 
             my $value_spot = $self->_storage->request_space(
                 $self->tag_size( $self->{index_size} ),
@@ -547,6 +550,7 @@ sub setup_fh {
         }
         else {
             $obj->{base_offset} = $bytes_read;
+            warn "REOPEN BASE OFFSET: $obj->{base_offset}\n";
 
             my ($_val_offset, $_is_del) = $self->_find_value_offset({
                 offset     => $obj->{base_offset},

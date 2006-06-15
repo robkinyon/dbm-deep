@@ -346,8 +346,10 @@ sub write_tag {
         signature => $sig,
         #XXX Is this even used?
         size      => $size,
+        start     => $offset,
         offset    => $offset + SIG_SIZE + $self->{data_size},
-        content   => $content
+        content   => $content,
+        is_new    => 1,
     };
 }
 

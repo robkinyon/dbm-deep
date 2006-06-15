@@ -43,14 +43,14 @@ use Digest::MD5 ();
 use FileHandle::Fmode ();
 use Scalar::Util ();
 
-use DBM::Deep::Engine;
+use DBM::Deep::Engine2;
 use DBM::Deep::File;
 
 ##
 # Setup constants for users to pass to new()
 ##
-sub TYPE_HASH   () { DBM::Deep::Engine->SIG_HASH  }
-sub TYPE_ARRAY  () { DBM::Deep::Engine->SIG_ARRAY }
+sub TYPE_HASH   () { DBM::Deep::Engine2->SIG_HASH  }
+sub TYPE_ARRAY  () { DBM::Deep::Engine2->SIG_ARRAY }
 
 sub _get_args {
     my $proto = shift;
@@ -124,7 +124,7 @@ sub _init {
 
         storage     => undef,
     }, $class;
-    $self->{engine} = DBM::Deep::Engine->new( { %{$args}, obj => $self } );
+    $self->{engine} = DBM::Deep::Engine2->new( { %{$args}, obj => $self } );
 
     # Grab the parameters we want to use
     foreach my $param ( keys %$self ) {

@@ -62,6 +62,7 @@ sub read_value {
     die "Internal error!" if !$val_offset;
 
     return $self->_read_value({
+        keyloc => $key_offset,
         offset => $val_offset,
     });
 }
@@ -82,7 +83,7 @@ sub key_exists {
         offset  => $_val_offset,
         key_md5 => $self->_apply_digest( $key ),
     });
-    return if !$key_offset;
+    return '' if !$key_offset;
 
     my ($val_offset, $is_del) = $self->_find_value_offset({
         offset     => $key_offset,
@@ -90,22 +91,30 @@ sub key_exists {
         allow_head => 1,
     });
 
-    return 1 if $is_del;
+    return '' if $is_del;
 
     die "Internal error!" if !$_val_offset;
-    return '';
+    return 1;
 }
 
 sub get_next_key {
     my $self = shift;
-    my ($offset) = @_;
+    my ($trans_id, $base_offset) = @_;
+
+    my ($_val_offset, $_is_del) = $self->_find_value_offset({
+        offset     => $base_offset,
+        trans_id   => $trans_id,
+        allow_head => 1,
+    });
+    die "Attempt to use a deleted value" if $_is_del;
+    die "Internal error!" if !$_val_offset;
 
     # If the previous key was not specifed, start at the top and
     # return the first one found.
     my $temp;
-    if ( @_ > 1 ) {
+    if ( @_ > 2 ) {
         $temp = {
-            prev_md5    => $self->apply_digest($_[1]),
+            prev_md5    => $self->_apply_digest($_[2]),
             return_next => 0,
         };
     }
@@ -116,7 +125,7 @@ sub get_next_key {
         };
     }
 
-    return $self->traverse_index( $temp, $offset, 0 );
+    return $self->traverse_index( $temp, $_val_offset, 0 );
 }
 
 sub delete_key {
@@ -139,6 +148,7 @@ sub delete_key {
 
     my $key_tag = $self->load_tag( $key_offset );
 
+    my $value = $self->read_value( $trans_id, $base_offset, $key );
     if ( $trans_id ) {
         $self->_mark_as_deleted({
             tag      => $key_tag,
@@ -146,7 +156,6 @@ sub delete_key {
         });
     }
     else {
-        my $value = $self->read_value( $trans_id, $base_offset, $key );
         if ( my @transactions = $self->_storage->current_transactions ) {
             foreach my $other_trans_id ( @transactions ) {
                 next if $self->_has_keyloc_entry({
@@ -156,15 +165,18 @@ sub delete_key {
                 $self->write_value( $other_trans_id, $base_offset, $key, $value );
             }
         }
-        else {
-            $self->_remove_key_offset({
-                offset  => $_val_offset,
-                key_md5 => $self->_apply_digest( $key ),
-            });
-        }
+
+        $self->_mark_as_deleted({
+            tag      => $key_tag,
+            trans_id => $trans_id,
+        });
+#        $self->_remove_key_offset({
+#            offset  => $_val_offset,
+#            key_md5 => $self->_apply_digest( $key ),
+#        });
     }
 
-    return 1;
+    return $value;
 }
 
 sub write_value {
@@ -237,7 +249,7 @@ sub write_value {
         loc      => $value_loc,
     });
 
-    $self->_write_value( $value_loc, $key, $value, $key );
+    $self->_write_value( $key_offset, $value_loc, $key, $value, $key );
 
     return 1;
 }
@@ -245,8 +257,6 @@ sub write_value {
 sub _find_value_offset {
     my $self = shift;
     my ($args) = @_;
-
-    use Data::Dumper;warn Dumper $args;
 
     my $key_tag = $self->load_tag( $args->{offset} );
 
@@ -269,7 +279,6 @@ sub _find_value_offset {
     return;
 }
 
-#XXX Need to keep track of $bucket_tag->(ref_loc} and $bucket_tag->{ch}
 sub _find_key_offset {
     my $self = shift;
     my ($args) = @_;
@@ -378,7 +387,7 @@ sub _read_value {
     my $self = shift;
     my ($args) = @_;
 
-    return $self->read_from_loc( $args->{offset} );
+    return $self->read_from_loc( $args->{keyloc}, $args->{offset} );
 }
 
 sub _mark_as_deleted {
@@ -392,12 +401,15 @@ sub _mark_as_deleted {
             substr( $args->{tag}{content}, $i * $self->{key_size}, $self->{key_size} ),
         );
 
+        last unless $loc || $is_deleted;
 
         if ( $trans_id == $args->{trans_id} ) {
             substr( $args->{tag}{content}, $i * $self->{key_size}, $self->{key_size} ) = pack(
                 "$self->{long_pack} C C",
                 $loc, $trans_id, 1,
             );
+            $is_changed = 1;
+            last;
         }
     }
 
@@ -519,8 +531,8 @@ sub setup_fh {
 
             $self->write_tag(
                 $obj->{base_offset}, SIG_KEYS,
-                pack( "$self->{long_pack} C C", $obj->{base_offset}, 0, 0 ),
-                chr(0) x ($self->{index_size} - $self->{long_size} + 2),
+                pack( "$self->{long_pack} C C", $value_spot, HEAD, 0 ),
+                chr(0) x ($self->{index_size} - $self->{key_size}),
             );
 
             $self->write_tag(
@@ -536,10 +548,18 @@ sub setup_fh {
         else {
             $obj->{base_offset} = $bytes_read;
 
+            my ($_val_offset, $_is_del) = $self->_find_value_offset({
+                offset     => $obj->{base_offset},
+                trans_id   => HEAD,
+                allow_head => 1,
+            });
+            die "Attempt to use a deleted value" if $_is_del;
+            die "Internal error!" if !$_val_offset;
+
             ##
             # Get our type from master index header
             ##
-            my $tag = $self->load_tag($obj->_base_offset);
+            my $tag = $self->load_tag($_val_offset);
             unless ( $tag ) {
                 flock $fh, LOCK_UN;
                 $self->_throw_error("Corrupted file, no master index record");

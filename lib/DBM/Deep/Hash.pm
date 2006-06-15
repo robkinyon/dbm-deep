@@ -5,6 +5,8 @@ use 5.6.0;
 use strict;
 use warnings;
 
+use constant DEBUG => 0;
+
 our $VERSION = q(0.99_03);
 
 use base 'DBM::Deep';
@@ -45,6 +47,7 @@ sub TIEHASH {
 }
 
 sub FETCH {
+    print "FETCH( @_ )\n" if DEBUG;
     my $self = shift->_get_self;
     my $key = ($self->_storage->{filter_store_key})
         ? $self->_storage->{filter_store_key}->($_[0])
@@ -54,6 +57,7 @@ sub FETCH {
 }
 
 sub STORE {
+    print "STORE( @_ )\n" if DEBUG;
     my $self = shift->_get_self;
 	my $key = ($self->_storage->{filter_store_key})
         ? $self->_storage->{filter_store_key}->($_[0])
@@ -64,6 +68,7 @@ sub STORE {
 }
 
 sub EXISTS {
+    print "EXISTS( @_ )\n" if DEBUG;
     my $self = shift->_get_self;
 	my $key = ($self->_storage->{filter_store_key})
         ? $self->_storage->{filter_store_key}->($_[0])
@@ -82,6 +87,7 @@ sub DELETE {
 }
 
 sub FIRSTKEY {
+    print "FIRSTKEY\n" if DEBUG;
 	##
 	# Locate and return first key (in no particular order)
 	##
@@ -102,6 +108,7 @@ sub FIRSTKEY {
 }
 
 sub NEXTKEY {
+    print "NEXTKEY( @_ )\n" if DEBUG;
 	##
 	# Return next key (in no particular order), given previous one
 	##

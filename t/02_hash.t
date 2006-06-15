@@ -131,5 +131,5 @@ ok(
 # Test autovivification
 
 $db->{unknown}{bar} = 1;
-ok( $db->{unknown} );
-cmp_ok( $db->{unknown}{bar}, '==', 1 );
+ok( $db->{unknown}, 'Autovivified value exists' );
+cmp_ok( $db->{unknown}{bar}, '==', 1, 'And the value stored is there' );

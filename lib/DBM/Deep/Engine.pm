@@ -3,7 +3,6 @@ package DBM::Deep::Engine;
 use 5.6.0;
 
 use strict;
-use warnings;
 
 our $VERSION = q(0.99_03);
 
@@ -501,7 +500,7 @@ sub add_bucket {
 
 sub _write_value {
     my $self = shift;
-    my ($location, $key, $value, $orig_key) = @_;
+    my ($key_loc, $location, $key, $value, $orig_key) = @_;
 
     my $storage = $self->_storage;
 
@@ -568,7 +567,7 @@ sub _write_value {
     if ($r eq 'HASH') {
         my %x = %$value;
         tie %$value, 'DBM::Deep', {
-            base_offset => $location,
+            base_offset => $key_loc,
             storage     => $storage,
             parent      => $self->{obj},
             parent_key  => $orig_key,
@@ -579,7 +578,7 @@ sub _write_value {
     elsif ($r eq 'ARRAY') {
         my @x = @$value;
         tie @$value, 'DBM::Deep', {
-            base_offset => $location,
+            base_offset => $key_loc,
             storage     => $storage,
             parent      => $self->{obj},
             parent_key  => $orig_key,
@@ -668,7 +667,7 @@ sub split_index {
 
 sub read_from_loc {
     my $self = shift;
-    my ($subloc, $orig_key) = @_;
+    my ($key_loc, $subloc, $orig_key) = @_;
 
     my $storage = $self->_storage;
 
@@ -706,7 +705,7 @@ sub read_from_loc {
 
         my $new_obj = DBM::Deep->new({
             type        => $signature,
-            base_offset => $subloc,
+            base_offset => $key_loc,
             storage     => $self->_storage,
             parent      => $self->{obj},
             parent_key  => $orig_key,
@@ -745,7 +744,7 @@ sub read_from_loc {
         if ( $size ) {
             my $new_loc = $storage->read_at( undef, $size );
             $new_loc = unpack( $self->{long_pack}, $new_loc ); 
-            return $self->read_from_loc( $new_loc, $orig_key );
+            return $self->read_from_loc( $key_loc, $new_loc, $orig_key );
         }
         else {
             return;

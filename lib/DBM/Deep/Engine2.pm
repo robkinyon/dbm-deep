@@ -39,7 +39,6 @@ sub read_value {
     my $self = shift;
     my ($trans_id, $base_offset, $key) = @_;
     
-#    print "Trying to read $key from $base_offset ($trans_id)\n" if $key > 400;
     my ($_val_offset, $_is_del) = $self->_find_value_offset({
         offset     => $base_offset,
         trans_id   => $trans_id,
@@ -65,6 +64,7 @@ sub read_value {
     return $self->_read_value({
         keyloc => $key_tag->{start},
         offset => $val_offset,
+        key    => $key,
     });
 }
 
@@ -126,6 +126,8 @@ sub get_next_key {
         };
     }
 
+    local $::DEBUG = 1;
+    print "get_next_key: $_val_offset\n" if $::DEBUG;
     return $self->traverse_index( $temp, $_val_offset, 0 );
 }
 
@@ -318,7 +320,6 @@ sub _find_key_offset {
 
     # Need to create a new keytag, too
     if ( $bucket_tag->{is_new} ) {
-#        print "Creating new keytag\n";
         my $keytag_loc = $self->_storage->request_space(
             $self->tag_size( $self->{keyloc_size} ),
         );
@@ -354,7 +355,6 @@ sub _find_key_offset {
         # If we have a subloc to return or we don't want to create a new
         # entry, we need to return now.
         $args->{create} ||= 0;
-#        print "Found ($subloc) at $index ($args->{create})\n";
         return ($self->load_tag( $subloc ), $bucket_tag) if $subloc || !$args->{create};
 
         my $keytag_loc = $self->_storage->request_space(
@@ -363,7 +363,6 @@ sub _find_key_offset {
 
         # There's space left in this bucket
         if ( defined $index ) {
-#            print "There's space left in the bucket for $keytag_loc\n";
             substr( $bucket_tag->{content}, $index * $self->{key_size}, $self->{key_size} ) =
                 $args->{key_md5} . pack( "$self->{long_pack}", $keytag_loc );
 
@@ -371,7 +370,6 @@ sub _find_key_offset {
         }
         # We need to split the index
         else {
-#            print "Splitting the index for $keytag_loc\n";
             $self->split_index( $bucket_tag, $args->{key_md5}, $keytag_loc );
         }
 
@@ -390,7 +388,7 @@ sub _read_value {
     my $self = shift;
     my ($args) = @_;
 
-    return $self->read_from_loc( $args->{keyloc}, $args->{offset} );
+    return $self->read_from_loc( $args->{keyloc}, $args->{offset}, $args->{key} );
 }
 
 sub _mark_as_deleted {
@@ -527,7 +525,6 @@ sub setup_fh {
             $obj->{base_offset} = $self->_storage->request_space(
                 $self->tag_size( $self->{keyloc_size} ),
             );
-            warn "INITIAL BASE OFFSET: $obj->{base_offset}\n";
 
             my $value_spot = $self->_storage->request_space(
                 $self->tag_size( $self->{index_size} ),
@@ -551,7 +548,6 @@ sub setup_fh {
         }
         else {
             $obj->{base_offset} = $bytes_read;
-            warn "REOPEN BASE OFFSET: $obj->{base_offset}\n";
 
             my ($_val_offset, $_is_del) = $self->_find_value_offset({
                 offset     => $obj->{base_offset},

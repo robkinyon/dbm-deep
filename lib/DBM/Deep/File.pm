@@ -146,6 +146,7 @@ sub print_at {
 sub read_at {
     my $self = shift;
     my ($loc, $size) = @_;
+    print join(":",caller) . " - read_at(@{[$loc || 'undef']}, $size)\n" if $::DEBUG;
 
     local ($/,$\);
 

@@ -419,6 +419,7 @@ sub _find_parent {
             $child = $parent;
             $parent = $parent->{parent};
         }
+
         if ( $base ) {
             $base = "\$db->get( q{$child->{parent_key}} )->" . $base;
         }

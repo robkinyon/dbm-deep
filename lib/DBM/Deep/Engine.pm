@@ -64,39 +64,6 @@ sub key_exists {
     return $self->bucket_exists( $tag, $dig_key, $key );
 }
 
-=pod
-sub key_exists {
-    my $self = shift;
-    my ($trans_id, $base_offset, $key) = @_;
-    
-    my ($_val_offset, $_is_del) = $self->_find_value_offset({
-        offset     => $base_offset,
-        trans_id   => $trans_id,
-        allow_head => 1,
-    });
-    die "Attempt to use a deleted value" if $_is_del;
-    die "Internal error!" if !$_val_offset;
-
-    my ($key_offset) = $self->_find_key_offset({
-        offset  => $_val_offset,
-        key_md5 => $self->_apply_digest( $key ),
-        create  => 0,
-    });
-    return if !$key_offset;
-
-    my ($val_offset, $is_del) = $self->_find_value_offset({
-        offset     => $key_offset,
-        trans_id   => $trans_id,
-        allow_head => 1,
-    });
-
-    return 1 if $is_del;
-
-    die "Internal error!" if !$_val_offset;
-    return '';
-}
-=cut
-
 sub get_next_key {
     my $self = shift;
     my ($trans_id, $offset) = @_;

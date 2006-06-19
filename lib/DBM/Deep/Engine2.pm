@@ -255,6 +255,8 @@ sub _find_value_offset {
     my $self = shift;
     my ($args) = @_;
 
+    use Data::Dumper;warn Dumper $args;
+
     my $key_tag = $self->load_tag( $args->{offset} );
 
     my @head;

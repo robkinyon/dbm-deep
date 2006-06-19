@@ -148,6 +148,7 @@ sub delete_key {
     return if !$key_tag->{start};
 
     my $value = $self->read_value( $trans_id, $base_offset, $key );
+    my $value = $self->read_value( $trans_id, $base_offset, $key );
     if ( $trans_id ) {
         $self->_mark_as_deleted({
             tag      => $key_tag,
@@ -254,8 +255,6 @@ sub write_value {
 sub _find_value_offset {
     my $self = shift;
     my ($args) = @_;
-
-    use Data::Dumper;warn Dumper $args;
 
     my $key_tag = $self->load_tag( $args->{offset} );
 

@@ -1,6 +1,6 @@
 package DBM::Deep::Engine;
 
-use Sub::Caller qw( load_tag );
+#use Sub::Caller qw( load_tag );
 
 use 5.6.0;
 
@@ -361,7 +361,7 @@ sub load_tag {
     ##
     my $self = shift;
     my ($offset) = @_;
-    print join(":",caller) . " - load_tag($offset)\n" if $::DEBUG;
+    print join(":",map{$_||''}caller) . " - load_tag($offset)\n" if $::DEBUG;
 
     my $storage = $self->_storage;
 

@@ -150,7 +150,6 @@ sub delete_key {
     return if !$key_tag->{start};
 
     my $value = $self->read_value( $trans_id, $base_offset, $key );
-    my $value = $self->read_value( $trans_id, $base_offset, $key );
     if ( $trans_id ) {
         $self->_mark_as_deleted({
             tag      => $key_tag,

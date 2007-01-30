@@ -26,12 +26,15 @@ my $db2 = DBM::Deep->new( $filename2 );
     );
     is( $db->{hash1}{subkey1}, 'subvalue1', "Value imported correctly" );
     is( $db->{hash1}{subkey2}, 'subvalue2', "Value imported correctly" );
-    ##
-    # Cross-ref nested hash accross DB objects
-    ##
+
+    # Test cross-ref nested hash accross DB objects
     throws_ok {
         $db2->{copy} = $db->{hash1};
-    } qr/Cannot cross-reference\. Use export\(\) instead/, "cross-ref fails";
+    } qr/Cannot store something that is tied\./, "cross-ref fails";
+
+    # This error text is for when internal cross-refs are implemented
+    #} qr/Cannot cross-reference\. Use export\(\) instead\./, "cross-ref fails";
+
     $db2->{copy} = $db->{hash1}->export;
 }
 

@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 109;
+use Test::More tests => 116;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -13,11 +13,6 @@ my $db = DBM::Deep->new(
 	file => $filename,
 	type => DBM::Deep->TYPE_ARRAY
 );
-
-TODO: {
-    local $TODO = "How is this test ever supposed to pass?";
-    ok( !$db->clear, "If the file has never been written to, clear() returns false" );
-}
 
 ##
 # basic put/get/push
@@ -119,7 +114,7 @@ $db->[1] = 'elem2';
 # exists
 ##
 ok( $db->exists(1), "The 1st value exists" );
-ok( !$db->exists(0), "The 0th value doesn't exists" );
+ok( $db->exists(0), "The 0th value doesn't exist" );
 ok( !$db->exists(22), "The 22nd value doesn't exists" );
 ok( $db->exists(-1), "The -1st value does exists" );
 ok( !$db->exists(-22), "The -22nd value doesn't exists" );
@@ -205,8 +200,42 @@ $db->[0] = [ 1 .. 3 ];
 $db->[1] = { a => 'foo' };
 is( $db->[0]->length, 3, "Reuse of same space with array successful" );
 is( $db->[1]->fetch('a'), 'foo', "Reuse of same space with hash successful" );
-# Test autovivification
 
+# Test autovivification
 $db->[9999]{bar} = 1;
 ok( $db->[9999] );
 cmp_ok( $db->[9999]{bar}, '==', 1 );
+
+# Test failures
+throws_ok {
+    $db->fetch( 'foo' );
+} qr/Cannot use 'foo' as an array index/, "FETCH fails on an illegal key";
+
+throws_ok {
+    $db->fetch();
+} qr/Cannot use an undefined array index/, "FETCH fails on an undefined key";
+
+throws_ok {
+    $db->store( 'foo', 'bar' );
+} qr/Cannot use 'foo' as an array index/, "STORE fails on an illegal key";
+
+throws_ok {
+    $db->store();
+} qr/Cannot use an undefined array index/, "STORE fails on an undefined key";
+
+throws_ok {
+    $db->delete( 'foo' );
+} qr/Cannot use 'foo' as an array index/, "DELETE fails on an illegal key";
+
+throws_ok {
+    $db->delete();
+} qr/Cannot use an undefined array index/, "DELETE fails on an undefined key";
+
+throws_ok {
+    $db->exists( 'foo' );
+} qr/Cannot use 'foo' as an array index/, "EXISTS fails on an illegal key";
+
+throws_ok {
+    $db->exists();
+} qr/Cannot use an undefined array index/, "EXISTS fails on an undefined key";
+

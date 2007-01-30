@@ -2,7 +2,8 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 13;
+use Test::More skip_all => "Internal references are not supported right now";
+#use Test::More tests => 13;
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );

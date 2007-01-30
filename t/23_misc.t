@@ -8,6 +8,19 @@ use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
 
+{
+    my ($fh, $filename) = new_fh();
+    print $fh "Not a DBM::Deep file";
+
+    my $old_fh = select $fh;
+    my $old_af = $|; $| = 1; $| = $old_af;
+    select $old_fh;
+
+    throws_ok {
+        my $db = DBM::Deep->new( $filename );
+    } qr/^DBM::Deep: Signature not found -- file is not a Deep DB/, "Only DBM::Deep DB files will be opened";
+}
+
 my ($fh, $filename) = new_fh();
 my $db = DBM::Deep->new( $filename );
 
@@ -22,10 +35,6 @@ is( $db->{key1}, "value1", "Value still set after re-open" );
 throws_ok {
     my $db = DBM::Deep->new( 't' );
 } qr/^DBM::Deep: Cannot sysopen file 't': /, "Can't open a file we aren't allowed to touch";
-
-throws_ok {
-    my $db = DBM::Deep->new( __FILE__ );
-} qr/^DBM::Deep: Signature not found -- file is not a Deep DB/, "Only DBM::Deep DB files will be opened";
 
 {
     my $db = DBM::Deep->new(

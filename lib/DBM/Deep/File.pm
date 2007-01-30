@@ -1,11 +1,11 @@
 package DBM::Deep::File;
 
-use 5.6.0;
+use 5.006_000;
 
 use strict;
 use warnings;
 
-our $VERSION = q(0.99_03);
+our $VERSION = q(0.99_04);
 
 use Fcntl qw( :DEFAULT :flock :seek );
 
@@ -14,27 +14,19 @@ sub new {
     my ($args) = @_;
 
     my $self = bless {
-        audit_fh           => undef,
-        audit_file         => undef,
         autobless          => 1,
-        autoflush          => undef,
+        autoflush          => 1,
         end                => 0,
         fh                 => undef,
         file               => undef,
         file_offset        => 0,
-        locking            => undef,
+        locking            => 1,
         locked             => 0,
+#XXX Migrate this to the engine, where it really belongs.
         filter_store_key   => undef,
         filter_store_value => undef,
         filter_fetch_key   => undef,
         filter_fetch_value => undef,
-
-        # These are values that are not expected to be passed in through
-        # $args. They are here for documentation purposes.
-        transaction_id     => 0,
-        transaction_offset => 0,
-        transaction_audit  => undef,
-        base_db_obj        => undef,
     }, $class;
 
     # Grab the parameters we want to use
@@ -49,34 +41,7 @@ sub new {
 
     $self->open unless $self->{fh};
 
-    if ( $self->{audit_file} && !$self->{audit_fh} ) {
-        my $flags = O_WRONLY | O_APPEND | O_CREAT;
-
-        my $fh;
-        sysopen( $fh, $self->{audit_file}, $flags )
-            or die "Cannot open audit file '$self->{audit_file}' for read/write: $!";
-
-        # Set the audit_fh to autoflush
-        my $old = select $fh;
-        $|=1;
-        select $old;
-
-        $self->{audit_fh} = $fh;
-    }
-
-
     return $self;
-}
-
-sub set_db {
-    my $self = shift;
-
-    unless ( $self->{base_db_obj} ) {
-        $self->{base_db_obj} = shift;
-        Scalar::Util::weaken( $self->{base_db_obj} );
-    }
-
-    return;
 }
 
 sub open {
@@ -118,7 +83,7 @@ sub close {
 sub set_inode {
     my $self = shift;
 
-    unless ( $self->{inode} ) {
+    unless ( defined $self->{inode} ) {
         my @stats = stat($self->{fh});
         $self->{inode} = $stats[1];
         $self->{end} = $stats[7];
@@ -146,7 +111,6 @@ sub print_at {
 sub read_at {
     my $self = shift;
     my ($loc, $size) = @_;
-    print join(":",map{$_||''}caller) . " - read_at(@{[$loc || 'undef']}, $size)\n" if $::DEBUG;
 
     local ($/,$\);
 
@@ -159,17 +123,6 @@ sub read_at {
     read( $fh, $buffer, $size);
 
     return $buffer;
-}
-
-sub increment_pointer {
-    my $self = shift;
-    my ($size) = @_;
-
-    if ( defined $size ) {
-        seek( $self->{fh}, $size, SEEK_CUR );
-    }
-
-    return 1;
 }
 
 sub DESTROY {
@@ -192,24 +145,6 @@ sub request_space {
     return $loc;
 }
 
-#sub release_space {
-#    my $self = shift;
-#    my ($size, $loc) = @_;
-#
-#    local($/,$\);
-#
-#    my $next_loc = 0;
-#
-#    my $fh = $self->{fh};
-#    seek( $fh, $loc + $self->{file_offset}, SEEK_SET );
-#    print( $fh SIG_FREE
-#        . pack($self->{long_pack}, $size )
-#        . pack($self->{long_pack}, $next_loc )
-#    );
-#
-#    return;
-#}
-
 ##
 # If db locking is set, flock() the db file.  If called multiple
 # times before unlock(), then the same number of unlocks() must
@@ -218,9 +153,6 @@ sub request_space {
 sub lock {
     my $self = shift;
     my ($obj, $type) = @_;
-
-    #XXX This may not always be the correct thing to do
-    $obj = $self->{base_db_obj} unless defined $obj;
 
     $type = LOCK_EX unless defined $type;
 
@@ -236,7 +168,7 @@ sub lock {
 
             # double-check file inode, in case another process
             # has optimize()d our file while we were waiting.
-            if ($stats[1] != $self->{inode}) {
+            if (defined($self->{inode}) && $stats[1] != $self->{inode}) {
                 $self->close;
                 $self->open;
 
@@ -276,133 +208,16 @@ sub unlock {
     return;
 }
 
-sub set_transaction_offset {
-    my $self = shift;
-    $self->{transaction_offset} = shift;
-}
-
-sub audit {
-    my $self = shift;
-    my ($string) = @_;
-
-    if ( my $afh = $self->{audit_fh} ) {
-        flock( $afh, LOCK_EX );
-
-        if ( $string =~ /^#/ ) {
-            print( $afh "$string " . localtime(time) . "\n" );
-        }
-        else {
-            print( $afh "$string # " . localtime(time) . "\n" );
-        }
-
-        flock( $afh, LOCK_UN );
-    }
-
-    if ( $self->{transaction_audit} ) {
-        push @{$self->{transaction_audit}}, $string;
-    }
-
-    return 1;
-}
-
-sub begin_transaction {
+sub flush {
     my $self = shift;
 
-    my $fh = $self->{fh};
-
-    $self->lock;
-
-    my $buffer = $self->read_at( $self->{transaction_offset}, 4 );
-    my ($next, @trans) = unpack( 'C C C C C C C C C C C C C C C C', $buffer );
-
-    $self->{transaction_id} = ++$next;
-
-    die if $trans[-1] != 0;
-
-    for ( my $i = 0; $i <= $#trans; $i++ ) {
-        next if $trans[$i] != 0;
-        $trans[$i] = $next;
-        last;
-    }
-
-    $self->print_at(
-        $self->{transaction_offset},
-        pack( 'C C C C C C C C C C C C C C C C', $next, @trans),
-    );
-
-    $self->unlock;
-
-    $self->{transaction_audit} = [];
-
-    return $self->{transaction_id};
-}
-
-sub end_transaction {
-    my $self = shift;
-
-    my $fh = $self->{fh};
-
-    $self->lock;
-
-    my $buffer = $self->read_at( $self->{transaction_offset}, 4 );
-    my ($next, @trans) = unpack( 'C C C C C C C C C C C C C C C C', $buffer );
-
-    @trans = grep { $_ != $self->{transaction_id} } @trans;
-
-    $self->print_at(
-        $self->{transaction_offset},
-        pack( 'C C C C C C C C C C C C C C C C', $next, @trans),
-    );
-
-    #XXX Need to free the space used by the current transaction
-
-    $self->unlock;
-
-    $self->{transaction_id} = 0;
-    $self->{transaction_audit} = undef;
-
-#    $self->{base_db_obj}->optimize;
-#    $self->{inode} = undef;
-#    $self->set_inode;
-
-    return 1;
-}
-
-sub current_transactions {
-    my $self = shift;
-
-    my $fh = $self->{fh};
-
-    $self->lock;
-
-    my $buffer = $self->read_at( $self->{transaction_offset}, 4 );
-    my ($next, @trans) = unpack( 'C C C C C C C C C C C C C C C C', $buffer );
-
-    $self->unlock;
-
-    return grep { $_ && $_ != $self->{transaction_id} } @trans;
-}
-
-sub transaction_id { return $_[0]->{transaction_id} }
-
-sub commit_transaction {
-    my $self = shift;
-
-    my @audit = @{$self->{transaction_audit}};
-
-    $self->end_transaction;
-
-    {
-        my $db = $self->{base_db_obj};
-        for ( @audit ) {
-            eval "$_;";
-            warn "$_: $@\n" if $@;
-        }
-    }
+    # Flush the filehandle
+    my $old_fh = select $self->{fh};
+    my $old_af = $|; $| = 1; $| = $old_af;
+    select $old_fh;
 
     return 1;
 }
 
 1;
 __END__
-

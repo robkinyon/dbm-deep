@@ -7,7 +7,7 @@ use strict;
     sub foo { 'foo' };
 }
 
-use Test::More tests => 64;
+use Test::More tests => 65;
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
@@ -50,6 +50,8 @@ my ($fh, $filename) = new_fh();
     is( $db->{unblessed}{b}[0], 1 );
     is( $db->{unblessed}{b}[1], 2 );
     is( $db->{unblessed}{b}[2], 3 );
+
+    $db->{blessed_long} = bless {}, 'a' x 1000;
 }
 
 {
@@ -69,9 +71,9 @@ my ($fh, $filename) = new_fh();
     is( $obj->{b}[2], 3 );
 
     my $obj2 = $db->{blessed2};
-    isa_ok( $obj, 'Foo' );
-    can_ok( $obj, 'export', 'foo' );
-    ok( !$obj->can( 'STORE' ), "... but it cannot 'STORE'" );
+    isa_ok( $obj2, 'Foo' );
+    can_ok( $obj2, 'export', 'foo' );
+    ok( !$obj2->can( 'STORE' ), "... but it cannot 'STORE'" );
 
     is( $obj2->[0]{a}, 'foo' );
     is( $obj2->[1], '2' );
@@ -83,6 +85,8 @@ my ($fh, $filename) = new_fh();
 
     $obj->{c} = 'new';
     is( $db->{blessed}{c}, 'new' );
+
+    isa_ok( $db->{blessed_long}, 'a' x 1000 );
 }
 
 {
@@ -93,6 +97,7 @@ my ($fh, $filename) = new_fh();
     is( $db->{blessed}{c}, 'new' );
 
     my $structure = $db->export();
+    use Data::Dumper;print Dumper $structure;
     
     my $obj = $structure->{blessed};
     isa_ok( $obj, 'Foo' );
@@ -105,9 +110,9 @@ my ($fh, $filename) = new_fh();
     is( $obj->{b}[2], 3 );
 
     my $obj2 = $structure->{blessed2};
-    isa_ok( $obj, 'Foo' );
-    can_ok( $obj, 'export', 'foo' );
-    ok( !$obj->can( 'STORE' ), "... but it cannot 'STORE'" );
+    isa_ok( $obj2, 'Foo' );
+    can_ok( $obj2, 'export', 'foo' );
+    ok( !$obj2->can( 'STORE' ), "... but it cannot 'STORE'" );
 
     is( $obj2->[0]{a}, 'foo' );
     is( $obj2->[1], '2' );
@@ -148,29 +153,31 @@ my ($fh, $filename) = new_fh();
     is( $db->{unblessed}{b}[2], 3 );
 }
 
-my ($fh2, $filename2) = new_fh();
 {
-    my $db = DBM::Deep->new(
-        file     => $filename2,
-        autobless => 1,
-    );
-    my $obj = bless {
-        a => 1,
-        b => [ 1 .. 3 ],
-    }, 'Foo';
+    my ($fh2, $filename2) = new_fh();
+    {
+        my $db = DBM::Deep->new(
+            file     => $filename2,
+            autobless => 1,
+        );
+        my $obj = bless {
+            a => 1,
+            b => [ 1 .. 3 ],
+        }, 'Foo';
 
-    $db->import( { blessed => $obj } );
-}
+        $db->import( { blessed => $obj } );
+    }
 
-{
-    my $db = DBM::Deep->new(
-        file     => $filename2,
-        autobless => 1,
-    );
+    {
+        my $db = DBM::Deep->new(
+            file     => $filename2,
+            autobless => 1,
+        );
 
-    my $blessed = $db->{blessed};
-    isa_ok( $blessed, 'Foo' );
-    is( $blessed->{a}, 1 );
+        my $blessed = $db->{blessed};
+        isa_ok( $blessed, 'Foo' );
+        is( $blessed->{a}, 1 );
+    }
 }
 
 {

@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 38;
+use Test::More tests => 49;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -18,6 +18,7 @@ $db->{key1} = "value1";
 is( $db->get("key1"), "value1", "get() works with hash assignment" );
 is( $db->fetch("key1"), "value1", "... fetch() works with hash assignment" );
 is( $db->{key1}, "value1", "... and hash-access also works" );
+
 $db->put("key2", undef);
 is( $db->get("key2"), undef, "get() works with put()" );
 is( $db->fetch("key2"), undef, "... fetch() works with put()" );
@@ -28,22 +29,30 @@ is( $db->get("key3"), "value3", "get() works with store()" );
 is( $db->fetch("key3"), "value3", "... fetch() works with put()" );
 is( $db->{key3}, 'value3', "... and hash-access also works" );
 
+# Verify that the keyval pairs are still correct.
+is( $db->{key1}, "value1", "Key1 is still correct" );
+is( $db->{key2}, undef, "Key2 is still correct" );
+is( $db->{key3}, 'value3', "Key3 is still correct" );
+
 ok( $db->exists("key1"), "exists() function works" );
 ok( exists $db->{key2}, "exists() works against tied hash" );
 
 ok( !exists $db->{key4}, "exists() function works for keys that aren't there" );
 is( $db->{key4}, undef, "Autovivified key4" );
-TODO: {
-    local $TODO = "Autovivification isn't correct yet";
-    ok( exists $db->{key4}, "Autovivified key4 now exists" );
-}
+ok( exists $db->{key4}, "Autovivified key4 now exists" );
+
 delete $db->{key4};
 ok( !exists $db->{key4}, "And key4 doesn't exists anymore" );
+
+# Keys will be done via an iterator that keeps a breadcrumb trail of the last
+# key it provided. There will also be an "edit revision number" on the
+# reference so that resetting the iterator can be done.
+#
+# Q: How do we make sure that the iterator is unique? Is it supposed to be?
 
 ##
 # count keys
 ##
-
 is( scalar keys %$db, 3, "keys() works against tied hash" );
 
 ##
@@ -97,7 +106,6 @@ $db->put("key1", "value2");
 is( $db->get("key1"), "value2", "... and replacement works" );
 
 $db->put("key1", "value222222222222222222222222");
-
 is( $db->get("key1"), "value222222222222222222222222", "We set a value before closing the file" );
 
 ##
@@ -129,7 +137,40 @@ ok(
 );
 
 # Test autovivification
-
 $db->{unknown}{bar} = 1;
-ok( $db->{unknown}, 'Autovivified value exists' );
+ok( $db->{unknown}, 'Autovivified hash exists' );
 cmp_ok( $db->{unknown}{bar}, '==', 1, 'And the value stored is there' );
+
+# Test failures
+throws_ok {
+    $db->fetch();
+} qr/Cannot use an undefined hash key/, "FETCH fails on an undefined key";
+
+throws_ok {
+    $db->fetch(undef);
+} qr/Cannot use an undefined hash key/, "FETCH fails on an undefined key";
+
+throws_ok {
+    $db->store();
+} qr/Cannot use an undefined hash key/, "STORE fails on an undefined key";
+
+throws_ok {
+    $db->store(undef, undef);
+} qr/Cannot use an undefined hash key/, "STORE fails on an undefined key";
+
+throws_ok {
+    $db->delete();
+} qr/Cannot use an undefined hash key/, "DELETE fails on an undefined key";
+
+throws_ok {
+    $db->delete(undef);
+} qr/Cannot use an undefined hash key/, "DELETE fails on an undefined key";
+
+throws_ok {
+    $db->exists();
+} qr/Cannot use an undefined hash key/, "EXISTS fails on an undefined key";
+
+throws_ok {
+    $db->exists(undef);
+} qr/Cannot use an undefined hash key/, "EXISTS fails on an undefined key";
+

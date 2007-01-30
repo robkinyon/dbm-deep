@@ -2,7 +2,8 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 17;
+use Test::More tests => 21;
+use Test::Deep;
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
@@ -38,13 +39,16 @@ is($db->{key2}, "value2", "Fetchfilters worked right");
 ##
 # Try fetching keys as well as values
 ##
-my $first_key = $db->first_key();
-my $next_key = $db->next_key($first_key);
+cmp_bag( [ keys %$db ], [qw( key1 key2 )], "DB keys correct" );
 
-ok(
-	(($first_key eq "key1") || ($first_key eq "key2")) && 
-	(($next_key eq "key1") || ($next_key eq "key2"))
-);
+# Exists and delete tests
+ok( exists $db->{key1}, "Key1 exists" );
+ok( exists $db->{key2}, "Key2 exists" );
+
+is( delete $db->{key1}, 'value1', "Delete returns the right value" );
+
+ok( !exists $db->{key1}, "Key1 no longer exists" );
+ok( exists $db->{key2}, "Key2 exists" );
 
 ##
 # Now clear all filters, and make sure all is unfiltered
@@ -54,8 +58,7 @@ ok( $db->set_filter( 'store_value', undef ), "Unset store_value filter" );
 ok( $db->set_filter( 'fetch_key', undef ), "Unset fetch_key filter" );
 ok( $db->set_filter( 'fetch_value', undef ), "Unset fetch_value filter" );
 
-is($db->{MYFILTERkey1}, "MYFILTERvalue1");
-is($db->{MYFILTERkey2}, "MYFILTERvalue2");
+is( $db->{MYFILTERkey2}, "MYFILTERvalue2", "We get the right unfiltered value" );
 
 sub my_filter_store_key { return 'MYFILTER' . $_[0]; }
 sub my_filter_store_value { return 'MYFILTER' . $_[0]; }

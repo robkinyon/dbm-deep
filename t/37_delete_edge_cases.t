@@ -4,7 +4,7 @@
 use strict;
 use Test::More tests => 4;
 use Test::Deep;
-use Clone::Any qw( clone );
+use Clone qw( clone );
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
@@ -27,6 +27,6 @@ delete $db->{foo};
 
 TODO: {
     local $TODO = "Delete isn't working right";
-ok( !tied(%$x), "\$x is NOT tied" );
-cmp_deeply( $x, $x_save, "When it's deleted, it's untied" );
+    ok( !tied(%$x), "\$x is NOT tied" );
+    cmp_deeply( $x, $x_save, "When it's deleted, it's untied" );
 }

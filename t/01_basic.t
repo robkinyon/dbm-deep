@@ -20,7 +20,7 @@ my $db = eval {
 };
 if ( $@ ) {
 	diag "ERROR: $@";
-    Test::More->builder->BAIL_OUT( "Opening a new file fails" );
+    Test::More->builder->BAIL_OUT( "Opening a new file fails." );
 }
 
 isa_ok( $db, 'DBM::Deep' );

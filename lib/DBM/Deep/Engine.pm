@@ -1,30 +1,20 @@
 package DBM::Deep::Engine;
 
-#use Sub::Caller qw( load_tag );
-
-use 5.6.0;
+use 5.006_000;
 
 use strict;
 
-our $VERSION = q(0.99_03);
+our $VERSION = q(0.99_04);
 
-use Fcntl qw( :DEFAULT :flock );
 use Scalar::Util ();
 
 # File-wide notes:
-# * To add to bucket_size, make sure you modify the following:
-#   - calculate_sizes()
-#   - _get_key_subloc()
-#   - add_bucket() - where the buckets are printed
-#
-# * Every method in here assumes that the _storage has been appropriately
+# * Every method in here assumes that the storage has been appropriately
 #   safeguarded. This can be anything from flock() to some sort of manual
 #   mutex. But, it's the caller's responsability to make sure that this has
 #   been done.
 
-##
 # Setup file and tag signatures.  These should never change.
-##
 sub SIG_FILE     () { 'DPDB' }
 sub SIG_HEADER   () { 'h'    }
 sub SIG_INTERNAL () { 'i'    }
@@ -37,82 +27,16 @@ sub SIG_BLIST    () { 'B'    }
 sub SIG_FREE     () { 'F'    }
 sub SIG_KEYS     () { 'K'    }
 sub SIG_SIZE     () {  1     }
+sub STALE_SIZE   () {  1     }
 
-# This is the transaction ID for the HEAD
-sub HEAD () { 0 }
+# Please refer to the pack() documentation for further information
+my %StP = (
+    1 => 'C', # Unsigned char value (no order specified, presumably ASCII)
+    2 => 'n', # Unsigned short in "network" (big-endian) order
+    4 => 'N', # Unsigned long in "network" (big-endian) order
+    8 => 'Q', # Usigned quad (no order specified, presumably machine-dependent)
+);
 
-################################################################################
-#
-# This is new code. It is a complete rewrite of the engine based on a new API
-#
-################################################################################
-
-sub read_value {
-    my $self = shift;
-    my ($trans_id, $offset, $key, $orig_key) = @_;
-
-    my $dig_key = $self->_apply_digest( $key );
-    my $tag = $self->find_blist( $offset, $dig_key ) or return;
-    return $self->get_bucket_value( $tag, $dig_key, $orig_key );
-}
-
-sub key_exists {
-    my $self = shift;
-    my ($trans_id, $offset, $key) = @_;
-
-    my $dig_key = $self->_apply_digest( $key );
-    # exists() returns the empty string, not undef
-    my $tag = $self->find_blist( $offset, $dig_key ) or return '';
-    return $self->bucket_exists( $tag, $dig_key, $key );
-}
-
-sub get_next_key {
-    my $self = shift;
-    my ($trans_id, $offset) = @_;
-
-    # If the previous key was not specifed, start at the top and
-    # return the first one found.
-    my $temp;
-    if ( @_ > 2 ) {
-        $temp = {
-            prev_md5    => $self->_apply_digest($_[2]),
-            return_next => 0,
-        };
-    }
-    else {
-        $temp = {
-            prev_md5    => chr(0) x $self->{hash_size},
-            return_next => 1,
-        };
-    }
-
-    return $self->traverse_index( $temp, $offset, 0 );
-}
-
-sub delete_key {
-    my $self = shift;
-    my ($trans_id, $offset, $key, $orig_key) = @_;
-
-    my $dig_key = $self->_apply_digest( $key );
-    my $tag = $self->find_blist( $offset, $dig_key ) or return;
-    my $value = $self->get_bucket_value( $tag, $dig_key, $orig_key );
-    $self->delete_bucket( $tag, $dig_key, $orig_key );
-    return $value;
-}
-
-sub write_value {
-    my $self = shift;
-    my ($trans_id, $offset, $key, $value, $orig_key) = @_;
-
-    my $dig_key = $self->_apply_digest( $key );
-    my $tag = $self->find_blist( $offset, $dig_key, { create => 1 } );
-    return $self->add_bucket( $tag, $dig_key, $key, $value, undef, $orig_key );
-}
-
-################################################################################
-#
-# Below here is the old code. It will be folded into the code above as it can.
-#
 ################################################################################
 
 sub new {
@@ -120,41 +44,31 @@ sub new {
     my ($args) = @_;
 
     my $self = bless {
-        long_size => 4,
-        long_pack => 'N',
-        data_size => 4,
-        data_pack => 'N',
+        byte_size   => 4,
 
-        digest    => \&Digest::MD5::md5,
-        hash_size => 16, # In bytes
-
-        ##
-        # Number of buckets per blist before another level of indexing is
-        # done. Increase this value for slightly greater speed, but larger database
-        # files. DO NOT decrease this value below 16, due to risk of recursive
-        # reindex overrun.
-        ##
+        digest      => undef,
+        hash_size   => 16,  # In bytes
+        hash_chars  => 256, # Number of chars the algorithm uses per byte
         max_buckets => 16,
+        num_txns    => 2,   # HEAD plus 1 additional transaction for importing
+        trans_id    => 0,   # Default to the HEAD
 
+        entries => {}, # This is the list of entries for transactions
         storage => undef,
-        obj     => undef,
     }, $class;
 
     if ( defined $args->{pack_size} ) {
         if ( lc $args->{pack_size} eq 'small' ) {
-            $args->{long_size} = 2;
-            $args->{long_pack} = 'n';
+            $args->{byte_size} = 2;
         }
         elsif ( lc $args->{pack_size} eq 'medium' ) {
-            $args->{long_size} = 4;
-            $args->{long_pack} = 'N';
+            $args->{byte_size} = 4;
         }
         elsif ( lc $args->{pack_size} eq 'large' ) {
-            $args->{long_size} = 8;
-            $args->{long_pack} = 'Q';
+            $args->{byte_size} = 8;
         }
         else {
-            die "Unknown pack_size value: '$args->{pack_size}'\n";
+            DBM::Deep->_throw_error( "Unknown pack_size value: '$args->{pack_size}'" );
         }
     }
 
@@ -163,1020 +77,1784 @@ sub new {
         next unless exists $args->{$param};
         $self->{$param} = $args->{$param};
     }
-    Scalar::Util::weaken( $self->{obj} ) if $self->{obj};
 
+    ##
+    # Number of buckets per blist before another level of indexing is
+    # done. Increase this value for slightly greater speed, but larger database
+    # files. DO NOT decrease this value below 16, due to risk of recursive
+    # reindex overrun.
+    ##
     if ( $self->{max_buckets} < 16 ) {
         warn "Floor of max_buckets is 16. Setting it to 16 from '$self->{max_buckets}'\n";
         $self->{max_buckets} = 16;
     }
 
+    if ( !$self->{digest} ) {
+        require Digest::MD5;
+        $self->{digest} = \&Digest::MD5::md5;
+    }
+
     return $self;
 }
 
-sub _storage { return $_[0]{storage} }
+################################################################################
+
+sub read_value {
+    my $self = shift;
+    my ($obj, $key) = @_;
+
+    # This will be a Reference sector
+    my $sector = $self->_load_sector( $obj->_base_offset )
+        or return;
+
+    if ( $sector->staleness != $obj->_staleness ) {
+        return;
+    }
+
+    my $key_md5 = $self->_apply_digest( $key );
+
+    my $value_sector = $sector->get_data_for({
+        key_md5    => $key_md5,
+        allow_head => 1,
+    });
+
+    unless ( $value_sector ) {
+        $value_sector = DBM::Deep::Engine::Sector::Null->new({
+            engine => $self,
+            data   => undef,
+        });
+
+        $sector->write_data({
+            key_md5 => $key_md5,
+            key     => $key,
+            value   => $value_sector,
+        });
+    }
+
+    return $value_sector->data;
+}
+
+sub get_classname {
+    my $self = shift;
+    my ($obj) = @_;
+
+    # This will be a Reference sector
+    my $sector = $self->_load_sector( $obj->_base_offset )
+        or DBM::Deep->_throw_error( "How did get_classname fail (no sector for '$obj')?!" );
+
+    if ( $sector->staleness != $obj->_staleness ) {
+        return;
+    }
+
+    return $sector->get_classname;
+}
+
+sub key_exists {
+    my $self = shift;
+    my ($obj, $key) = @_;
+
+    # This will be a Reference sector
+    my $sector = $self->_load_sector( $obj->_base_offset )
+        or return '';
+
+    if ( $sector->staleness != $obj->_staleness ) {
+        return '';
+    }
+
+    my $data = $sector->get_data_for({
+        key_md5    => $self->_apply_digest( $key ),
+        allow_head => 1,
+    });
+
+    # exists() returns 1 or '' for true/false.
+    return $data ? 1 : '';
+}
+
+sub delete_key {
+    my $self = shift;
+    my ($obj, $key) = @_;
+
+    my $sector = $self->_load_sector( $obj->_base_offset )
+        or return;
+
+    if ( $sector->staleness != $obj->_staleness ) {
+        return;
+    }
+
+    return $sector->delete_key({
+        key_md5    => $self->_apply_digest( $key ),
+        allow_head => 0,
+    });
+}
+
+sub write_value {
+    my $self = shift;
+    my ($obj, $key, $value) = @_;
+
+    my $r = Scalar::Util::reftype( $value ) || '';
+    {
+        last if $r eq '';
+        last if $r eq 'HASH';
+        last if $r eq 'ARRAY';
+
+        DBM::Deep->_throw_error(
+            "Storage of references of type '$r' is not supported."
+        );
+    }
+
+    my ($class, $type);
+    if ( !defined $value ) {
+        $class = 'DBM::Deep::Engine::Sector::Null';
+    }
+    elsif ( $r eq 'ARRAY' || $r eq 'HASH' ) {
+        if ( $r eq 'ARRAY' && tied(@$value) ) {
+            DBM::Deep->_throw_error( "Cannot store something that is tied." );
+        }
+        if ( $r eq 'HASH' && tied(%$value) ) {
+            DBM::Deep->_throw_error( "Cannot store something that is tied." );
+        }
+        $class = 'DBM::Deep::Engine::Sector::Reference';
+        $type = substr( $r, 0, 1 );
+    }
+    else {
+        $class = 'DBM::Deep::Engine::Sector::Scalar';
+    }
+
+    # This will be a Reference sector
+    my $sector = $self->_load_sector( $obj->_base_offset )
+        or DBM::Deep->_throw_error( "Cannot write to a deleted spot in DBM::Deep." );
+
+    if ( $sector->staleness != $obj->_staleness ) {
+        DBM::Deep->_throw_error( "Cannot write to a deleted spot in DBM::Deep.n" );
+    }
+
+    # Create this after loading the reference sector in case something bad happens.
+    # This way, we won't allocate value sector(s) needlessly.
+    my $value_sector = $class->new({
+        engine => $self,
+        data   => $value,
+        type   => $type,
+    });
+
+    $sector->write_data({
+        key     => $key,
+        key_md5 => $self->_apply_digest( $key ),
+        value   => $value_sector,
+    });
+
+    # This code is to make sure we write all the values in the $value to the disk
+    # and to make sure all changes to $value after the assignment are reflected
+    # on disk. This may be counter-intuitive at first, but it is correct dwimmery.
+    #   NOTE - simply tying $value won't perform a STORE on each value. Hence, the
+    # copy to a temp value.
+    if ( $r eq 'ARRAY' ) {
+        my @temp = @$value;
+        tie @$value, 'DBM::Deep', {
+            base_offset => $value_sector->offset,
+            staleness   => $value_sector->staleness,
+            storage     => $self->storage,
+            engine      => $self,
+        };
+        @$value = @temp;
+        bless $value, 'DBM::Deep::Array' unless Scalar::Util::blessed( $value );
+    }
+    elsif ( $r eq 'HASH' ) {
+        my %temp = %$value;
+        tie %$value, 'DBM::Deep', {
+            base_offset => $value_sector->offset,
+            staleness   => $value_sector->staleness,
+            storage     => $self->storage,
+            engine      => $self,
+        };
+
+        %$value = %temp;
+        bless $value, 'DBM::Deep::Hash' unless Scalar::Util::blessed( $value );
+    }
+
+    return 1;
+}
+
+# XXX Add staleness here
+sub get_next_key {
+    my $self = shift;
+    my ($obj, $prev_key) = @_;
+
+    # XXX Need to add logic about resetting the iterator if any key in the reference has changed
+    unless ( $prev_key ) {
+        $obj->{iterator} = DBM::Deep::Iterator->new({
+            base_offset => $obj->_base_offset,
+            engine      => $self,
+        });
+    }
+
+    return $obj->{iterator}->get_next_key( $obj );
+}
+
+################################################################################
+
+sub setup_fh {
+    my $self = shift;
+    my ($obj) = @_;
+
+    # We're opening the file.
+    unless ( $obj->_base_offset ) {
+        my $bytes_read = $self->_read_file_header;
+
+        # Creating a new file
+        unless ( $bytes_read ) {
+            $self->_write_file_header;
+
+            # 1) Create Array/Hash entry
+            my $initial_reference = DBM::Deep::Engine::Sector::Reference->new({
+                engine => $self,
+                type   => $obj->_type,
+            });
+            $obj->{base_offset} = $initial_reference->offset;
+            $obj->{staleness} = $initial_reference->staleness;
+
+            $self->storage->flush;
+        }
+        # Reading from an existing file
+        else {
+            $obj->{base_offset} = $bytes_read;
+            my $initial_reference = DBM::Deep::Engine::Sector::Reference->new({
+                engine => $self,
+                offset => $obj->_base_offset,
+            });
+            unless ( $initial_reference ) {
+                DBM::Deep->_throw_error("Corrupted file, no master index record");
+            }
+
+            unless ($obj->_type eq $initial_reference->type) {
+                DBM::Deep->_throw_error("File type mismatch");
+            }
+
+            $obj->{staleness} = $initial_reference->staleness;
+        }
+    }
+
+    return 1;
+}
+
+sub begin_work {
+    my $self = shift;
+    my ($obj) = @_;
+
+    if ( $self->trans_id ) {
+        DBM::Deep->_throw_error( "Cannot begin_work within an active transaction" );
+    }
+
+    my @slots = $self->read_txn_slots;
+    for my $i ( 1 .. @slots ) {
+        next if $slots[$i];
+        $slots[$i] = 1;
+        $self->set_trans_id( $i );
+        last;
+    }
+    $self->write_txn_slots( @slots );
+
+    if ( !$self->trans_id ) {
+        DBM::Deep->_throw_error( "Cannot begin_work - no available transactions" );
+    }
+
+    return;
+}
+
+sub rollback {
+    my $self = shift;
+    my ($obj) = @_;
+
+    if ( !$self->trans_id ) {
+        DBM::Deep->_throw_error( "Cannot rollback without an active transaction" );
+    }
+
+    # Each entry is the file location for a bucket that has a modification for
+    # this transaction. The entries need to be expunged.
+    foreach my $entry (@{ $self->get_entries } ) {
+        # Remove the entry here
+        my $read_loc = $entry
+          + $self->hash_size
+          + $self->byte_size
+          + $self->trans_id * ( $self->byte_size + 4 );
+
+        my $data_loc = $self->storage->read_at( $read_loc, $self->byte_size );
+        $data_loc = unpack( $StP{$self->byte_size}, $data_loc );
+        $self->storage->print_at( $read_loc, pack( $StP{$self->byte_size}, 0 ) );
+
+        if ( $data_loc > 1 ) {
+            $self->_load_sector( $data_loc )->free;
+        }
+    }
+
+    $self->clear_entries;
+
+    my @slots = $self->read_txn_slots;
+    $slots[$self->trans_id] = 0;
+    $self->write_txn_slots( @slots );
+    $self->inc_txn_staleness_counter( $self->trans_id );
+    $self->set_trans_id( 0 );
+
+    return 1;
+}
+
+sub commit {
+    my $self = shift;
+    my ($obj) = @_;
+
+    if ( !$self->trans_id ) {
+        DBM::Deep->_throw_error( "Cannot commit without an active transaction" );
+    }
+
+    foreach my $entry (@{ $self->get_entries } ) {
+        # Overwrite the entry in head with the entry in trans_id
+        my $base = $entry
+          + $self->hash_size
+          + $self->byte_size;
+
+        my $head_loc = $self->storage->read_at( $base, $self->byte_size );
+        $head_loc = unpack( $StP{$self->byte_size}, $head_loc );
+        my $trans_loc = $self->storage->read_at(
+            $base + $self->trans_id * ( $self->byte_size + 4 ), $self->byte_size,
+        );
+
+        $self->storage->print_at( $base, $trans_loc );
+        $self->storage->print_at(
+            $base + $self->trans_id * ( $self->byte_size + 4 ),
+            pack( $StP{$self->byte_size} . ' N', (0) x 2 ),
+        );
+
+        if ( $head_loc > 1 ) {
+            $self->_load_sector( $head_loc )->free;
+        }
+    }
+
+    $self->clear_entries;
+
+    my @slots = $self->read_txn_slots;
+    $slots[$self->trans_id] = 0;
+    $self->write_txn_slots( @slots );
+    $self->inc_txn_staleness_counter( $self->trans_id );
+    $self->set_trans_id( 0 );
+
+    return 1;
+}
+
+sub read_txn_slots {
+    my $self = shift;
+    return split '', unpack( 'b32',
+        $self->storage->read_at(
+            $self->trans_loc, 4,
+        )
+    );
+}
+
+sub write_txn_slots {
+    my $self = shift;
+    $self->storage->print_at( $self->trans_loc,
+        pack( 'b32', join('', @_) ),
+    );
+}
+
+sub get_running_txn_ids {
+    my $self = shift;
+    my @transactions = $self->read_txn_slots;
+    my @trans_ids = grep { $transactions[$_] } 0 .. $#transactions;
+}
+
+sub get_txn_staleness_counter {
+    my $self = shift;
+    my ($trans_id) = @_;
+
+    # Hardcode staleness of 0 for the HEAD
+    return 0 unless $trans_id;
+
+    my $x = unpack( 'N',
+        $self->storage->read_at(
+            $self->trans_loc + 4 * $trans_id,
+            4,
+        )
+    );
+    return $x;
+}
+
+sub inc_txn_staleness_counter {
+    my $self = shift;
+    my ($trans_id) = @_;
+
+    # Hardcode staleness of 0 for the HEAD
+    return unless $trans_id;
+
+    $self->storage->print_at(
+        $self->trans_loc + 4 * $trans_id,
+        pack( 'N', $self->get_txn_staleness_counter( $trans_id ) + 1 ),
+    );
+}
+
+sub get_entries {
+    my $self = shift;
+    return [ keys %{ $self->{entries}{$self->trans_id} ||= {} } ];
+}
+
+sub add_entry {
+    my $self = shift;
+    my ($trans_id, $loc) = @_;
+
+    $self->{entries}{$trans_id} ||= {};
+    $self->{entries}{$trans_id}{$loc} = undef;
+}
+
+# If the buckets are being relocated because of a reindexing, the entries
+# mechanism needs to be made aware of it.
+sub reindex_entry {
+    my $self = shift;
+    my ($old_loc, $new_loc) = @_;
+
+    TRANS:
+    while ( my ($trans_id, $locs) = each %{ $self->{entries} } ) {
+        foreach my $orig_loc ( keys %{ $locs } ) {
+            if ( $orig_loc == $old_loc ) {
+                delete $locs->{orig_loc};
+                $locs->{$new_loc} = undef;
+                next TRANS;
+            }
+        }
+    }
+}
+
+sub clear_entries {
+    my $self = shift;
+    delete $self->{entries}{$self->trans_id};
+}
+
+################################################################################
+
+{
+    my $header_fixed = length( SIG_FILE ) + 1 + 4 + 4;
+
+    sub _write_file_header {
+        my $self = shift;
+
+        my $header_var = 1 + 1 + 1 + 4 + 4 * $self->num_txns + 3 * $self->byte_size;
+
+        my $loc = $self->storage->request_space( $header_fixed + $header_var );
+
+        $self->storage->print_at( $loc,
+            SIG_FILE,
+            SIG_HEADER,
+            pack('N', 1),           # header version - at this point, we're at 9 bytes
+            pack('N', $header_var), # header size
+            # --- Above is $header_fixed. Below is $header_var
+            pack('C', $self->byte_size),
+            pack('C', $self->max_buckets),
+            pack('C', $self->num_txns),
+            pack('N', 0 ),                   # Transaction activeness bitfield
+            pack('N' . $self->num_txns, 0 x $self->num_txns ), # Transaction staleness counters
+            pack($StP{$self->byte_size}, 0), # Start of free chain (blist size)
+            pack($StP{$self->byte_size}, 0), # Start of free chain (data size)
+            pack($StP{$self->byte_size}, 0), # Start of free chain (index size)
+        );
+
+        $self->set_trans_loc( $header_fixed + 3 );
+        $self->set_chains_loc( $header_fixed + 3 + 4 + 4 * $self->num_txns );
+
+        return;
+    }
+
+    sub _read_file_header {
+        my $self = shift;
+
+        my $buffer = $self->storage->read_at( 0, $header_fixed );
+        return unless length($buffer);
+
+        my ($file_signature, $sig_header, $header_version, $size) = unpack(
+            'A4 A N N', $buffer
+        );
+
+        unless ( $file_signature eq SIG_FILE ) {
+            $self->storage->close;
+            DBM::Deep->_throw_error( "Signature not found -- file is not a Deep DB" );
+        }
+
+        unless ( $sig_header eq SIG_HEADER ) {
+            $self->storage->close;
+            DBM::Deep->_throw_error( "Old file version found." );
+        }
+
+        my $buffer2 = $self->storage->read_at( undef, $size );
+        my @values = unpack( 'C C C', $buffer2 );
+
+        if ( @values != 3 || grep { !defined } @values ) {
+            $self->storage->close;
+            DBM::Deep->_throw_error("Corrupted file - bad header");
+        }
+
+        $self->set_trans_loc( $header_fixed + scalar(@values) );
+        $self->set_chains_loc( $header_fixed + scalar(@values) + 4 + 4 * $self->num_txns );
+
+        #XXX Add warnings if values weren't set right
+        @{$self}{qw(byte_size max_buckets num_txns)} = @values;
+
+        my $header_var = scalar(@values) + 4 + 4 * $self->num_txns + 3 * $self->byte_size;
+        unless ( $size == $header_var ) {
+            $self->storage->close;
+            DBM::Deep->_throw_error( "Unexpected size found ($size <-> $header_var)." );
+        }
+
+        return length($buffer) + length($buffer2);
+    }
+}
+
+sub _load_sector {
+    my $self = shift;
+    my ($offset) = @_;
+
+    # Add a catch for offset of 0 or 1
+    return if $offset <= 1;
+
+    my $type = $self->storage->read_at( $offset, 1 );
+    return if $type eq chr(0);
+
+    if ( $type eq $self->SIG_ARRAY || $type eq $self->SIG_HASH ) {
+        return DBM::Deep::Engine::Sector::Reference->new({
+            engine => $self,
+            type   => $type,
+            offset => $offset,
+        });
+    }
+    # XXX Don't we need key_md5 here?
+    elsif ( $type eq $self->SIG_BLIST ) {
+        return DBM::Deep::Engine::Sector::BucketList->new({
+            engine => $self,
+            type   => $type,
+            offset => $offset,
+        });
+    }
+    elsif ( $type eq $self->SIG_INDEX ) {
+        return DBM::Deep::Engine::Sector::Index->new({
+            engine => $self,
+            type   => $type,
+            offset => $offset,
+        });
+    }
+    elsif ( $type eq $self->SIG_NULL ) {
+        return DBM::Deep::Engine::Sector::Null->new({
+            engine => $self,
+            type   => $type,
+            offset => $offset,
+        });
+    }
+    elsif ( $type eq $self->SIG_DATA ) {
+        return DBM::Deep::Engine::Sector::Scalar->new({
+            engine => $self,
+            type   => $type,
+            offset => $offset,
+        });
+    }
+    # This was deleted from under us, so just return and let the caller figure it out.
+    elsif ( $type eq $self->SIG_FREE ) {
+        return;
+    }
+
+    DBM::Deep->_throw_error( "'$offset': Don't know what to do with type '$type'" );
+}
 
 sub _apply_digest {
     my $self = shift;
     return $self->{digest}->(@_);
 }
 
-sub calculate_sizes {
+sub _add_free_blist_sector { shift->_add_free_sector( 0, @_ ) }
+sub _add_free_data_sector { shift->_add_free_sector( 1, @_ ) }
+sub _add_free_index_sector { shift->_add_free_sector( 2, @_ ) }
+
+sub _add_free_sector {
     my $self = shift;
+    my ($multiple, $offset, $size) = @_;
 
-    # The 2**8 here indicates the number of different characters in the
-    # current hashing algorithm
-    #XXX Does this need to be updated with different hashing algorithms?
-    $self->{hash_chars_used}  = (2**8);
-    $self->{index_size}       = $self->{hash_chars_used} * $self->{long_size};
+    my $chains_offset = $multiple * $self->byte_size;
 
-    $self->{bucket_size}      = $self->{hash_size} + $self->{long_size} * 2;
-    $self->{bucket_list_size} = $self->{max_buckets} * $self->{bucket_size};
+    my $storage = $self->storage;
 
-    $self->{key_size}         = $self->{long_size} * 2;
-    $self->{keyloc_size}      = $self->{max_buckets} * $self->{key_size};
+    # Increment staleness.
+    # XXX Can this increment+modulo be done by "&= 0x1" ?
+    my $staleness = unpack( $StP{STALE_SIZE()}, $storage->read_at( $offset + SIG_SIZE, STALE_SIZE ) );
+    $staleness = ($staleness + 1 ) % ( 2 ** ( 8 * STALE_SIZE ) );
+    $storage->print_at( $offset + SIG_SIZE, pack( $StP{STALE_SIZE()}, $staleness ) );
 
-    return;
-}
+    my $old_head = $storage->read_at( $self->chains_loc + $chains_offset, $self->byte_size );
 
-sub write_file_header {
-    my $self = shift;
-
-    my $loc = $self->_storage->request_space( length( SIG_FILE ) + 33 );
-
-    $self->_storage->print_at( $loc,
-        SIG_FILE,
-        SIG_HEADER,
-        pack('N', 1),  # header version
-        pack('N', 24), # header size
-        pack('N4', 0, 0, 0, 0),  # currently running transaction IDs
-        pack('n', $self->{long_size}),
-        pack('A', $self->{long_pack}),
-        pack('n', $self->{data_size}),
-        pack('A', $self->{data_pack}),
-        pack('n', $self->{max_buckets}),
+    $storage->print_at( $self->chains_loc + $chains_offset,
+        pack( $StP{$self->byte_size}, $offset ),
     );
 
-    $self->_storage->set_transaction_offset( 13 );
-
-    return;
+    # Record the old head in the new sector after the signature and staleness counter
+    $storage->print_at( $offset + SIG_SIZE + STALE_SIZE, $old_head );
 }
 
-sub read_file_header {
+sub _request_blist_sector { shift->_request_sector( 0, @_ ) }
+sub _request_data_sector { shift->_request_sector( 1, @_ ) }
+sub _request_index_sector { shift->_request_sector( 2, @_ ) }
+
+sub _request_sector {
     my $self = shift;
+    my ($multiple, $size) = @_;
 
-    my $buffer = $self->_storage->read_at( 0, length(SIG_FILE) + 9 );
-    return unless length($buffer);
+    my $chains_offset = $multiple * $self->byte_size;
 
-    my ($file_signature, $sig_header, $header_version, $size) = unpack(
-        'A4 A N N', $buffer
+    my $old_head = $self->storage->read_at( $self->chains_loc + $chains_offset, $self->byte_size );
+    my $loc = unpack( $StP{$self->byte_size}, $old_head );
+
+    # We don't have any free sectors of the right size, so allocate a new one.
+    unless ( $loc ) {
+        my $offset = $self->storage->request_space( $size );
+
+        # Zero out the new sector. This also guarantees correct increases
+        # in the filesize.
+        $self->storage->print_at( $offset, chr(0) x $size );
+
+        return $offset;
+    }
+
+    # Read the new head after the signature and the staleness counter
+    my $new_head = $self->storage->read_at( $loc + SIG_SIZE + STALE_SIZE, $self->byte_size );
+    $self->storage->print_at( $self->chains_loc + $chains_offset, $new_head );
+    $self->storage->print_at(
+        $loc + SIG_SIZE + STALE_SIZE,
+        pack( $StP{$self->byte_size}, 0 ),
     );
 
-    unless ( $file_signature eq SIG_FILE ) {
-        $self->_storage->close;
-        $self->_throw_error( "Signature not found -- file is not a Deep DB" );
-    }
-
-    unless ( $sig_header eq SIG_HEADER ) {
-        $self->_storage->close;
-        $self->_throw_error( "Old file version found." );
-    }
-
-    my $buffer2 = $self->_storage->read_at( undef, $size );
-    my ($a1, $a2, $a3, $a4, @values) = unpack( 'N4 n A n A n', $buffer2 );
-
-    $self->_storage->set_transaction_offset( 13 );
-
-    if ( @values < 5 || grep { !defined } @values ) {
-        $self->_storage->close;
-        $self->_throw_error("Corrupted file - bad header");
-    }
-
-    #XXX Add warnings if values weren't set right
-    @{$self}{qw(long_size long_pack data_size data_pack max_buckets)} = @values;
-
-    return length($buffer) + length($buffer2);
+    return $loc;
 }
 
-sub setup_fh {
+################################################################################
+
+sub storage     { $_[0]{storage} }
+sub byte_size   { $_[0]{byte_size} }
+sub hash_size   { $_[0]{hash_size} }
+sub hash_chars  { $_[0]{hash_chars} }
+sub num_txns    { $_[0]{num_txns} }
+sub max_buckets { $_[0]{max_buckets} }
+sub blank_md5   { chr(0) x $_[0]->hash_size }
+
+sub trans_id     { $_[0]{trans_id} }
+sub set_trans_id { $_[0]{trans_id} = $_[1] }
+
+sub trans_loc     { $_[0]{trans_loc} }
+sub set_trans_loc { $_[0]{trans_loc} = $_[1] }
+
+sub chains_loc     { $_[0]{chains_loc} }
+sub set_chains_loc { $_[0]{chains_loc} = $_[1] }
+
+################################################################################
+
+package DBM::Deep::Iterator;
+
+sub new {
+    my $class = shift;
+    my ($args) = @_;
+
+    my $self = bless {
+        breadcrumbs => [],
+        engine      => $args->{engine},
+        base_offset => $args->{base_offset},
+    }, $class;
+
+    Scalar::Util::weaken( $self->{engine} );
+
+    return $self;
+}
+
+sub reset { $_[0]{breadcrumbs} = [] }
+
+sub get_sector_iterator {
+    my $self = shift;
+    my ($loc) = @_;
+
+    my $sector = $self->{engine}->_load_sector( $loc )
+        or return;
+
+    if ( $sector->isa( 'DBM::Deep::Engine::Sector::Index' ) ) {
+        return DBM::Deep::Iterator::Index->new({
+            iterator => $self,
+            sector   => $sector,
+        });
+    }
+    elsif ( $sector->isa( 'DBM::Deep::Engine::Sector::BucketList' ) ) {
+        return DBM::Deep::Iterator::BucketList->new({
+            iterator => $self,
+            sector   => $sector,
+        });
+    }
+
+    DBM::Deep->_throw_error( "get_sector_iterator(): Why did $loc make a $sector?" );
+}
+
+sub get_next_key {
     my $self = shift;
     my ($obj) = @_;
 
-    # Need to remove use of $fh here
-    my $fh = $self->_storage->{fh};
-    flock $fh, LOCK_EX;
+    my $crumbs = $self->{breadcrumbs};
+    my $e = $self->{engine};
 
-    #XXX The duplication of calculate_sizes needs to go away
-    unless ( $obj->{base_offset} ) {
-        my $bytes_read = $self->read_file_header;
+    unless ( @$crumbs ) {
+        # This will be a Reference sector
+        my $sector = $e->_load_sector( $self->{base_offset} )
+            # If no sector is found, thist must have been deleted from under us.
+            or return;
 
-        $self->calculate_sizes;
-
-        ##
-        # File is empty -- write header and master index
-        ##
-        if (!$bytes_read) {
-            $self->_storage->audit( "# Database created on" );
-
-            $self->write_file_header;
-
-            $obj->{base_offset} = $self->_storage->request_space(
-                $self->tag_size( $self->{index_size} ),
-            );
-
-            $self->write_tag(
-                $obj->_base_offset, $obj->_type,
-                chr(0)x$self->{index_size},
-            );
-
-            # Flush the filehandle
-            my $old_fh = select $fh;
-            my $old_af = $|; $| = 1; $| = $old_af;
-            select $old_fh;
+        if ( $sector->staleness != $obj->_staleness ) {
+            return;
         }
-        else {
-            $obj->{base_offset} = $bytes_read;
 
-            ##
-            # Get our type from master index header
-            ##
-            my $tag = $self->load_tag($obj->_base_offset);
-            unless ( $tag ) {
-                flock $fh, LOCK_UN;
-                $self->_throw_error("Corrupted file, no master index record");
-            }
+        my $loc = $sector->get_blist_loc
+            or return;
 
-            unless ($obj->_type eq $tag->{signature}) {
-                flock $fh, LOCK_UN;
-                $self->_throw_error("File type mismatch");
-            }
-        }
-    }
-    else {
-        $self->calculate_sizes;
+        push @$crumbs, $self->get_sector_iterator( $loc );
     }
 
-    #XXX We have to make sure we don't mess up when autoflush isn't turned on
-    $self->_storage->set_inode;
+    FIND_NEXT_KEY: {
+        # We're at the end.
+        unless ( @$crumbs ) {
+            $self->reset;
+            return;
+        }
 
-    flock $fh, LOCK_UN;
+        my $iterator = $crumbs->[-1];
 
-    return 1;
+        # This level is done.
+        if ( $iterator->at_end ) {
+            pop @$crumbs;
+            redo FIND_NEXT_KEY;
+        }
+
+        if ( $iterator->isa( 'DBM::Deep::Iterator::Index' ) ) {
+            # If we don't have any more, it will be caught at the
+            # prior check.
+            if ( my $next = $iterator->get_next_iterator ) {
+                push @$crumbs, $next;
+            }
+            redo FIND_NEXT_KEY;
+        }
+
+        unless ( $iterator->isa( 'DBM::Deep::Iterator::BucketList' ) ) {
+            DBM::Deep->_throw_error(
+                "Should have a bucketlist iterator here - instead have $iterator"
+            );
+        }
+
+        # At this point, we have a BucketList iterator
+        my $key = $iterator->get_next_key;
+        if ( defined $key ) {
+            return $key;
+        }
+        #XXX else { $iterator->set_to_end() } ?
+
+        # We hit the end of the bucketlist iterator, so redo
+        redo FIND_NEXT_KEY;
+    }
+
+    DBM::Deep->_throw_error( "get_next_key(): How did we get here?" );
 }
 
-sub tag_size {
-    my $self = shift;
-    my ($size) = @_;
-    return SIG_SIZE + $self->{data_size} + $size;
+package DBM::Deep::Iterator::Index;
+
+sub new {
+    my $self = bless $_[1] => $_[0];
+    $self->{curr_index} = 0;
+    return $self;
 }
 
-sub write_tag {
-    ##
-    # Given offset, signature and content, create tag and write to disk
-    ##
+sub at_end {
     my $self = shift;
-    my ($offset, $sig, $content) = @_;
-    my $size = length( $content );
+    return $self->{curr_index} >= $self->{iterator}{engine}->hash_chars;
+}
 
-    $self->_storage->print_at(
-        $offset, 
-        $sig, pack($self->{data_pack}, $size), $content,
+sub get_next_iterator {
+    my $self = shift;
+
+    my $loc;
+    while ( !$loc ) {
+        return if $self->at_end;
+        $loc = $self->{sector}->get_entry( $self->{curr_index}++ );
+    }
+
+    return $self->{iterator}->get_sector_iterator( $loc );
+}
+
+package DBM::Deep::Iterator::BucketList;
+
+sub new {
+    my $self = bless $_[1] => $_[0];
+    $self->{curr_index} = 0;
+    return $self;
+}
+
+sub at_end {
+    my $self = shift;
+    return $self->{curr_index} >= $self->{iterator}{engine}->max_buckets;
+}
+
+sub get_next_key {
+    my $self = shift;
+
+    return if $self->at_end;
+
+    my $idx = $self->{curr_index}++;
+
+    my $data_loc = $self->{sector}->get_data_location_for({
+        allow_head => 1,
+        idx        => $idx,
+    }) or return;
+
+    #XXX Do we want to add corruption checks here?
+    return $self->{sector}->get_key_for( $idx )->data;
+}
+
+package DBM::Deep::Engine::Sector;
+
+sub new {
+    my $self = bless $_[1], $_[0];
+    Scalar::Util::weaken( $self->{engine} );
+    $self->_init;
+    return $self;
+}
+
+#sub _init {}
+#sub clone { DBM::Deep->_throw_error( "Must be implemented in the child class" ); }
+
+sub engine { $_[0]{engine} }
+sub offset { $_[0]{offset} }
+sub type   { $_[0]{type} }
+
+sub base_size {
+   my $self = shift;
+   return $self->engine->SIG_SIZE + $self->engine->STALE_SIZE;
+}
+
+sub free {
+    my $self = shift;
+
+    my $e = $self->engine;
+
+    $e->storage->print_at( $self->offset, $e->SIG_FREE );
+    # Skip staleness counter
+    $e->storage->print_at( $self->offset + $self->base_size,
+        chr(0) x ($self->size - $self->base_size),
     );
 
-    return unless defined $offset;
+    my $free_meth = $self->free_meth;
+    $e->$free_meth( $self->offset, $self->size );
 
-    return {
-        signature => $sig,
-        #XXX Is this even used?
-        size      => $size,
-        start     => $offset,
-        offset    => $offset + SIG_SIZE + $self->{data_size},
-        content   => $content,
-        is_new    => 1,
-    };
+    return;
 }
 
-sub load_tag {
-    ##
-    # Given offset, load single tag and return signature, size and data
-    ##
+package DBM::Deep::Engine::Sector::Data;
+
+our @ISA = qw( DBM::Deep::Engine::Sector );
+
+# This is in bytes
+sub size { return 256 }
+sub free_meth { return '_add_free_data_sector' }
+
+sub clone {
     my $self = shift;
-    my ($offset) = @_;
-    print join(":",map{$_||''}caller) . " - load_tag($offset)\n" if $::DEBUG;
-
-    my $storage = $self->_storage;
-
-    my ($sig, $size) = unpack(
-        "A $self->{data_pack}",
-        $storage->read_at( $offset, SIG_SIZE + $self->{data_size} ),
-    );
-
-    return {
-        signature => $sig,
-        size      => $size,   #XXX Is this even used?
-        start     => $offset,
-        offset    => $offset + SIG_SIZE + $self->{data_size},
-        content   => $storage->read_at( undef, $size ),
-    };
+    return ref($self)->new({
+        engine => $self->engine,
+        data   => $self->data,
+        type   => $self->type,
+    });
 }
 
-sub find_keyloc {
+package DBM::Deep::Engine::Sector::Scalar;
+
+our @ISA = qw( DBM::Deep::Engine::Sector::Data );
+
+sub free {
     my $self = shift;
-    my ($tag, $transaction_id) = @_;
-    $transaction_id = $self->_storage->transaction_id
-        unless defined $transaction_id;
 
-    for ( my $i = 0; $i < $self->{max_buckets}; $i++ ) {
-        my ($loc, $trans_id, $is_deleted) = unpack(
-            "$self->{long_pack} C C",
-            substr( $tag->{content}, $i * $self->{key_size}, $self->{key_size} ),
-        );
+    my $chain_loc = $self->chain_loc;
 
-        next if $loc != HEAD && $transaction_id != $trans_id;
-        return( $loc, $is_deleted, $i * $self->{key_size} );
+    $self->SUPER::free();
+
+    if ( $chain_loc ) {
+        $self->engine->_load_sector( $chain_loc )->free;
     }
 
     return;
 }
 
-sub add_bucket {
-    ##
-    # Adds one key/value pair to bucket list, given offset, MD5 digest of key,
-    # plain (undigested) key and value.
-    ##
+sub type { $_[0]{engine}->SIG_DATA }
+sub _init {
     my $self = shift;
-    my ($tag, $md5, $plain_key, $value, $deleted, $orig_key) = @_;
 
-    # This verifies that only supported values will be stored.
-    {
-        my $r = Scalar::Util::reftype( $value );
+    my $engine = $self->engine;
 
-        last if !defined $r;
-        last if $r eq 'HASH';
-        last if $r eq 'ARRAY';
+    unless ( $self->offset ) {
+        my $data_section = $self->size - $self->base_size - 1 * $engine->byte_size - 1;
 
-        $self->_throw_error(
-            "Storage of references of type '$r' is not supported."
+        $self->{offset} = $engine->_request_data_sector( $self->size );
+
+        my $data = delete $self->{data};
+        my $dlen = length $data;
+        my $continue = 1;
+        my $curr_offset = $self->offset;
+        while ( $continue ) {
+
+            my $next_offset = 0;
+
+            my ($leftover, $this_len, $chunk);
+            if ( $dlen > $data_section ) {
+                $leftover = 0;
+                $this_len = $data_section;
+                $chunk = substr( $data, 0, $this_len );
+
+                $dlen -= $data_section;
+                $next_offset = $engine->_request_data_sector( $self->size );
+                $data = substr( $data, $this_len );
+            }
+            else {
+                $leftover = $data_section - $dlen;
+                $this_len = $dlen;
+                $chunk = $data;
+
+                $continue = 0;
+            }
+
+            $engine->storage->print_at( $curr_offset, $self->type ); # Sector type
+            # Skip staleness
+            $engine->storage->print_at( $curr_offset + $self->base_size,
+                pack( $StP{$engine->byte_size}, $next_offset ),  # Chain loc
+                pack( $StP{1}, $this_len ),                      # Data length
+                $chunk,                                          # Data to be stored in this sector
+                chr(0) x $leftover,                              # Zero-fill the rest
+            );
+
+            $curr_offset = $next_offset;
+        }
+
+        return;
+    }
+}
+
+sub data_length {
+    my $self = shift;
+
+    my $buffer = $self->engine->storage->read_at(
+        $self->offset + $self->base_size + $self->engine->byte_size, 1
+    );
+
+    return unpack( $StP{1}, $buffer );
+}
+
+sub chain_loc {
+    my $self = shift;
+    return unpack(
+        $StP{$self->engine->byte_size},
+        $self->engine->storage->read_at(
+            $self->offset + $self->base_size,
+            $self->engine->byte_size,
+        ),
+    );
+}
+
+sub data {
+    my $self = shift;
+
+    my $data;
+    while ( 1 ) {
+        my $chain_loc = $self->chain_loc;
+
+        $data .= $self->engine->storage->read_at(
+            $self->offset + $self->base_size + $self->engine->byte_size + 1, $self->data_length,
+        );
+
+        last unless $chain_loc;
+
+        $self = $self->engine->_load_sector( $chain_loc );
+    }
+
+    return $data;
+}
+
+package DBM::Deep::Engine::Sector::Null;
+
+our @ISA = qw( DBM::Deep::Engine::Sector::Data );
+
+sub type { $_[0]{engine}->SIG_NULL }
+sub data_length { 0 }
+sub data { return }
+
+sub _init {
+    my $self = shift;
+
+    my $engine = $self->engine;
+
+    unless ( $self->offset ) {
+        my $leftover = $self->size - $self->base_size - 1 * $engine->byte_size - 1;
+
+        $self->{offset} = $engine->_request_data_sector( $self->size );
+        $engine->storage->print_at( $self->offset, $self->type ); # Sector type
+        # Skip staleness counter
+        $engine->storage->print_at( $self->offset + $self->base_size,
+            pack( $StP{$engine->byte_size}, 0 ),  # Chain loc
+            pack( $StP{1}, $self->data_length ),  # Data length
+            chr(0) x $leftover,                   # Zero-fill the rest
+        );
+
+        return;
+    }
+}
+
+package DBM::Deep::Engine::Sector::Reference;
+
+our @ISA = qw( DBM::Deep::Engine::Sector::Data );
+
+sub _init {
+    my $self = shift;
+
+    my $e = $self->engine;
+
+    unless ( $self->offset ) {
+        my $classname = Scalar::Util::blessed( delete $self->{data} );
+        my $leftover = $self->size - $self->base_size - 2 * $e->byte_size;
+
+        my $class_offset = 0;
+        if ( defined $classname ) {
+            my $class_sector = DBM::Deep::Engine::Sector::Scalar->new({
+                engine => $e,
+                data   => $classname,
+            });
+            $class_offset = $class_sector->offset;
+        }
+
+        $self->{offset} = $e->_request_data_sector( $self->size );
+        $e->storage->print_at( $self->offset, $self->type ); # Sector type
+        # Skip staleness counter
+        $e->storage->print_at( $self->offset + $self->base_size,
+            pack( $StP{$e->byte_size}, 0 ),             # Index/BList loc
+            pack( $StP{$e->byte_size}, $class_offset ), # Classname loc
+            chr(0) x $leftover,                         # Zero-fill the rest
         );
     }
-
-    my $storage = $self->_storage;
-
-    #ACID - This is a mutation. Must only find the exact transaction
-    my ($keyloc, $offset) = $self->_find_in_buckets( $tag, $md5, 1 );
-
-    my @transactions;
-    if ( $storage->transaction_id == 0 ) {
-        @transactions = $storage->current_transactions;
+    else {
+        $self->{type} = $e->storage->read_at( $self->offset, 1 );
     }
 
-#    $self->_release_space( $size, $subloc );
-#XXX This needs updating to use _release_space
+    $self->{staleness} = unpack(
+        $StP{$e->STALE_SIZE},
+        $e->storage->read_at( $self->offset + $e->SIG_SIZE, $e->STALE_SIZE ),
+    );
 
-    my $location;
-    my $size = $self->_length_needed( $value, $plain_key );
+    return;
+}
 
-    # Updating a known md5
-    if ( $keyloc ) {
-        my $keytag = $self->load_tag( $keyloc );
-        my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
+sub free {
+    my $self = shift;
 
-        if ( $subloc && !$is_deleted && @transactions ) {
-            my $old_value = $self->read_from_loc( $subloc, $orig_key );
-            my $old_size = $self->_length_needed( $old_value, $plain_key );
+    my $blist_loc = $self->get_blist_loc;
+    $self->engine->_load_sector( $blist_loc )->free if $blist_loc;
 
-            for my $trans_id ( @transactions ) {
-                my ($loc, $is_deleted, $offset2) = $self->find_keyloc( $keytag, $trans_id );
-                unless ($loc) {
-                    my $location2 = $storage->request_space( $old_size );
-                    $storage->print_at( $keytag->{offset} + $offset2,
-                        pack($self->{long_pack}, $location2 ),
-                        pack( 'C C', $trans_id, 0 ),
-                    );
-                    $self->_write_value( $location2, $plain_key, $old_value, $orig_key );
+    my $class_loc = $self->get_class_offset;
+    $self->engine->_load_sector( $class_loc )->free if $class_loc;
+
+    $self->SUPER::free();
+}
+
+sub staleness { $_[0]{staleness} }
+
+sub get_data_for {
+    my $self = shift;
+    my ($args) = @_;
+
+    # Assume that the head is not allowed unless otherwise specified.
+    $args->{allow_head} = 0 unless exists $args->{allow_head};
+
+    # Assume we don't create a new blist location unless otherwise specified.
+    $args->{create} = 0 unless exists $args->{create};
+
+    my $blist = $self->get_bucket_list({
+        key_md5 => $args->{key_md5},
+        key => $args->{key},
+        create  => $args->{create},
+    });
+    return unless $blist && $blist->{found};
+
+    # At this point, $blist knows where the md5 is. What it -doesn't- know yet
+    # is whether or not this transaction has this key. That's part of the next
+    # function call.
+    my $location = $blist->get_data_location_for({
+        allow_head => $args->{allow_head},
+    }) or return;
+
+    return $self->engine->_load_sector( $location );
+}
+
+sub write_data {
+    my $self = shift;
+    my ($args) = @_;
+
+    my $blist = $self->get_bucket_list({
+        key_md5 => $args->{key_md5},
+        key => $args->{key},
+        create  => 1,
+    }) or DBM::Deep->_throw_error( "How did write_data fail (no blist)?!" );
+
+    # Handle any transactional bookkeeping.
+    if ( $self->engine->trans_id ) {
+        if ( ! $blist->has_md5 ) {
+            $blist->mark_deleted({
+                trans_id => 0,
+            });
+        }
+    }
+    else {
+        my @trans_ids = $self->engine->get_running_txn_ids;
+        if ( $blist->has_md5 ) {
+            if ( @trans_ids ) {
+                my $old_value = $blist->get_data_for;
+                foreach my $other_trans_id ( @trans_ids ) {
+                    next if $blist->get_data_location_for({
+                        trans_id   => $other_trans_id,
+                        allow_head => 0,
+                    });
+                    $blist->write_md5({
+                        trans_id => $other_trans_id,
+                        key      => $args->{key},
+                        key_md5  => $args->{key_md5},
+                        value    => $old_value->clone,
+                    });
                 }
             }
         }
-
-        $location = $self->_storage->request_space( $size );
-        #XXX This needs to be transactionally-aware in terms of which keytag->{offset} to use
-        $storage->print_at( $keytag->{offset} + $offset,
-            pack($self->{long_pack}, $location ),
-            pack( 'C C', $storage->transaction_id, 0 ),
-        );
-    }
-    # Adding a new md5
-    else {
-        my $keyloc = $storage->request_space( $self->tag_size( $self->{keyloc_size} ) );
-
-        # The bucket fit into list
-        if ( defined $offset ) {
-            $storage->print_at( $tag->{offset} + $offset,
-                $md5, pack( $self->{long_pack}, $keyloc ),
-            );
-        }
-        # If bucket didn't fit into list, split into a new index level
         else {
-            $self->split_index( $tag, $md5, $keyloc );
-        }
-
-        my $keytag = $self->write_tag(
-            $keyloc, SIG_KEYS, chr(0)x$self->{keyloc_size},
-        );
-
-        $location = $self->_storage->request_space( $size );
-        $storage->print_at( $keytag->{offset},
-            pack( $self->{long_pack}, $location ),
-            pack( 'C C', $storage->transaction_id, 0 ),
-        );
-
-        my $offset = 1;
-        for my $trans_id ( @transactions ) {
-            $storage->print_at( $keytag->{offset} + $self->{key_size} * $offset++,
-                pack( $self->{long_pack}, 0 ),
-                pack( 'C C', $trans_id, 1 ),
-            );
+            if ( @trans_ids ) {
+                foreach my $other_trans_id ( @trans_ids ) {
+                    #XXX This doesn't seem to possible to ever happen . . .
+                    next if $blist->get_data_location_for({ trans_id => $other_trans_id, allow_head => 0 });
+                    $blist->mark_deleted({
+                        trans_id => $other_trans_id,
+                    });
+                }
+            }
         }
     }
 
-    $self->_write_value( $location, $plain_key, $value, $orig_key );
+    #XXX Is this safe to do transactionally?
+    # Free the place we're about to write to.
+    if ( $blist->get_data_location_for({ allow_head => 0 }) ) {
+        $blist->get_data_for({ allow_head => 0 })->free;
+    }
 
-    return 1;
+    $blist->write_md5({
+        key      => $args->{key},
+        key_md5  => $args->{key_md5},
+        value    => $args->{value},
+    });
 }
 
-sub _write_value {
+sub delete_key {
     my $self = shift;
-    my ($key_loc, $location, $key, $value, $orig_key) = @_;
+    my ($args) = @_;
 
-    my $storage = $self->_storage;
+    # XXX What should happen if this fails?
+    my $blist = $self->get_bucket_list({
+        key_md5 => $args->{key_md5},
+    }) or DBM::Deep->_throw_error( "How did delete_key fail (no blist)?!" );
 
-    my $dbm_deep_obj = _get_dbm_object( $value );
-    if ( $dbm_deep_obj && $dbm_deep_obj->_storage ne $storage ) {
-        $self->_throw_error( "Cannot cross-reference. Use export() instead" );
-    }
+    # Save the location so that we can free the data
+    my $location = $blist->get_data_location_for({
+        allow_head => 0,
+    });
+    my $old_value = $location && $self->engine->_load_sector( $location );
 
-    ##
-    # Write signature based on content type, set content length and write
-    # actual value.
-    ##
-    my $r = Scalar::Util::reftype( $value ) || '';
-    if ( $dbm_deep_obj ) {
-        $self->write_tag( $location, SIG_INTERNAL,pack($self->{long_pack}, $dbm_deep_obj->_base_offset) );
-    }
-    elsif ($r eq 'HASH') {
-        if ( !$dbm_deep_obj && tied %{$value} ) {
-            $self->_throw_error( "Cannot store something that is tied" );
+    my @trans_ids = $self->engine->get_running_txn_ids;
+
+    if ( $self->engine->trans_id == 0 ) {
+        if ( @trans_ids ) {
+            foreach my $other_trans_id ( @trans_ids ) {
+                next if $blist->get_data_location_for({ trans_id => $other_trans_id, allow_head => 0 });
+                $blist->write_md5({
+                    trans_id => $other_trans_id,
+                    key      => $args->{key},
+                    key_md5  => $args->{key_md5},
+                    value    => $old_value->clone,
+                });
+            }
         }
-        $self->write_tag( $location, SIG_HASH, chr(0)x$self->{index_size} );
     }
-    elsif ($r eq 'ARRAY') {
-        if ( !$dbm_deep_obj && tied @{$value} ) {
-            $self->_throw_error( "Cannot store something that is tied" );
+
+    my $data;
+    if ( @trans_ids ) {
+        $blist->mark_deleted( $args );
+
+        if ( $old_value ) {
+            $data = $old_value->data;
+            $old_value->free;
         }
-        $self->write_tag( $location, SIG_ARRAY, chr(0)x$self->{index_size} );
-    }
-    elsif (!defined($value)) {
-        $self->write_tag( $location, SIG_NULL, '' );
     }
     else {
-        $self->write_tag( $location, SIG_DATA, $value );
+        $data = $blist->delete_md5( $args );
     }
 
-    ##
-    # Plain key is stored AFTER value, as keys are typically fetched less often.
-    ##
-    $storage->print_at( undef, pack($self->{data_pack}, length($key)) . $key );
-
-    # Internal references don't care about autobless
-    return 1 if $dbm_deep_obj;
-
-    ##
-    # If value is blessed, preserve class name
-    ##
-    if ( $storage->{autobless} ) {
-        if ( defined( my $c = Scalar::Util::blessed($value) ) ) {
-            $storage->print_at( undef, chr(1), pack($self->{data_pack}, length($c)) . $c );
-        }
-        else {
-            $storage->print_at( undef, chr(0) );
-        }
-    }
-
-    ##
-    # Tie the passed in reference so that changes to it are reflected in the
-    # datafile. The use of $location as the base_offset will act as the
-    # the linkage between parent and child.
-    #
-    # The overall assignment is a hack around the fact that just tying doesn't
-    # store the values. This may not be the wrong thing to do.
-    ##
-    if ($r eq 'HASH') {
-        my %x = %$value;
-        tie %$value, 'DBM::Deep', {
-            base_offset => $key_loc,
-            storage     => $storage,
-            parent      => $self->{obj},
-            parent_key  => $orig_key,
-        };
-        %$value = %x;
-        bless $value, 'DBM::Deep::Hash' unless Scalar::Util::blessed( $value );
-    }
-    elsif ($r eq 'ARRAY') {
-        my @x = @$value;
-        tie @$value, 'DBM::Deep', {
-            base_offset => $key_loc,
-            storage     => $storage,
-            parent      => $self->{obj},
-            parent_key  => $orig_key,
-        };
-        @$value = @x;
-        bless $value, 'DBM::Deep::Array' unless Scalar::Util::blessed( $value );
-    }
-
-    return 1;
+    return $data;
 }
 
-sub split_index {
+sub get_blist_loc {
     my $self = shift;
-    my ($tag, $md5, $keyloc) = @_;
 
-    my $storage = $self->_storage;
-
-    my $loc = $storage->request_space(
-        $self->tag_size( $self->{index_size} ),
-    );
-
-    $storage->print_at( $tag->{ref_loc}, pack($self->{long_pack}, $loc) );
-
-    my $index_tag = $self->write_tag(
-        $loc, SIG_INDEX,
-        chr(0)x$self->{index_size},
-    );
-
-    my $keys = $tag->{content}
-             . $md5 . pack($self->{long_pack}, $keyloc);
-
-    my @newloc = ();
-    BUCKET:
-    # The <= here is deliberate - we have max_buckets+1 keys to iterate
-    # through, unlike every other loop that uses max_buckets as a stop.
-    for (my $i = 0; $i <= $self->{max_buckets}; $i++) {
-        my ($key, $old_subloc) = $self->_get_key_subloc( $keys, $i );
-
-        die "[INTERNAL ERROR]: No key in split_index()\n" unless $key;
-        die "[INTERNAL ERROR]: No subloc in split_index()\n" unless $old_subloc;
-
-        my $num = ord(substr($key, $tag->{ch} + 1, 1));
-
-        if ($newloc[$num]) {
-            my $subkeys = $storage->read_at( $newloc[$num], $self->{bucket_list_size} );
-
-            # This is looking for the first empty spot
-            my ($subloc, $offset) = $self->_find_in_buckets(
-                { content => $subkeys }, '',
-            );
-
-            $storage->print_at(
-                $newloc[$num] + $offset,
-                $key, pack($self->{long_pack}, $old_subloc),
-            );
-
-            next;
-        }
-
-        my $loc = $storage->request_space(
-            $self->tag_size( $self->{bucket_list_size} ),
-        );
-
-        $storage->print_at(
-            $index_tag->{offset} + ($num * $self->{long_size}),
-            pack($self->{long_pack}, $loc),
-        );
-
-        my $blist_tag = $self->write_tag(
-            $loc, SIG_BLIST,
-            chr(0)x$self->{bucket_list_size},
-        );
-
-        $storage->print_at( $blist_tag->{offset}, $key . pack($self->{long_pack}, $old_subloc) );
-
-        $newloc[$num] = $blist_tag->{offset};
-    }
-
-    $self->_release_space(
-        $self->tag_size( $self->{bucket_list_size} ),
-        $tag->{start},
-    );
-
-    return 1;
+    my $e = $self->engine;
+    my $blist_loc = $e->storage->read_at( $self->offset + $self->base_size, $e->byte_size );
+    return unpack( $StP{$e->byte_size}, $blist_loc );
 }
 
-sub read_from_loc {
+sub get_bucket_list {
     my $self = shift;
-    my ($key_loc, $subloc, $orig_key) = @_;
+    my ($args) = @_;
+    $args ||= {};
 
-    my $storage = $self->_storage;
+    # XXX Add in check here for recycling?
 
-    my $signature = $storage->read_at( $subloc, SIG_SIZE );
+    my $engine = $self->engine;
 
-    ##
-    # If value is a hash or array, return new DBM::Deep object with correct offset
-    ##
-    if (($signature eq SIG_HASH) || ($signature eq SIG_ARRAY)) {
-        #XXX This needs to be a singleton
-#        my $new_obj;
-#        my $is_autobless;
-#        if ( $signature eq SIG_HASH ) {
-#            $new_obj = {};
-#            tie %$new_obj, 'DBM::Deep', {
-#                base_offset => $subloc,
-#                storage     => $self->_storage,
-#                parent      => $self->{obj},
-#                parent_key  => $orig_key,
-#            };
-#            $is_autobless = tied(%$new_obj)->_storage->{autobless};
-#        }
-#        else {
-#            $new_obj = [];
-#            tie @$new_obj, 'DBM::Deep', {
-#                base_offset => $subloc,
-#                storage     => $self->_storage,
-#                parent      => $self->{obj},
-#                parent_key  => $orig_key,
-#            };
-#            $is_autobless = tied(@$new_obj)->_storage->{autobless};
-#        }
-#
-#        if ($is_autobless) {
+    my $blist_loc = $self->get_blist_loc;
 
-        my $new_obj = DBM::Deep->new({
-            type        => $signature,
-            base_offset => $key_loc,
-            storage     => $self->_storage,
-            parent      => $self->{obj},
-            parent_key  => $orig_key,
+    # There's no index or blist yet
+    unless ( $blist_loc ) {
+        return unless $args->{create};
+
+        my $blist = DBM::Deep::Engine::Sector::BucketList->new({
+            engine  => $engine,
+            key_md5 => $args->{key_md5},
         });
 
-        if ($new_obj->_storage->{autobless}) {
-            ##
-            # Skip over value and plain key to see if object needs
-            # to be re-blessed
-            ##
-            $storage->increment_pointer( $self->{data_size} + $self->{index_size} );
+        $engine->storage->print_at( $self->offset + $self->base_size,
+            pack( $StP{$engine->byte_size}, $blist->offset ),
+        );
 
-            my $size = $storage->read_at( undef, $self->{data_size} );
-            $size = unpack($self->{data_pack}, $size);
-            if ($size) { $storage->increment_pointer( $size ); }
-
-            my $bless_bit = $storage->read_at( undef, 1 );
-            if ( ord($bless_bit) ) {
-                my $size = unpack(
-                    $self->{data_pack},
-                    $storage->read_at( undef, $self->{data_size} ),
-                );
-
-                if ( $size ) {
-                    $new_obj = bless $new_obj, $storage->read_at( undef, $size );
-                }
-            }
-        }
-
-        return $new_obj;
+        return $blist;
     }
-    elsif ( $signature eq SIG_INTERNAL ) {
-        my $size = $storage->read_at( undef, $self->{data_size} );
-        $size = unpack($self->{data_pack}, $size);
 
-        if ( $size ) {
-            my $new_loc = $storage->read_at( undef, $size );
-            $new_loc = unpack( $self->{long_pack}, $new_loc ); 
-            return $self->read_from_loc( $key_loc, $new_loc, $orig_key );
+    my $sector = $engine->_load_sector( $blist_loc )
+        or DBM::Deep->_throw_error( "Cannot read sector at $blist_loc in get_bucket_list()" );
+    my $i = 0;
+    my $last_sector = undef;
+    while ( $sector->isa( 'DBM::Deep::Engine::Sector::Index' ) ) {
+        $blist_loc = $sector->get_entry( ord( substr( $args->{key_md5}, $i++, 1 ) ) );
+        $last_sector = $sector;
+        if ( $blist_loc ) {
+            $sector = $engine->_load_sector( $blist_loc )
+                or DBM::Deep->_throw_error( "Cannot read sector at $blist_loc in get_bucket_list()" );
         }
         else {
-            return;
-        }
-    }
-    ##
-    # Otherwise return actual value
-    ##
-    elsif ( $signature eq SIG_DATA ) {
-        my $size = $storage->read_at( undef, $self->{data_size} );
-        $size = unpack($self->{data_pack}, $size);
-
-        my $value = $size ? $storage->read_at( undef, $size ) : '';
-        return $value;
-    }
-
-    ##
-    # Key exists, but content is null
-    ##
-    return;
-}
-
-sub get_bucket_value {
-    ##
-    # Fetch single value given tag and MD5 digested key.
-    ##
-    my $self = shift;
-    my ($tag, $md5, $orig_key) = @_;
-
-    #ACID - This is a read. Can find exact or HEAD
-    my ($keyloc, $offset) = $self->_find_in_buckets( $tag, $md5 );
-
-    if ( !$keyloc ) {
-        #XXX Need to use real key
-#        $self->add_bucket( $tag, $md5, $orig_key, undef, $orig_key );
-#        return;
-    }
-#    elsif ( !$is_deleted ) {
-    else {
-        my $keytag = $self->load_tag( $keyloc );
-        my ($subloc, $is_deleted) = $self->find_keyloc( $keytag );
-        if (!$subloc && !$is_deleted) {
-            ($subloc, $is_deleted) = $self->find_keyloc( $keytag, 0 );
-        }
-        if ( $subloc && !$is_deleted ) {
-            return $self->read_from_loc( $subloc, $orig_key );
-        }
-    }
-
-    return;
-}
-
-sub delete_bucket {
-    ##
-    # Delete single key/value pair given tag and MD5 digested key.
-    ##
-    my $self = shift;
-    my ($tag, $md5, $orig_key) = @_;
-
-    #ACID - Although this is a mutation, we must find any transaction.
-    # This is because we need to mark something as deleted that is in the HEAD.
-    my ($keyloc, $offset) = $self->_find_in_buckets( $tag, $md5 );
-
-    return if !$keyloc;
-
-    my $storage = $self->_storage;
-
-    my @transactions;
-    if ( $storage->transaction_id == 0 ) {
-        @transactions = $storage->current_transactions;
-    }
-
-    if ( $storage->transaction_id == 0 ) {
-        my $keytag = $self->load_tag( $keyloc );
-
-        my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
-        return if !$subloc || $is_deleted;
-
-        my $value = $self->read_from_loc( $subloc, $orig_key );
-
-        my $size = $self->_length_needed( $value, $orig_key );
-
-        for my $trans_id ( @transactions ) {
-            my ($loc, $is_deleted, $offset2) = $self->find_keyloc( $keytag, $trans_id );
-            unless ($loc) {
-                my $location2 = $storage->request_space( $size );
-                $storage->print_at( $keytag->{offset} + $offset2,
-                    pack($self->{long_pack}, $location2 ),
-                    pack( 'C C', $trans_id, 0 ),
-                );
-                $self->_write_value( $location2, $orig_key, $value, $orig_key );
-            }
-        }
-
-        $keytag = $self->load_tag( $keyloc );
-        ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
-        $storage->print_at( $keytag->{offset} + $offset,
-            substr( $keytag->{content}, $offset + $self->{key_size} ),
-            chr(0) x $self->{key_size},
-        );
-    }
-    else {
-        my $keytag = $self->load_tag( $keyloc );
-
-        my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
-
-        $storage->print_at( $keytag->{offset} + $offset,
-            pack($self->{long_pack}, 0 ),
-            pack( 'C C', $storage->transaction_id, 1 ),
-        );
-    }
-
-    return 1;
-}
-
-sub bucket_exists {
-    ##
-    # Check existence of single key given tag and MD5 digested key.
-    ##
-    my $self = shift;
-    my ($tag, $md5) = @_;
-
-    #ACID - This is a read. Can find exact or HEAD
-    my ($keyloc) = $self->_find_in_buckets( $tag, $md5 );
-    my $keytag = $self->load_tag( $keyloc );
-    my ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag );
-    if ( !$subloc && !$is_deleted ) {
-        ($subloc, $is_deleted, $offset) = $self->find_keyloc( $keytag, 0 );
-    }
-    return ($subloc && !$is_deleted) && 1;
-}
-
-sub find_blist {
-    ##
-    # Locate offset for bucket list, given digested key
-    ##
-    my $self = shift;
-    my ($offset, $md5, $args) = @_;
-    $args = {} unless $args;
-
-    ##
-    # Locate offset for bucket list using digest index system
-    ##
-    my $tag = $self->load_tag( $offset )
-        or $self->_throw_error( "INTERNAL ERROR - Cannot find tag" );
-
-    #XXX What happens when $ch >= $self->{hash_size} ??
-    for (my $ch = 0; $tag->{signature} ne SIG_BLIST; $ch++) {
-        my $num = ord substr($md5, $ch, 1);
-
-        my $ref_loc = $tag->{offset} + ($num * $self->{long_size});
-        $tag = $self->index_lookup( $tag, $num );
-
-        if (!$tag) {
-            return if !$args->{create};
-
-            my $loc = $self->_storage->request_space(
-                $self->tag_size( $self->{bucket_list_size} ),
-            );
-
-            $self->_storage->print_at( $ref_loc, pack($self->{long_pack}, $loc) );
-
-            $tag = $self->write_tag(
-                $loc, SIG_BLIST,
-                chr(0)x$self->{bucket_list_size},
-            );
-
-            $tag->{ref_loc} = $ref_loc;
-            $tag->{ch} = $ch;
-
+            $sector = undef;
             last;
         }
-
-        $tag->{ch} = $ch;
-        $tag->{ref_loc} = $ref_loc;
     }
 
-    return $tag;
-}
+    # This means we went through the Index sector(s) and found an empty slot
+    unless ( $sector ) {
+        return unless $args->{create};
 
-sub index_lookup {
-    ##
-    # Given index tag, lookup single entry in index and return .
-    ##
-    my $self = shift;
-    my ($tag, $index) = @_;
+        DBM::Deep->_throw_error( "No last_sector when attempting to build a new entry" )
+            unless $last_sector;
 
-    my $location = unpack(
-        $self->{long_pack},
-        substr(
-            $tag->{content},
-            $index * $self->{long_size},
-            $self->{long_size},
-        ),
-    );
+        my $blist = DBM::Deep::Engine::Sector::BucketList->new({
+            engine  => $engine,
+            key_md5 => $args->{key_md5},
+        });
 
-    if (!$location) { return; }
+        $last_sector->set_entry( ord( substr( $args->{key_md5}, $i - 1, 1 ) ) => $blist->offset );
 
-    return $self->load_tag( $location );
-}
-
-sub traverse_index {
-    ##
-    # Scan index and recursively step into deeper levels, looking for next key.
-    ##
-    my $self = shift;
-    my ($xxxx, $offset, $ch, $force_return_next) = @_;
-
-    my $tag = $self->load_tag( $offset );
-
-    if ($tag->{signature} ne SIG_BLIST) {
-        my $start = $xxxx->{return_next} ? 0 : ord(substr($xxxx->{prev_md5}, $ch, 1));
-
-        for (my $idx = $start; $idx < $self->{hash_chars_used}; $idx++) {
-            my $subloc = unpack(
-                $self->{long_pack},
-                substr(
-                    $tag->{content},
-                    $idx * $self->{long_size},
-                    $self->{long_size},
-                ),
-            );
-
-            if ($subloc) {
-                my $result = $self->traverse_index(
-                    $xxxx, $subloc, $ch + 1, $force_return_next,
-                );
-
-                if (defined $result) { return $result; }
-            }
-        } # index loop
-
-        $xxxx->{return_next} = 1;
+        return $blist;
     }
-    # This is the bucket list
-    else {
-        my $keys = $tag->{content};
-        if ($force_return_next) { $xxxx->{return_next} = 1; }
 
-        ##
-        # Iterate through buckets, looking for a key match
-        ##
-        my $transaction_id = $self->_storage->transaction_id;
-        for (my $i = 0; $i < $self->{max_buckets}; $i++) {
-            my ($key, $keyloc) = $self->_get_key_subloc( $keys, $i );
+    $sector->find_md5( $args->{key_md5} );
 
-            # End of bucket list -- return to outer loop
-            if (!$keyloc) {
-                $xxxx->{return_next} = 1;
-                last;
-            }
-            # Located previous key -- return next one found
-            elsif ($key eq $xxxx->{prev_md5}) {
-                $xxxx->{return_next} = 1;
-                next;
-            }
-            # Seek to bucket location and skip over signature
-            elsif ($xxxx->{return_next}) {
-                my $storage = $self->_storage;
+    # See whether or not we need to reindex the bucketlist
+    if ( !$sector->has_md5 && $args->{create} && $sector->{idx} == -1 ) {
+        my $new_index = DBM::Deep::Engine::Sector::Index->new({
+            engine => $engine,
+        });
 
-                my $keytag = $self->load_tag( $keyloc );
-                my ($subloc, $is_deleted) = $self->find_keyloc( $keytag );
-                if ( $subloc == 0 && !$is_deleted ) {
-                    ($subloc, $is_deleted) = $self->find_keyloc( $keytag, 0 );
-                }
-                next if $is_deleted;
+        my %blist_cache;
+        #XXX q.v. the comments for this function.
+        foreach my $entry ( $sector->chopped_up ) {
+            my ($spot, $md5) = @{$entry};
+            my $idx = ord( substr( $md5, $i, 1 ) );
 
-                # Skip over value to get to plain key
-                my $sig = $storage->read_at( $subloc, SIG_SIZE );
+            # XXX This is inefficient
+            my $blist = $blist_cache{$idx}
+                ||= DBM::Deep::Engine::Sector::BucketList->new({
+                    engine => $engine,
+                });
 
-                my $size = $storage->read_at( undef, $self->{data_size} );
-                $size = unpack($self->{data_pack}, $size);
-                if ($size) { $storage->increment_pointer( $size ); }
+            $new_index->set_entry( $idx => $blist->offset );
 
-                # Read in plain key and return as scalar
-                $size = $storage->read_at( undef, $self->{data_size} );
-                $size = unpack($self->{data_pack}, $size);
-
-                my $plain_key;
-                if ($size) { $plain_key = $storage->read_at( undef, $size); }
-                return $plain_key;
-            }
+            my $new_spot = $blist->write_at_next_open( $md5 );
+            $engine->reindex_entry( $spot => $new_spot );
         }
 
-        $xxxx->{return_next} = 1;
+        # Handle the new item separately.
+        {
+            my $idx = ord( substr( $args->{key_md5}, $i, 1 ) );
+            my $blist = $blist_cache{$idx}
+                ||= DBM::Deep::Engine::Sector::BucketList->new({
+                    engine => $engine,
+                });
+
+            $new_index->set_entry( $idx => $blist->offset );
+
+            #XXX THIS IS HACKY!
+            $blist->find_md5( $args->{key_md5} );
+            $blist->write_md5({
+                key     => $args->{key},
+                key_md5 => $args->{key_md5},
+                value   => DBM::Deep::Engine::Sector::Null->new({
+                    engine => $engine,
+                    data   => undef,
+                }),
+            });
+        }
+
+        if ( $last_sector ) {
+            $last_sector->set_entry(
+                ord( substr( $args->{key_md5}, $i - 1, 1 ) ),
+                $new_index->offset,
+            );
+        } else {
+            $engine->storage->print_at( $self->offset + $self->base_size,
+                pack( $StP{$engine->byte_size}, $new_index->offset ),
+            );
+        }
+
+        $sector->free;
+
+        $sector = $blist_cache{ ord( substr( $args->{key_md5}, $i, 1 ) ) };
+        $sector->find_md5( $args->{key_md5} );
     }
 
-    return;
+    return $sector;
 }
 
-# Utilities
-
-sub _get_key_subloc {
+sub get_class_offset {
     my $self = shift;
-    my ($keys, $idx) = @_;
 
+    my $e = $self->engine;
     return unpack(
-        # This is 'a', not 'A'. Please read the pack() documentation for the
-        # difference between the two and why it's important.
-        "a$self->{hash_size} $self->{long_pack}",
-        substr(
-            $keys,
-            ($idx * $self->{bucket_size}),
-            $self->{bucket_size},
+        $StP{$e->byte_size},
+        $e->storage->read_at(
+            $self->offset + $self->base_size + 1 * $e->byte_size, $e->byte_size,
         ),
     );
 }
 
-sub _find_in_buckets {
+sub get_classname {
     my $self = shift;
-    my ($tag, $md5) = @_;
 
-    BUCKET:
-    for ( my $i = 0; $i < $self->{max_buckets}; $i++ ) {
-        my ($key, $subloc) = $self->_get_key_subloc(
-            $tag->{content}, $i,
+    my $class_offset = $self->get_class_offset;
+
+    return unless $class_offset;
+
+    return $self->engine->_load_sector( $class_offset )->data;
+}
+
+#XXX Add singleton handling here
+sub data {
+    my $self = shift;
+
+    my $new_obj = DBM::Deep->new({
+        type        => $self->type,
+        base_offset => $self->offset,
+        staleness   => $self->staleness,
+        storage     => $self->engine->storage,
+        engine      => $self->engine,
+    });
+
+    if ( $self->engine->storage->{autobless} ) {
+        my $classname = $self->get_classname;
+        if ( defined $classname ) {
+            bless $new_obj, $classname;
+        }
+    }
+
+    return $new_obj;
+}
+
+package DBM::Deep::Engine::Sector::BucketList;
+
+our @ISA = qw( DBM::Deep::Engine::Sector );
+
+sub _init {
+    my $self = shift;
+
+    my $engine = $self->engine;
+
+    unless ( $self->offset ) {
+        my $leftover = $self->size - $self->base_size;
+
+        $self->{offset} = $engine->_request_blist_sector( $self->size );
+        $engine->storage->print_at( $self->offset, $engine->SIG_BLIST ); # Sector type
+        # Skip staleness counter
+        $engine->storage->print_at( $self->offset + $self->base_size,
+            chr(0) x $leftover, # Zero-fill the data
+        );
+    }
+
+    if ( $self->{key_md5} ) {
+        $self->find_md5;
+    }
+
+    return $self;
+}
+
+sub size {
+    my $self = shift;
+    unless ( $self->{size} ) {
+        my $e = $self->engine;
+        # Base + numbuckets * bucketsize
+        $self->{size} = $self->base_size + $e->max_buckets * $self->bucket_size;
+    }
+    return $self->{size};
+}
+
+sub free_meth { return '_add_free_blist_sector' }
+
+sub bucket_size {
+    my $self = shift;
+    unless ( $self->{bucket_size} ) {
+        my $e = $self->engine;
+        # Key + head (location) + transactions (location + staleness-counter)
+        my $location_size = $e->byte_size + $e->num_txns * ( $e->byte_size + 4 );
+        $self->{bucket_size} = $e->hash_size + $location_size;
+    }
+    return $self->{bucket_size};
+}
+
+# XXX This is such a poor hack. I need to rethink this code.
+sub chopped_up {
+    my $self = shift;
+
+    my $e = $self->engine;
+
+    my @buckets;
+    foreach my $idx ( 0 .. $e->max_buckets - 1 ) {
+        my $spot = $self->offset + $self->base_size + $idx * $self->bucket_size;
+        my $md5 = $e->storage->read_at( $spot, $e->hash_size );
+
+        #XXX If we're chopping, why would we ever have the blank_md5?
+        last if $md5 eq $e->blank_md5;
+
+        my $rest = $e->storage->read_at( undef, $self->bucket_size - $e->hash_size );
+        push @buckets, [ $spot, $md5 . $rest ];
+    }
+
+    return @buckets;
+}
+
+sub write_at_next_open {
+    my $self = shift;
+    my ($entry) = @_;
+
+    #XXX This is such a hack!
+    $self->{_next_open} = 0 unless exists $self->{_next_open};
+
+    my $spot = $self->offset + $self->base_size + $self->{_next_open}++ * $self->bucket_size;
+    $self->engine->storage->print_at( $spot, $entry );
+
+    return $spot;
+}
+
+sub has_md5 {
+    my $self = shift;
+    unless ( exists $self->{found} ) {
+        $self->find_md5;
+    }
+    return $self->{found};
+}
+
+sub find_md5 {
+    my $self = shift;
+
+    $self->{found} = undef;
+    $self->{idx}   = -1;
+
+    if ( @_ ) {
+        $self->{key_md5} = shift;
+    }
+
+    # If we don't have an MD5, then what are we supposed to do?
+    unless ( exists $self->{key_md5} ) {
+        DBM::Deep->_throw_error( "Cannot find_md5 without a key_md5 set" );
+    }
+
+    my $e = $self->engine;
+    foreach my $idx ( 0 .. $e->max_buckets - 1 ) {
+        my $potential = $e->storage->read_at(
+            $self->offset + $self->base_size + $idx * $self->bucket_size, $e->hash_size,
         );
 
-        next BUCKET if $subloc && $key ne $md5;
-        return( $subloc, $i * $self->{bucket_size} );
+        if ( $potential eq $e->blank_md5 ) {
+            $self->{idx} = $idx;
+            return;
+        }
+
+        if ( $potential eq $self->{key_md5} ) {
+            $self->{found} = 1;
+            $self->{idx} = $idx;
+            return;
+        }
     }
 
     return;
 }
 
-sub _release_space {
+sub write_md5 {
     my $self = shift;
-    my ($size, $loc) = @_;
+    my ($args) = @_;
 
-    my $next_loc = 0;
+    DBM::Deep->_throw_error( "write_md5: no key" ) unless exists $args->{key};
+    DBM::Deep->_throw_error( "write_md5: no key_md5" ) unless exists $args->{key_md5};
+    DBM::Deep->_throw_error( "write_md5: no value" ) unless exists $args->{value};
 
-    $self->_storage->print_at( $loc,
-        SIG_FREE, 
-        pack($self->{long_pack}, $size ),
-        pack($self->{long_pack}, $next_loc ),
+    my $engine = $self->engine;
+
+    $args->{trans_id} = $engine->trans_id unless exists $args->{trans_id};
+
+    my $spot = $self->offset + $self->base_size + $self->{idx} * $self->bucket_size;
+    $engine->add_entry( $args->{trans_id}, $spot );
+
+    unless ($self->{found}) {
+        my $key_sector = DBM::Deep::Engine::Sector::Scalar->new({
+            engine => $engine,
+            data   => $args->{key},
+        });
+
+        $engine->storage->print_at( $spot,
+            $args->{key_md5},
+            pack( $StP{$engine->byte_size}, $key_sector->offset ),
+        );
+    }
+
+    my $loc = $spot
+      + $engine->hash_size
+      + $engine->byte_size
+      + $args->{trans_id} * ( $engine->byte_size + 4 );
+
+    $engine->storage->print_at( $loc,
+        pack( $StP{$engine->byte_size}, $args->{value}->offset ),
+        pack( 'N', $engine->get_txn_staleness_counter( $args->{trans_id} ) ),
+    );
+}
+
+sub mark_deleted {
+    my $self = shift;
+    my ($args) = @_;
+    $args ||= {};
+
+    my $engine = $self->engine;
+
+    $args->{trans_id} = $engine->trans_id unless exists $args->{trans_id};
+
+    my $spot = $self->offset + $self->base_size + $self->{idx} * $self->bucket_size;
+    $engine->add_entry( $args->{trans_id}, $spot );
+
+    my $loc = $spot
+      + $engine->hash_size
+      + $engine->byte_size
+      + $args->{trans_id} * ( $engine->byte_size + 4 );
+
+    $engine->storage->print_at( $loc,
+        pack( $StP{$engine->byte_size}, 1 ), # 1 is the marker for deleted
+        pack( 'N', $engine->get_txn_staleness_counter( $args->{trans_id} ) ),
+    );
+}
+
+sub delete_md5 {
+    my $self = shift;
+    my ($args) = @_;
+
+    my $engine = $self->engine;
+    return undef unless $self->{found};
+
+    # Save the location so that we can free the data
+    my $location = $self->get_data_location_for({
+        allow_head => 0,
+    });
+    my $key_sector = $self->get_key_for;
+
+    my $spot = $self->offset + $self->base_size + $self->{idx} * $self->bucket_size;
+    $engine->storage->print_at( $spot,
+        $engine->storage->read_at(
+            $spot + $self->bucket_size,
+            $self->bucket_size * ( $engine->max_buckets - $self->{idx} - 1 ),
+        ),
+        chr(0) x $self->bucket_size,
     );
 
-    return;
+    $key_sector->free;
+
+    my $data_sector = $self->engine->_load_sector( $location );
+    my $data = $data_sector->data;
+    $data_sector->free;
+
+    return $data;
 }
 
-sub _throw_error {
-    die "DBM::Deep: $_[1]\n";
-}
-
-sub _get_dbm_object {
-    my $item = shift;
-
-    my $obj = eval {
-        local $SIG{__DIE__};
-        if ($item->isa( 'DBM::Deep' )) {
-            return $item;
-        }
-        return;
-    };
-    return $obj if $obj;
-
-    my $r = Scalar::Util::reftype( $item ) || '';
-    if ( $r eq 'HASH' ) {
-        my $obj = eval {
-            local $SIG{__DIE__};
-            my $obj = tied(%$item);
-            if ($obj->isa( 'DBM::Deep' )) {
-                return $obj;
-            }
-            return;
-        };
-        return $obj if $obj;
-    }
-    elsif ( $r eq 'ARRAY' ) {
-        my $obj = eval {
-            local $SIG{__DIE__};
-            my $obj = tied(@$item);
-            if ($obj->isa( 'DBM::Deep' )) {
-                return $obj;
-            }
-            return;
-        };
-        return $obj if $obj;
-    }
-
-    return;
-}
-
-sub _length_needed {
+sub get_data_location_for {
     my $self = shift;
-    my ($value, $key) = @_;
+    my ($args) = @_;
+    $args ||= {};
 
-    my $is_dbm_deep = eval {
-        local $SIG{'__DIE__'};
-        $value->isa( 'DBM::Deep' );
-    };
+    $args->{allow_head} = 0 unless exists $args->{allow_head};
+    $args->{trans_id}   = $self->engine->trans_id unless exists $args->{trans_id};
+    $args->{idx}        = $self->{idx} unless exists $args->{idx};
 
-    my $len = SIG_SIZE
-            + $self->{data_size} # size for value
-            + $self->{data_size} # size for key
-            + length( $key );    # length of key
+    my $e = $self->engine;
 
-    if ( $is_dbm_deep && $value->_storage eq $self->_storage ) {
-        # long_size is for the internal reference
-        return $len + $self->{long_size};
+    my $spot = $self->offset + $self->base_size
+      + $args->{idx} * $self->bucket_size
+      + $e->hash_size
+      + $e->byte_size
+      + $args->{trans_id} * ( $e->byte_size + 4 );
+
+    my $buffer = $e->storage->read_at(
+        $spot,
+        $e->byte_size + 4,
+    );
+    my ($loc, $staleness) = unpack( $StP{$e->byte_size} . ' N', $buffer );
+
+    # We have found an entry that is old, so get rid of it
+    if ( $staleness != (my $s = $e->get_txn_staleness_counter( $args->{trans_id} ) ) ) {
+        $e->storage->print_at(
+            $spot,
+            pack( $StP{$e->byte_size} . ' N', (0) x 2 ), 
+        );
+        $loc = 0;
     }
 
-    if ( $self->_storage->{autobless} ) {
-        # This is for the bit saying whether or not this thing is blessed.
-        $len += 1;
+    # If we're in a transaction and we never wrote to this location, try the
+    # HEAD instead.
+    if ( $args->{trans_id} && !$loc && $args->{allow_head} ) {
+        return $self->get_data_location_for({
+            trans_id   => 0,
+            allow_head => 1,
+            idx        => $args->{idx},
+        });
+    }
+    return $loc <= 1 ? 0 : $loc;
+}
+
+sub get_data_for {
+    my $self = shift;
+    my ($args) = @_;
+    $args ||= {};
+
+    return unless $self->{found};
+    my $location = $self->get_data_location_for({
+        allow_head => $args->{allow_head},
+    });
+    return $self->engine->_load_sector( $location );
+}
+
+sub get_key_for {
+    my $self = shift;
+    my ($idx) = @_;
+    $idx = $self->{idx} unless defined $idx;
+
+    if ( $idx >= $self->engine->max_buckets ) {
+        DBM::Deep->_throw_error( "get_key_for(): Attempting to retrieve $idx" );
     }
 
-    my $r = Scalar::Util::reftype( $value ) || '';
-    unless ( $r eq 'HASH' || $r eq 'ARRAY' ) {
-        if ( defined $value ) {
-            $len += length( $value );
-        }
-        return $len;
+    my $location = $self->engine->storage->read_at(
+        $self->offset + $self->base_size + $idx * $self->bucket_size + $self->engine->hash_size,
+        $self->engine->byte_size,
+    );
+    $location = unpack( $StP{$self->engine->byte_size}, $location );
+    DBM::Deep->_throw_error( "get_key_for: No location?" ) unless $location;
+
+    return $self->engine->_load_sector( $location );
+}
+
+package DBM::Deep::Engine::Sector::Index;
+
+our @ISA = qw( DBM::Deep::Engine::Sector );
+
+sub _init {
+    my $self = shift;
+
+    my $engine = $self->engine;
+
+    unless ( $self->offset ) {
+        my $leftover = $self->size - $self->base_size;
+
+        $self->{offset} = $engine->_request_index_sector( $self->size );
+        $engine->storage->print_at( $self->offset, $engine->SIG_INDEX ); # Sector type
+        # Skip staleness counter
+        $engine->storage->print_at( $self->offset + $self->base_size,
+            chr(0) x $leftover, # Zero-fill the rest
+        );
     }
 
-    $len += $self->{index_size};
+    return $self;
+}
 
-    # if autobless is enabled, must also take into consideration
-    # the class name as it is stored after the key.
-    if ( $self->_storage->{autobless} ) {
-        my $c = Scalar::Util::blessed($value);
-        if ( defined $c && !$is_dbm_deep ) {
-            $len += $self->{data_size} + length($c);
-        }
+sub size {
+    my $self = shift;
+    unless ( $self->{size} ) {
+        my $e = $self->engine;
+        $self->{size} = $self->base_size + $e->byte_size * $e->hash_chars;
+    }
+    return $self->{size};
+}
+
+sub free_meth { return '_add_free_index_sector' }
+
+sub free {
+    my $self = shift;
+    my $e = $self->engine;
+
+    for my $i ( 0 .. $e->hash_chars - 1 ) {
+        my $l = $self->get_entry( $i ) or next;
+        $e->_load_sector( $l )->free;
     }
 
-    return $len;
+    $self->SUPER::free();
+}
+
+sub _loc_for {
+    my $self = shift;
+    my ($idx) = @_;
+    return $self->offset + $self->base_size + $idx * $self->engine->byte_size;
+}
+
+sub get_entry {
+    my $self = shift;
+    my ($idx) = @_;
+
+    my $e = $self->engine;
+
+    DBM::Deep->_throw_error( "get_entry: Out of range ($idx)" )
+        if $idx < 0 || $idx >= $e->hash_chars;
+
+    return unpack(
+        $StP{$e->byte_size},
+        $e->storage->read_at( $self->_loc_for( $idx ), $e->byte_size ),
+    );
+}
+
+sub set_entry {
+    my $self = shift;
+    my ($idx, $loc) = @_;
+
+    my $e = $self->engine;
+
+    DBM::Deep->_throw_error( "set_entry: Out of range ($idx)" )
+        if $idx < 0 || $idx >= $e->hash_chars;
+
+    $self->engine->storage->print_at(
+        $self->_loc_for( $idx ),
+        pack( $StP{$e->byte_size}, $loc ),
+    );
 }
 
 1;

@@ -1,11 +1,11 @@
 package DBM::Deep::Array;
 
-use 5.6.0;
+use 5.006_000;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.99_03';
+our $VERSION = '0.99_04';
 
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative
@@ -26,15 +26,11 @@ sub _import {
     my $self = shift;
     my ($struct) = @_;
 
-    eval {
-        local $SIG{'__DIE__'};
-        $self->push( @$struct );
-    }; if ($@) {
-        $self->_throw_error("Cannot import: type mismatch");
-    }
+    $self->push( @$struct );
 
     return 1;
 }
+
 sub TIEARRAY {
     my $class = shift;
     my $args = $class->_get_args( @_ );
@@ -50,8 +46,10 @@ sub FETCH {
 
     $self->lock( $self->LOCK_SH );
 
-    my $orig_key;
-    if ( $key =~ /^-?\d+$/ ) {
+    if ( !defined $key ) {
+        DBM::Deep->_throw_error( "Cannot use an undefined array index." );
+    }
+    elsif ( $key =~ /^-?\d+$/ ) {
         if ( $key < 0 ) {
             $key += $self->FETCHSIZE;
             unless ( $key >= 0 ) {
@@ -59,13 +57,13 @@ sub FETCH {
                 return;
             }
         }
-        $orig_key = $key;
     }
-    else {
-        $orig_key = undef;
+    elsif ( $key ne 'length' ) {
+        $self->unlock;
+        DBM::Deep->_throw_error( "Cannot use '$key' as an array index." );
     }
 
-    my $rv = $self->SUPER::FETCH( $key, $orig_key );
+    my $rv = $self->SUPER::FETCH( $key );
 
     $self->unlock;
 
@@ -80,7 +78,10 @@ sub STORE {
 
     my $size;
     my $idx_is_numeric;
-    if ( $key =~ /^\-?\d+$/ ) {
+    if ( !defined $key ) {
+        DBM::Deep->_throw_error( "Cannot use an undefined array index." );
+    }
+    elsif ( $key =~ /^-?\d+$/ ) {
         $idx_is_numeric = 1;
         if ( $key < 0 ) {
             $size = $self->FETCHSIZE;
@@ -90,8 +91,12 @@ sub STORE {
             $key += $size
         }
     }
+    elsif ( $key ne 'length' ) {
+        $self->unlock;
+        DBM::Deep->_throw_error( "Cannot use '$key' as an array index." );
+    }
 
-    my $rv = $self->SUPER::STORE( $key, $value, ($key eq 'length' ? undef : $key) );
+    my $rv = $self->SUPER::STORE( $key, $value );
 
     if ( $idx_is_numeric ) {
         $size = $self->FETCHSIZE unless defined $size;
@@ -111,7 +116,10 @@ sub EXISTS {
 
     $self->lock( $self->LOCK_SH );
 
-    if ( $key =~ /^\-?\d+$/ ) {
+    if ( !defined $key ) {
+        DBM::Deep->_throw_error( "Cannot use an undefined array index." );
+    }
+    elsif ( $key =~ /^-?\d+$/ ) {
         if ( $key < 0 ) {
             $key += $self->FETCHSIZE;
             unless ( $key >= 0 ) {
@@ -119,6 +127,10 @@ sub EXISTS {
                 return;
             }
         }
+    }
+    elsif ( $key ne 'length' ) {
+        $self->unlock;
+        DBM::Deep->_throw_error( "Cannot use '$key' as an array index." );
     }
 
     my $rv = $self->SUPER::EXISTS( $key );
@@ -135,7 +147,10 @@ sub DELETE {
     $self->lock( $self->LOCK_EX );
 
     my $size = $self->FETCHSIZE;
-    if ( $key =~ /^-?\d+$/ ) {
+    if ( !defined $key ) {
+        DBM::Deep->_throw_error( "Cannot use an undefined array index." );
+    }
+    elsif ( $key =~ /^-?\d+$/ ) {
         if ( $key < 0 ) {
             $key += $size;
             unless ( $key >= 0 ) {
@@ -144,11 +159,15 @@ sub DELETE {
             }
         }
     }
+    elsif ( $key ne 'length' ) {
+        $self->unlock;
+        DBM::Deep->_throw_error( "Cannot use '$key' as an array index." );
+    }
 
     my $rv = $self->SUPER::DELETE( $key );
 
     if ($rv && $key == $size - 1) {
-        $self->STORESIZE( $key, ($key eq 'length' ? undef : $key) );
+        $self->STORESIZE( $key );
     }
 
     $self->unlock;
@@ -156,6 +175,9 @@ sub DELETE {
     return $rv;
 }
 
+# Now that we have a real Reference sector, we should store arrayzize there. However,
+# arraysize needs to be transactionally-aware, so a simple location to store it isn't
+# going to work.
 sub FETCHSIZE {
     my $self = shift->_get_self;
 
@@ -164,17 +186,13 @@ sub FETCHSIZE {
     my $SAVE_FILTER = $self->_storage->{filter_fetch_value};
     $self->_storage->{filter_fetch_value} = undef;
 
-    my $packed_size = $self->FETCH('length');
+    my $size = $self->FETCH('length') || 0;
 
     $self->_storage->{filter_fetch_value} = $SAVE_FILTER;
 
     $self->unlock;
 
-    if ($packed_size) {
-        return int(unpack($self->_engine->{long_pack}, $packed_size));
-    }
-
-    return 0;
+    return $size;
 }
 
 sub STORESIZE {
@@ -186,7 +204,7 @@ sub STORESIZE {
     my $SAVE_FILTER = $self->_storage->{filter_store_value};
     $self->_storage->{filter_store_value} = undef;
 
-    my $result = $self->STORE('length', pack($self->_engine->{long_pack}, $new_length), 'length');
+    my $result = $self->STORE('length', $new_length, 'length');
 
     $self->_storage->{filter_store_value} = $SAVE_FILTER;
 
@@ -346,7 +364,7 @@ sub SPLICE {
     return wantarray ? @old_elements : $old_elements[-1];
 }
 
-# We don't need to define it, yet.
+# We don't need to populate it, yet.
 # It will be useful, though, when we split out HASH and ARRAY
 sub EXTEND {
     ##

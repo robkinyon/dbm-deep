@@ -1,13 +1,11 @@
 package DBM::Deep::Hash;
 
-use 5.6.0;
+use 5.006_000;
 
 use strict;
 use warnings;
 
-use constant DEBUG => 0;
-
-our $VERSION = q(0.99_03);
+our $VERSION = q(0.99_04);
 
 use base 'DBM::Deep';
 
@@ -22,13 +20,8 @@ sub _import {
     my $self = shift;
     my ($struct) = @_;
 
-    eval {
-        local $SIG{'__DIE__'};
-        foreach my $key (keys %$struct) {
-            $self->put($key, $struct->{$key});
-        }
-    }; if ($@) {
-        $self->_throw_error("Cannot import: type mismatch");
+    foreach my $key (keys %$struct) {
+        $self->put($key, $struct->{$key});
     }
 
     return 1;
@@ -47,8 +40,8 @@ sub TIEHASH {
 }
 
 sub FETCH {
-    print "FETCH( @_ )\n" if DEBUG;
     my $self = shift->_get_self;
+    DBM::Deep->_throw_error( "Cannot use an undefined hash key." ) unless defined $_[0];
     my $key = ($self->_storage->{filter_store_key})
         ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
@@ -57,8 +50,8 @@ sub FETCH {
 }
 
 sub STORE {
-    print "STORE( @_ )\n" if DEBUG;
     my $self = shift->_get_self;
+    DBM::Deep->_throw_error( "Cannot use an undefined hash key." ) unless defined $_[0];
 	my $key = ($self->_storage->{filter_store_key})
         ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
@@ -68,8 +61,8 @@ sub STORE {
 }
 
 sub EXISTS {
-    print "EXISTS( @_ )\n" if DEBUG;
     my $self = shift->_get_self;
+    DBM::Deep->_throw_error( "Cannot use an undefined hash key." ) unless defined $_[0];
 	my $key = ($self->_storage->{filter_store_key})
         ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
@@ -79,6 +72,7 @@ sub EXISTS {
 
 sub DELETE {
     my $self = shift->_get_self;
+    DBM::Deep->_throw_error( "Cannot use an undefined hash key." ) unless defined $_[0];
 	my $key = ($self->_storage->{filter_store_key})
         ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
@@ -87,7 +81,6 @@ sub DELETE {
 }
 
 sub FIRSTKEY {
-    print "FIRSTKEY\n" if DEBUG;
 	##
 	# Locate and return first key (in no particular order)
 	##
@@ -98,7 +91,7 @@ sub FIRSTKEY {
 	##
 	$self->lock( $self->LOCK_SH );
 	
-	my $result = $self->_engine->get_next_key($self->_storage->transaction_id, $self->_base_offset);
+	my $result = $self->_engine->get_next_key( $self );
 	
 	$self->unlock();
 	
@@ -108,7 +101,6 @@ sub FIRSTKEY {
 }
 
 sub NEXTKEY {
-    print "NEXTKEY( @_ )\n" if DEBUG;
 	##
 	# Return next key (in no particular order), given previous one
 	##
@@ -123,7 +115,7 @@ sub NEXTKEY {
 	##
 	$self->lock( $self->LOCK_SH );
 	
-	my $result = $self->_engine->get_next_key( $self->_storage->transaction_id, $self->_base_offset, $prev_key );
+	my $result = $self->_engine->get_next_key( $self, $prev_key );
 	
 	$self->unlock();
 	

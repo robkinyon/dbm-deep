@@ -2,7 +2,8 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 4;
+use Test::More tests => 5;
+use Test::Exception;
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
@@ -12,6 +13,10 @@ my $db = DBM::Deep->new(
 	file => $filename,
 	locking => 1,
 );
+
+lives_ok {
+    $db->unlock;
+} "Can call unlock on an unlocked DB.";
 
 ##
 # basic put/get

@@ -1,8 +1,32 @@
 Revision history for DBM::Deep.
 
-0.99_03 ??? ?? ??:??:?? 2006 Pacific
+0.99_04 Jan 24 22:30:00 2007 EDT
+    - Added the missing lib/DBM/Deep.pod file to the MANIFEST
+    - Fixed a poorly-designed test that was failing depending on what Clone::Any
+    - was using.
+    - All "use 5.6.0;" lines are now "use 5.006_000;" to avoid warnings about
+      unsupported vstrings in bleadperl.
+
+0.99_03 Jan 23 22:30:00 2007 EDT
+    - THIS VERSION IS INCOMPATIBLE WITH FILES FROM ALL OTHER PRIOR VERSIONS.
+      - The fileformat changed completely. I will be writing a converter, but
+        it's not there right now. Do NOT expect that this module will
+        correctly detect older versions and handle them sanely. Sanity will be
+        there for 1.00, but we're not there yet, are we?
     - Converted to use FileHandle::Fmode to handle filehandle status checks
     - Fixed bug with deleting already-deleted items on Win32 (reported by Nigel Sandever)
+    - The guts of how transactions work has been rewritten to better handle
+      some edgecases. This required a complete rewrite of the engine.
+    - Freespace management is now in place. It's not perfect, but it's there.
+    - The rewrite of the engine required a rewrite of how first_key/next_key
+      was implemented. This should result in significant speed improvements.
+    - Self-reference has been removed. This means you cannot do:
+          $db->{foo} = { x => 'y' };
+          $db->{bar} = $db->{foo};
+      I hope to be able to return this functionality by 1.00, but I cannot
+      promise anything. To do this properly, it requires refcounting in order
+      to correctly handle deletions and transactions. Once you move away from
+      a simple tree, everything becomes really hard.
 
 0.99_02 Apr 28 05:00:00 2006 Pacific
     - Added missing file to the MANIFEST

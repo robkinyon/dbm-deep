@@ -1,0 +1,82 @@
+=head1 NAME
+
+Testing TODO
+
+=head1 PURPOSE
+
+This file is to detail the tests, in a general sense, that have yet to be
+written so that I don't forget them.
+
+=head1 MISSING TESTS
+
+=over 4
+
+=item * Readonly filehandles
+
+=over 4
+
+=item * Mutations on readonly filehandles
+
+This is to verify that the appropriate errors are thrown
+
+=item * Run an optimize on a readonly FH
+
+=back
+
+=item * _copy_value()
+
+For some reason, $c doesn't seem to be undefinable in _copy_value. Maybe this
+means that the bless()ing should occur iff C<!$c-E<gt>isa('DBM::Deep')>?
+
+=item * Splice
+
+=over 4
+
+=item * Undefined initial offset
+
+=item * splicing in a group that's equal to the target
+
+=back
+
+=item * Passing in a fh without a file_offset
+
+=item * Do I ever use print_at() without passing in offset?
+
+=item * How should the inode check for locking happen?
+
+=item * medium and large pack_sizes
+
+Need to make sure I only run the large pack_size test on 64-bit Perls
+
+=item * max_buckets check
+
+=item * get_classname() on a deleted sector
+
+How should this be triggered?!
+
+=item * Open a corrupted file that has a header, but not initial reference
+
+=item * Max out the number of transactions
+
+=item * Delete something in the head that has its own value in a transaction
+
+=item * Run an import within a transaction
+
+=over 4
+
+=item * Should all assignments with a non-scalar rvalue happen within a sub-transaction?
+
+=item * Does this mean that sub-transactions should just be done right now?
+
+It shouldn't be too hard to variablize which transaction is the base instead
+of hard-coding 0 . . .
+
+=back
+
+=item * Delete something within a transaction, then commit.
+
+Verify that the space is reusable by assigning more to the DB.
+
+=back
+
+=cut

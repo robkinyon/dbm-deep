@@ -10,6 +10,7 @@ my $db1 = DBM::Deep->new(
     file => $filename,
     locking => 1,
     autoflush => 1,
+    num_txns  => 16,
     type => DBM::Deep->TYPE_ARRAY,
 );
 
@@ -17,6 +18,7 @@ my $db2 = DBM::Deep->new(
     file => $filename,
     locking => 1,
     autoflush => 1,
+    num_txns  => 16,
     type => DBM::Deep->TYPE_ARRAY,
 );
 

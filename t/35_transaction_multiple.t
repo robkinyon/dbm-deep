@@ -10,18 +10,21 @@ my $db1 = DBM::Deep->new(
     file => $filename,
     locking => 1,
     autoflush => 1,
+    num_txns  => 16,
 );
 
 my $db2 = DBM::Deep->new(
     file => $filename,
     locking => 1,
     autoflush => 1,
+    num_txns  => 16,
 );
 
 my $db3 = DBM::Deep->new(
     file => $filename,
     locking => 1,
     autoflush => 1,
+    num_txns  => 16,
 );
 
 $db1->{foo} = 'bar';
@@ -49,9 +52,9 @@ ok( !exists $db3->{bar}, "After DB1 set bar to foo, DB3's bar doesn't exist" );
 
 $db2->begin_work;
 
-is( $db1->{foo}, 'bar2', "After DB2 transaction begin, DB1's foo is bar2" );
-is( $db2->{foo}, 'bar', "After DB2 transaction begin, DB2's foo is bar" );
-is( $db3->{foo}, 'bar', "After DB2 transaction begin, DB3's foo is bar" );
+is( $db1->{foo}, 'bar2', "After DB2 transaction begin, DB1's foo is still bar2" );
+is( $db2->{foo}, 'bar', "After DB2 transaction begin, DB2's foo is still bar" );
+is( $db3->{foo}, 'bar', "After DB2 transaction begin, DB3's foo is still bar" );
 
 ok(  exists $db1->{bar}, "After DB2 transaction begin, DB1's bar exists" );
 ok( !exists $db2->{bar}, "After DB2 transaction begin, DB2's bar doesn't exist" );

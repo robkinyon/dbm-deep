@@ -10,7 +10,7 @@ plan skip_all => "You must set \$ENV{LONG_TESTS} to run the long tests"
 use Test::Deep;
 use t::common qw( new_fh );
 
-plan tests => 5;
+plan tests => 9;
 
 use_ok( 'DBM::Deep' );
 
@@ -22,28 +22,36 @@ my $db = DBM::Deep->new(
 	type => DBM::Deep->TYPE_HASH,
 );
 
+$db->{foo} = {};
+my $foo = $db->{foo};
+
 ##
 # put/get many keys
 ##
 my $max_keys = 4000;
 
 for ( 0 .. $max_keys ) {
-    $db->put( "hello $_" => "there " . $_ * 2 );
+    $foo->put( "hello $_" => "there " . $_ * 2 );
 }
 
 my $count = -1;
 for ( 0 .. $max_keys ) {
     $count = $_;
-    unless ( $db->get( "hello $_" ) eq "there " . $_ * 2 ) {
+    unless ( $foo->get( "hello $_" ) eq "there " . $_ * 2 ) {
         last;
     };
 }
 is( $count, $max_keys, "We read $count keys" );
 
-my @keys = sort keys %$db;
+my @keys = sort keys %$foo;
 cmp_ok( scalar(@keys), '==', $max_keys + 1, "Number of keys is correct" );
 my @control =  sort map { "hello $_" } 0 .. $max_keys;
 cmp_deeply( \@keys, \@control, "Correct keys are there" );
+
+ok( !exists $foo->{does_not_exist}, "EXISTS works on large hashes for non-existent keys" );
+is( $foo->{does_not_exist}, undef, "autovivification works on large hashes" );
+ok( exists $foo->{does_not_exist}, "EXISTS works on large hashes for newly-existent keys" );
+cmp_ok( scalar(keys %$foo), '==', $max_keys + 2, "Number of keys after autovivify is correct" );
 
 $db->clear;
 cmp_ok( scalar(keys %$db), '==', 0, "Number of keys after clear() is correct" );

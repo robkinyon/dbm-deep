@@ -10,6 +10,7 @@ my $db = DBM::Deep->new(
     file => $filename,
     locking => 1,
     autoflush => 1,
+    num_txns  => 16,
 );
 
 {
@@ -17,16 +18,16 @@ my $db = DBM::Deep->new(
         foo => 5,
     }, 'Foo';
 
-    cmp_ok( $obj->{foo}, '==', 5 );
-    ok( !exists $obj->{bar} );
+    cmp_ok( $obj->{foo}, '==', 5, "FOO is 5 in the object" );
+    ok( !exists $obj->{bar}, "BAR doesn't exist in the object" );
 
     $db->begin_work;
 
-    $db->{foo} = $obj;
-    $db->{foo}{bar} = 1;
+        $db->{foo} = $obj;
+        $db->{foo}{bar} = 1;
 
-    cmp_ok( $db->{foo}{bar}, '==', 1, "The value is visible within the transaction" );
-    cmp_ok( $obj->{bar}, '==', 1, "The value is visible within the object" );
+        cmp_ok( $db->{foo}{bar}, '==', 1, "The value is visible within the transaction" );
+        cmp_ok( $obj->{bar}, '==', 1, "The value is visible within the object" );
 
     $db->rollback;
 
@@ -55,11 +56,11 @@ __END__
 
     $db->begin_work;
 
-    $db->{foo} = $obj;
-    $db->{foo}{bar} = 1;
+        $db->{foo} = $obj;
+        $db->{foo}{bar} = 1;
 
-    cmp_ok( $db->{foo}{bar}, '==', 1, "The value is visible within the transaction" );
-    cmp_ok( $obj->{bar}, '==', 1, "The value is visible within the object" );
+        cmp_ok( $db->{foo}{bar}, '==', 1, "The value is visible within the transaction" );
+        cmp_ok( $obj->{bar}, '==', 1, "The value is visible within the object" );
 
     $db->commit;
 

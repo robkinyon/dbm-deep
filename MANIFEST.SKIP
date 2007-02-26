@@ -17,3 +17,5 @@ cover_db
 ^\.#
 ^\.DS_Store
 ^__MACOSX
+^articles
+^t_attic

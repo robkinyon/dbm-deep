@@ -1,11 +1,26 @@
 Revision history for DBM::Deep.
 
+1.0000 Feb 26 22:30:00 2007 EDT
+    - THIS VERSION IS INCOMPATIBLE WITH FILES FROM ALL OTHER PRIOR VERSIONS.
+      - To aid in this form of upgrades, DBM::Deep now checks the file format
+        version to make sure that it knows how to read it.
+      - db_upgrade.pl was added to utils/. This will -NOT- install onto
+        your system. This is deliberate.
+      - db_upgrade.pl will not handle developer release file formats. This
+        is due to the fact that all developer releases in preparation for a
+        given release share the same file version, even though the file
+        format may change. This is deliberate.
+    - Importing no longer takes place within a transaction
+    - The following parameters were added:
+      - data_sector_size - this determines the default size of a data sector.
+    - Correctly handle opening readonly files
+
 0.99_04 Jan 24 22:30:00 2007 EDT
     - Added the missing lib/DBM/Deep.pod file to the MANIFEST
     - Fixed a poorly-designed test that was failing depending on what Clone::Any
-    - was using.
+      was using.
     - All "use 5.6.0;" lines are now "use 5.006_000;" to avoid warnings about
-      unsupported vstrings in bleadperl.
+      unsupported vstrings in 5.9.x
 
 0.99_03 Jan 23 22:30:00 2007 EDT
     - THIS VERSION IS INCOMPATIBLE WITH FILES FROM ALL OTHER PRIOR VERSIONS.

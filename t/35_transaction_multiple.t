@@ -49,7 +49,7 @@ $db1->{bar} = 'foo';
 ok(  exists $db1->{bar}, "After DB1 set bar to foo, DB1's bar exists" );
 ok( !exists $db2->{bar}, "After DB1 set bar to foo, DB2's bar doesn't exist" );
 ok( !exists $db3->{bar}, "After DB1 set bar to foo, DB3's bar doesn't exist" );
-
+ 
 $db2->begin_work;
 
 is( $db1->{foo}, 'bar2', "After DB2 transaction begin, DB1's foo is still bar2" );

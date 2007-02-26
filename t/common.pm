@@ -27,7 +27,7 @@ sub new_fh {
 
     return ($fh, $filename);
 }
-#END{<>}
+
 1;
 __END__
 

@@ -57,17 +57,22 @@ This is the tagging of the file header. The file used by versions prior to
 
 =item * Version
 
-This is four bytes containing the header version. This lets the header change over time.
+This is four bytes containing the file version. This lets the file format change over time.
+
+=item * Constants
+
+These are the file-wide constants that determine how the file is laid out.
+They can only be set upon file creation.
 
 =item * Transaction information
 
 The current running transactions are stored here, as is the next transaction
 ID.
 
-=item * Constants
+=item * Freespace information
 
-These are the file-wide constants that determine how the file is laid out.
-They can only be set upon file creation.
+Pointers into the next free sectors of the various sector sizes (Index,
+Bucketlist, and Data) are stored here.
 
 =back
 
@@ -148,7 +153,7 @@ increasing your memeory usage at all.
 DBM::Deep is I/O-bound, pure and simple. The faster your disk, the faster
 DBM::Deep will be. Currently, when performing C<my $x = $db-E<gt>{foo}>, there
 are a minimum of 4 seeks and 1332 + N bytes read (where N is the length of your
-data). (All values assume a medium filesize.) The actions take are:
+data). (All values assume a medium filesize.) The actions taken are:
 
 =over 4
 

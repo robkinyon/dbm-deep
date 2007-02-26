@@ -19,6 +19,7 @@ my $build = Module::Build->new(
         'File::Path'      => '0.01',
         'File::Temp'      => '0.01',
         'Test::Deep'      => '0.095',
+        'Test::Warn'      => '0.08',
         'Test::More'      => '0.47',
         'Test::Exception' => '0.21',
     },

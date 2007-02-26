@@ -202,9 +202,9 @@ from the values stored in the datafile's header.
 
 =item * num_txns
 
-This is the maximum number of transactions that can be running at one time. The
-default is two - the HEAD and one for imports. The minimum is two and the
-maximum is 255. The more transactions, the larger and quicker the datafile grows.
+This is the number of transactions that can be running at one time. The
+default is one - the HEAD. The minimum is one and the maximum is 255. The more
+transactions, the larger and quicker the datafile grows.
 
 See L</TRANSACTIONS> below.
 
@@ -212,8 +212,25 @@ See L</TRANSACTIONS> below.
 
 This is the number of entries that can be added before a reindexing. The larger
 this number is made, the larger a file gets, but the better performance you will
-have. The default and minimum number this can be is 16. There is no maximum, but
-more than 32 isn't recommended.
+have. The default and minimum number this can be is 16. The maximum is 256, but
+more than 64 isn't recommended.
+
+=item * data_sector_size
+
+This is the size in bytes of a given data sector. Data sectors will chain, so
+a value of any size can be stored. However, chaining is expensive in terms of
+time. Setting this value to something close to the expected common length of
+your scalars will improve your performance. If it is too small, your file will
+have a lot of chaining. If it is too large, your file will have a lot of dead
+space in it.
+
+The default for this is 64 bytes. The minimum value is 32 and the maximum is
+256 bytes.
+
+B<Note:> There are between 6 and 10 bytes taken up in each data sector for
+bookkeeping. (It's 4 + the number of bytes in your L</pack_size>.) This is
+included within the data_sector_size, thus the effective value is 6-10 bytes
+less than what you specified.
 
 =item * pack_size
 
@@ -224,15 +241,16 @@ are:
 
 =item * small
 
-This uses 2-byte offsets, allowing for a maximum file size of 65K
+This uses 2-byte offsets, allowing for a maximum file size of 65 KB.
 
 =item * medium (default)
 
-This uses 4-byte offsets, allowing for a maximum file size of 2G.
+This uses 4-byte offsets, allowing for a maximum file size of 4 GB.
 
 =item * large
 
-This uses 8-byte offsets, allowing for a maximum file size of 16XB (exabytes).
+This uses 8-byte offsets, allowing for a maximum file size of 16 XB
+(exabytes). This can only be enabled if your Perl is compiled for 64-bit.
 
 =back
 
@@ -597,12 +615,6 @@ B<Note:> Make sure your existing structure has no circular references in it.
 These will cause an infinite loop when importing. There are plans to fix this
 in a later release.
 
-B<Note:> With the addition of transactions, importing is performed within a
-transaction, then immediately committed upon success (and rolled back upon
-failre). As a result, you cannot call C<import()> from within a transaction.
-This restriction will be lifted when subtransactions are added in a future
-release.
-
 =head2 Exporting
 
 Calling the C<export()> method on an existing DBM::Deep object will return
@@ -780,7 +792,7 @@ failure. You can wrap calls in an eval block to catch the die.
 =head1 LARGEFILE SUPPORT
 
 If you have a 64-bit system, and your Perl is compiled with both LARGEFILE
-and 64-bit support, you I<may> be able to create databases larger than 2 GB.
+and 64-bit support, you I<may> be able to create databases larger than 4 GB.
 DBM::Deep by default uses 32-bit file offset tags, but these can be changed
 by specifying the 'pack_size' parameter when constructing the file.
 
@@ -802,9 +814,9 @@ the file's header and cannot be changed for the life of the file. These
 parameters are per-file, meaning you can access 32-bit and 64-bit files, as
 you choose.
 
-B<Note:> We have not personally tested files larger than 2 GB -- all my
+B<Note:> We have not personally tested files larger than 4 GB -- all my
 systems have only a 32-bit Perl. However, I have received user reports that
-this does indeed work!
+this does indeed work.
 
 =head1 LOW-LEVEL ACCESS
 
@@ -924,12 +936,6 @@ the transaction.
 Transactions in DBM::Deep are done using a variant of the MVCC method, the
 same method used by the InnoDB MySQL engine.
 
-=head2 Software-Transactional Memory
-
-The addition of transactions to this module provides the basis for STM within
-Perl 5. Contention is resolved using a default last-write-wins. Currently,
-this default cannot be changed, but it will be addressed in a future version.
-
 =head1 PERFORMANCE
 
 Because DBM::Deep is a conncurrent datastore, every change is flushed to disk
@@ -971,6 +977,16 @@ consider using the C<pack_size =E<gt> 'small'> option. This will instruct
 DBM::Deep to use 16bit addresses, meaning that the seek times will be less.
 
 =back
+
+=head1 MIGRATION
+
+As of 1.0000, the file format has changed. Furthermore, DBM::Deep is now
+designed to potentially change file format between point-releases, if needed to
+support a requested feature. To aid in this, a migration script is provided
+within the CPAN distribution called C<utils/upgrade_db.pl>.
+
+B<NOTE:> This script is not installed onto your system because it carries a copy
+of every version prior to the current version.
 
 =head1 TODO
 
@@ -1152,11 +1168,11 @@ B<Devel::Cover> report on this distribution's test suite.
   File                           stmt   bran   cond    sub    pod   time  total
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
   blib/lib/DBM/Deep.pm           96.8   87.9   90.5  100.0   89.5    4.5   95.2
-  blib/lib/DBM/Deep/Array.pm    100.0   94.3  100.0  100.0  100.0    4.9   98.7
-  blib/lib/DBM/Deep/Engine.pm    96.9   85.2   79.7  100.0    0.0   58.2   90.3
-  blib/lib/DBM/Deep/File.pm      99.0   88.9   77.8  100.0    0.0   30.0   90.3
-  blib/lib/DBM/Deep/Hash.pm     100.0  100.0  100.0  100.0  100.0    2.4  100.0
-  Total                          97.6   87.9   84.0  100.0   32.1  100.0   92.8
+  blib/lib/DBM/Deep/Array.pm    100.0   94.3  100.0  100.0  100.0    4.8   98.7
+  blib/lib/DBM/Deep/Engine.pm    97.2   86.4   86.0  100.0    0.0   56.8   91.0
+  blib/lib/DBM/Deep/File.pm      98.1   83.3   66.7  100.0    0.0   31.4   88.0
+  blib/lib/DBM/Deep/Hash.pm     100.0  100.0  100.0  100.0  100.0    2.5  100.0
+  Total                          97.7   88.1   86.6  100.0   31.6  100.0   93.0
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 MORE INFORMATION
@@ -1167,11 +1183,18 @@ irc.perl.org
 
 The source code repository is at L<http://svn.perl.org/modules/DBM-Deep>
 
-=head1 MAINTAINER(S)
+=head1 MAINTAINERS
 
 Rob Kinyon, L<rkinyon@cpan.org>
 
 Originally written by Joseph Huckaby, L<jhuckaby@cpan.org>
+
+=head1 SPONSORS
+
+Stonehenge Consulting (L<http://www.stonehenge.com/>) sponsored the
+developement of transactions and freespace management, leading to the 1.0000
+release. A great debt of gratitude goes out to them for their continuing
+leadership in and support of the Perl community.
 
 =head1 CONTRIBUTORS
 
@@ -1179,9 +1202,7 @@ The following have contributed greatly to make DBM::Deep what it is today:
 
 =over 4
 
-=item * Adam Sah and Rich Gaushell
-
-=item * Stonehenge for sponsoring the 1.00 release
+=item * Adam Sah and Rich Gaushell for innumerable contributions early on.
 
 =item * Dan Golden and others at YAPC::NA 2006 for helping me design through transactions.
 
@@ -1195,7 +1216,7 @@ Digest::SHA256(3), Crypt::Blowfish(3), Compress::Zlib(3)
 =head1 LICENSE
 
 Copyright (c) 2007 Rob Kinyon. All Rights Reserved.
-This is free software, you may use it and distribute it under the
-same terms as Perl itself.
+This is free software, you may use it and distribute it under the same terms
+as Perl itself.
 
 =cut

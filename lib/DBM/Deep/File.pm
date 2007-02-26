@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(0.99_04);
+our $VERSION = q(1.0000);
 
 use Fcntl qw( :DEFAULT :flock :seek );
 
@@ -50,7 +50,14 @@ sub open {
     # Adding O_BINARY should remove the need for the binmode below. However,
     # I'm not going to remove it because I don't have the Win32 chops to be
     # absolutely certain everything will be ok.
-    my $flags = O_RDWR | O_CREAT | O_BINARY;
+    my $flags = O_CREAT | O_BINARY;
+
+    if ( !-e $self->{file} || -w _ ) {
+      $flags |= O_RDWR;
+    }
+    else {
+      $flags |= O_RDONLY;
+    }
 
     my $fh;
     sysopen( $fh, $self->{file}, $flags )

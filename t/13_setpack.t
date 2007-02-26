@@ -77,7 +77,7 @@ my ($default, $small, $medium, $large);
 
 SKIP: {
     skip "Largefile support is not compiled into $^X", 3
-        if 1; #unless $Config{ uselargefile };
+        unless $Config{ use64bitall };
 
     my ($fh, $filename) = new_fh();
     {

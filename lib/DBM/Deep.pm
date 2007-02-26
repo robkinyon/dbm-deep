@@ -1,40 +1,11 @@
 package DBM::Deep;
 
-##
-# DBM::Deep
-#
-# Description:
-#    Multi-level database module for storing hash trees, arrays and simple
-#    key/value pairs into FTP-able, cross-platform binary database files.
-#
-#    Type `perldoc DBM::Deep` for complete documentation.
-#
-# Usage Examples:
-#    my %db;
-#    tie %db, 'DBM::Deep', 'my_database.db'; # standard tie() method
-#
-#    my $db = new DBM::Deep( 'my_database.db' ); # preferred OO method
-#
-#    $db->{my_scalar} = 'hello world';
-#    $db->{my_hash} = { larry => 'genius', hashes => 'fast' };
-#    $db->{my_array} = [ 1, 2, 3, time() ];
-#    $db->{my_complex} = [ 'hello', { perl => 'rules' }, 42, 99 ];
-#    push @{$db->{my_array}}, 'another value';
-#    my @key_list = keys %{$db->{my_hash}};
-#    print "This module " . $db->{my_complex}->[1]->{perl} . "!\n";
-#
-# Copyright:
-#    (c) 2002-2006 Joseph Huckaby.  All Rights Reserved.
-#    This program is free software; you can redistribute it and/or
-#    modify it under the same terms as Perl itself.
-##
-
 use 5.006_000;
 
 use strict;
 use warnings;
 
-our $VERSION = q(0.99_04);
+our $VERSION = q(1.0000);
 
 use Fcntl qw( :flock );
 
@@ -245,11 +216,8 @@ sub import {
     #XXX but that's a lot more thinking than I want to do right now.
     eval {
         local $SIG{'__DIE__'};
-        $self->begin_work;
         $self->_import( Clone::clone( $struct ) );
-        $self->commit;
     }; if ( my $e = $@ ) {
-        $self->rollback;
         die $e;
     }
 

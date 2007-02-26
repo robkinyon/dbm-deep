@@ -75,7 +75,8 @@ use_ok( 'DBM::Deep' );
     # we wrote this dreck ...
     my $size = -s $filename;
     
-    my $expected = $size + 9 * ( 256 + 256 );
+    my $data_sector_size = $db->_engine->data_sector_size;
+    my $expected = $size + 9 * ( 2 * $data_sector_size );
 
     $db->{ $_ } = undef for 5 .. 17;
 

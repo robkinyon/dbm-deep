@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = '0.99_04';
+our $VERSION = q(1.0000);
 
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative

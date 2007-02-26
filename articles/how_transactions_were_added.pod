@@ -1,0 +1,593 @@
+=head0 Adding transactions to DBM::Deep
+
+For the past nine months, I've been working on adding transactions to
+L<DBM::Deep|DBM::Deep>. During that time, I looked far and wide for an
+accessible description of how a programmer should go about implementing
+transactions. The only things I found were either extremely pedantic academic
+papers or the code of complex applications. The former weren't very easy to
+read and the latter were less so N<Have I<you> ever tried to read the source
+for BDB or InnoDB? Reading perl's source is easier.>. This is the article I
+wished I'd been able to read nine months ago.
+
+=head1 What is DBM::Deep?
+
+L<DBM::Deep|DBM::Deep> is a module written completely in Perl that provides a way of
+storing Perl datastructures (scalars, hashes, and arrays) on disk instead of
+in memory. The datafile produced is able to be transferred from one machine to
+another, regardless of OS or Perl version. There are several reasons why
+someone would want to do this.
+
+=over 4
+
+=item * Transparent Persistence
+
+This is the ability to save a set of datastructures to disk and retrieve them
+later without the vast majority of the program ever knowing that the data is
+persisted. Furthermore, the datastructure is persisted immediately and not at
+set marshalling periods.
+
+=item * Huge datastructures
+
+Normally, datastructures are limited by the size of RAM the server has.
+L<DBM::Deep|DBM::Deep> allows for the size a given datastructure to be limited by disk
+size instead (up to the given perl's largefile support).
+
+=item * Database
+
+Most programmers hear the word "database" and think "relational database
+management system" (or RDBMS). A database is a more general term meaning
+"place one stores data." This can be relational, object, or something else.
+The software used to manage and query a database is a "database management
+system" (DBMS).
+
+L<DBM::Deep|DBM::Deep> provides one half of a DBMS - the data storage part.
+Once the datastructures on disk, L<DBM::Deep|DBM::Deep> provides the
+capability to allow multiple processes to access the data. N<Presto is a start
+at providing the other half of the DBMS using DBm::Deep as the engine.>
+
+=back
+
+=head1 How does DBM::Deep work?
+
+L<DBM::Deep|DBM::Deep> works by tying a variable to a file on disk. Every
+read and write go directly to the file and modify the file immediately. To
+represent Perl's hashes and arrays, a record-based file format is used. There
+is a file header storing file-wide values, such as the size of the internal
+file pointers.  Afterwards, there are the data records.
+
+The most important feature of L<DBM::Deep|DBM::Deep> is that it can be
+completely transparent. Other than the line tying the variable to the file, no
+other part of your program needs to know that the variable being used isn't a
+"normal" Perl variable. So, the following works just fine:
+
+  # As far as the rest of the program is concerned, the following two lines
+  # are identical - they produce a variable $foo that can be used as a hashref.
+  # my $foo = {};
+  my $foo = DBM::Deep->new( 'mydb.db' );
+
+  $foo->{bar} = 'baz';
+  $foo->{complex} = [
+    { a => 'b' }, 0, '123', undef, [ 1 .. 5 ],
+  ];
+
+  # And so on and so forth.
+
+=head2 DBM::Deep's file structure
+
+L<DBM::Deep|DBM::Deep>'s file structure is record-based. The key (or array
+index - arrays are currently just funny hashes internally) is hashed using MD5
+and then stored in a cascade of Index and bucketlist records. The bucketlist
+record stores the actual key string and pointers to where the data records are
+stored. The data records themselves are one of Null, Scalar, or Reference.
+Null represents an I<undef>, Scalar represents a string (numbers are
+stringified internally for simplicity) and are allocated in fixed-size chunks.
+Reference represent an array or hash reference and contains a pointer to an
+Index and bucketlist cascade of its own. Reference will also store the class
+the hash or array reference is blessed into, meaning that almost all objects
+can be stored safely.
+
+=head2 DBM::Deep's class hierarchy
+
+Managing all of these functions takes a lot of different abstractions. There
+are at least 3 different interfacing layers, and more if you look hard enough.
+To manage this complexity, L<DBM::Deep|DBM::Deep> uses the following abstractions:
+
+=over 4
+
+=item * Tying classes
+
+These are the classes that manage the external face of the module. They manage
+B<all> of the interactions with outside code - OO interface, tying, and
+various utility methods. If they cannot handle the request themselves, they
+delegate to the engine. There are currently three classes in this layer.
+
+=item * Engine classes
+
+These classes manage the file format and all of the ways that the records
+interact with each other. Nearly every call will make requests to the File
+classes for reading and/or writing data to the file. There are currently nine
+classes in this layer, including a class for each record type.
+
+=item * File class
+
+This class mediates all interaction with the file system. Every read, write,
+lock, and unlock goes through this class. There is currently one class in this
+layer.
+
+=item * Iterator classes
+
+These are introspection classes that provide iteration for hashes. They manage
+keeping track of where the next key should be and how to get there. There are
+currently four classes in this layer.
+
+=back
+
+=head1 Why add transactions to DBM::Deep?
+
+For the most part, L<DBM::Deep|DBM::Deep> functions perfectly well without
+transactions. Most uses that I've seen tend to be either single-process
+read/write persistence or a multi-process readonly cache for an expensive, but
+static, lookup. With transactions, L<DBM::Deep|DBM::Deep> can now be used
+safely for multi-process read/write persistence in situations that don't
+need (or cannot use) a full RDBMS.
+
+=head2 What are transactions?
+
+Originally from the database world, a transaction is a way of isolating the
+effects of a given set of actions, then applying them all at once. It's a way
+of saying "I'm going to try the following steps, see if I like the result,
+then I want everyone else looking at this datastore to see the results
+immediately." The most common example is taken from banking. Let's say that an
+application receives a request to have Joe pay Bob five zorkmids. Without
+transactions, the application would take the money from Joe's account, then
+add the money to Bob's account. But, what happens if the application crashes
+after debiting Joe, but before crediting Bob? The application has made money
+disappear. Or, vice versa, if Bob is credited before Joe is debited, the
+application has created money.
+
+With a transaction wrapping the money transfer, if the application crashes in
+the middle, it's as if the action never happened. So, when the application
+recovers from the crash, Joe and Bob still have the same amount of money in
+their accounts as they did before. The transaction can restart and Bob can
+finally receive his zorkmids.
+
+More formally, transactions are generally considered to be proper when they are
+ACID-compliant. ACID is an acronym that stands for the following:
+
+=over 4
+
+=item * Atomic
+
+Either every change happens or none of the changes happen.
+
+=item * Consistent
+
+When the transaction begins and when it is committed, the database must be in
+a legal state. This condition doesn't apply to L<DBM::Deep|DBM::Deep> as all
+Perl datastructures are internally consistent.
+
+=item * Isolated
+
+As far as a transaction is concerned, it is the only thing running against the
+database while it is running. Unlike most RDBMSes, L<DBM::Deep|DBM::Deep>
+provides the strongest isolation level possible, usually called
+I<Serializable> by most RDBMSes.
+
+=item * Durable
+
+Once the database says that a commit has happened, the commit will be
+guaranteed, regardless of whatever happens. I chose to not implement this
+condition in L<DBM::Deep|DBM::Deep> N<This condition requires the presence of
+at least one more file, which violates one of the original design goals.>.
+
+=back
+
+=head2 Why add them to DBM::Deep?
+
+The ability to have actions occur in either I<atomically> (as in the previous
+example) or I<isolation> from the rest of the users of the data is a powerful
+thing. This allows for a large amount of safety and predictability in how
+data transformations occur. Imagine, for example, that you have a set of
+calculations that will update various variables. However, there are some
+situations that will cause you to throw away all results and start over with a
+different seed. Without transactions, you would have to put everything into
+temporary variables, then transfer the values when the calculations were found
+to be successful. If you ever add a new value or if a value is used in only
+certain calculations, you may forget to do the correct thing. With
+transactions, you start a transaction and do your thing within it. If the
+calculations succeed, you commit. If they fail, you rollback and try again.
+
+If you're thinking that this is very similar to how Subversion (SVN) or CVS
+works, you're absolutely correct - they are transactional in exactly the same
+way.
+
+=head1 How it happened
+
+The addition of transactions to L<DBM::Deep|DBM::Deep> has easily been the
+single most complex software endeavor I've ever undertaken. While transactions
+are conceptually simple, the devil is in the details. And there were a B<lot>
+of details.
+
+=head2 The naive approach
+
+Initially, I hoped I could just copy the entire datastructure and mark it as
+owned by the transaction. This is the most straightforward solution and is
+extremely simple to implement. Whenever a transaction starts, copy the whole
+thing over to somewhere else. If the transaction is committed, overwrite the
+original with the transaction's version. If it's rolled back, throw it away.
+
+It's a popular solution as seen by the fact that it's the mechanism used in
+both L<Data::Transactional|Data::Transactional> and
+L<Tie::Scalar::Transactional|Tie::Scalar::Transactional>. While very simple to
+implement, it scales very poorly as the datastructure grows. As one of the
+primary usecases for L<DBM::Deep|DBM::Deep> is working with huge
+datastructures, this plan was dead on arrival.
+
+=head2 The relational approach
+
+As I'm also a MySQL DBA, I looked to how the InnoDB engine implements
+transactions. Given that relational databases are designed to work with large
+amounts of data, it made sense to look here next.
+
+InnoDB implements transactions using MVCC
+N<http://en.wikipedia.org/wiki/Multiversion_concurrency_control>. When a
+transaction starts, it stores a timestamp corresponding to its start time.
+Whenever a modification to a row is committed, the modification is
+timestamped. When a transaction modifies a row, it copies the row into its
+own scratchpad and modifies it. Whenever a transaction reads a row, it first
+attempts to read the row from its scratchpad. If it's not there, then it reads
+the version of the row whose timestamp is no later than the timestamp of the
+transaction. When committing, the transaction's scratchpad is written out to
+the main data area with the timestamp of the commit and the scratchpad is
+thrown away. When rolling back, the scratchpad is thrown out.
+
+At first, this mechanism looked promising and I whipped up a couple spikes
+(or code explorations) to try it out. The problem I ran into, again, was the
+existence of large datastructures. When making large changes to a relational
+database within a transaction, the engine can store the rows within the actual
+table and mark them as being part of a transaction's scratchpad. Perl's
+fractal datastructures, however, don't lend themselves to this kind of
+treatment. The scratchpad would, in some pathological cases, be a
+near-complete copy of the original datastructure. N<Funnily enough, this is
+yet another example of the object relational impedance mismatch
+(http://en.wikipedia.org/wiki/Object-Relational_impedance_mismatch).>
+
+=head2 The subversive approach
+
+Despairing, I went to YAPC::NA::2006 hoping to discuss the problem with the
+best minds in the Perl community. I was lucky enough to run into both Audrey
+Tang (author of Pugs) and clkao (author of SVK). In between talks, I managed
+to discuss the problems I'd run into with both of them. They looked at me
+oddly and asked why I wasn't looking at Subversion (SVN) as a model for
+transactions. My first reaction was "It's a source control application. What
+does it know about transa- . . . Ohhhh!" And they smiled.
+
+Like Perl datastructures, a filesystem is fractal. Directories contain both
+files and directories. Directories act as hashes and a files act as scalars
+whose names are their hashkeys. When a modification is made to a SVN checkout,
+SVN tracks the changes at the filename (or directory name) level. When a
+commit is made, only those filenames which have changes are copied over to the
+HEAD. Everything else remains untouched.
+
+Translating this to hashes and hashkeys, this implies that transactional
+information should be stored at the level of the hashkey. Or, in
+L<DBM::Deep|DBM::Deep> terms, within the bucket for that key. As a nice
+side-effect, other than the key's datastructure within the bucket, the entire
+datafile is unaware of anything to do with transactions.
+
+=head2 The spike
+
+Spikes are kind of like a reconnaissance mission in the military. They go out
+to get intel on the enemy and are explicitly not supposed to take any ground
+or, in many cases, take out of the enemy forces. In coding terms, the spike is
+code meant to explore a problemspace that you B<will> throw away and
+reimplement.
+
+As transactions were going to be between the bucket for the key and the
+datapointer to the value, my first thought was to put in another sector that
+would handle this mapping. This had the advantage of changing nothing except
+for adding one new sector type and the handling for it. Just doing this got me
+to the point where I could pass the following test:
+
+  my $db1 = DBM::Deep->new( $filename );
+  my $db2 = DBM::Deep->new( $filename );
+
+  $db1->{abc} = 'foo';
+
+  is( $db1->{abc}, 'foo' );
+  is( $db2->{abc}, 'foo' );
+
+  $db1->begin_work();
+
+      $db1->{abc} = 'floober';
+
+      is( $db1->{abc}, 'floober' );
+      is( $db2->{abc}, 'foo' );
+
+Just that much was a major accomplishment.
+
+=head2 Tests, tests, and more tests
+
+I was lucky that when I took over L<DBM::Deep|DBM::Deep> that Joe Huckaby
+(the original author) handed me a comprehensive test suite. This meant that I
+could add in transactions with a high degree of confidence that I hadn't
+messed up non-transactional uses. The test suite was also invaluable for
+working through the various situations that transactions can cause.
+
+But, a test is only as good as the test-writer. For example, it was a while
+before I realized that I needed to test C<is( $db1-E<gt>{abc}, 'foo' )>
+I<before> modifying it in the transaction.
+
+To pass that test, the code for retrieval needed to look first in the
+transaction's spot and if that spot had never been assigned to, look at the
+spot for the HEAD. While this is how SVN works, it wasn't an immediately
+obvious test to write.
+
+=head2 The HEAD
+
+In SVN, the HEAD revision is the latest revision checked into the repository.
+When you do a local modification, you're doing a modification to your copy of
+the HEAD. Then, you choose to either check in (C<commit()>) or revert
+(C<rollback()>) your changes.
+
+In order to make the code work for the base case (no transaction running), the
+first entry in the transaction sector became the HEAD. Thus, it was assigned
+transaction ID 0. This also had the really neat side-benefit that C<if (
+$trans_id ) {}> will run the code if and only if L<DBM::Deep|DBM::Deep> is
+in a running transaction.
+
+=head2 Ending the spike
+
+At this point, I had learned everything I needed from the spike. Yes, the
+SVN idea looked like it was going to work. Yes, there were a lot of squibbly
+details. No, it wasn't going to be finished before I left YAPC::NA. *sigh*
+
+The biggest lessons learned from the spike were:
+
+=over 4
+
+=item 1 Tests are good
+
+I seem to have to relearn this every project I work on. It's pretty sad, if
+you ask me.
+
+=item 1 The transaction sector is superfluous
+
+As I worked with it, the transaction sector didn't add any information over
+extending the actual bucket to have the transaction to datapointer mapping
+within it.
+
+=back
+
+=head2 Protection from changes
+
+After the missed test for checking that starting a transaction didn't lose the
+connection to the HEAD, I started writing more and more tests, being very anal
+about what I was checking. I wrote tests to check every piece of state I could
+think of before and after every change in state, regardless of where the
+change was made. Writing these tests immediately raised an issue with changing
+the HEAD while a transaction is running. If the transaction has already edited
+that key, it already has its new value. However, if it doesn't, it needs to be
+protected from the change to the HEAD. This is the key piece for providing
+I<Isolation>.
+
+My first attempt to solve this problem focused on having the transaction
+itself detect changes. But, the primary usecase for transactions is that each
+transaction is going to be running in a separate process. Without implementing
+IPC, the only common point between various processes is the datafile itself.
+The only process aware of the change is the process making the change. Even
+though it seemed counter-intuitive, the only sane mechanism was that each
+process modifying the HEAD would also protect all running transactions from
+its change, if needed.
+
+=head2 Committing and rolling back
+
+Now that changes are able to be made within a transaction and the transaction,
+the HEAD, and other transactions are protected from one other, the next step
+was to provide the ability to both commit and rollback these changes.
+
+=head3 Rollback
+
+Conceptually, rolling back should the simpler to implement - just discard the
+changes that have been made within the transaction and continue onward with
+the HEAD. And, for the first attempt, that is exactly what I did. This meant
+that the following test would pass:
+
+  $db->{foo} = 'bar';
+
+  $db->begin_work;
+
+  is( $db->{foo}, 'bar' );
+
+  $db->{foo} = 'baz';
+
+  is( $db->{foo}, 'baz' );
+
+  $db->rollback;
+
+  is( $db->{foo}, 'bar' );
+
+But, this didn't work out very well for repeated use of that transaction slot.
+I threw a number of solutions at the problem, but none of them were
+addressing the real issue - knowing which use of a transaction ID made the
+change vs. which use of a transaction ID was accessing the value.
+
+XXX
+
+=head3 Committing
+
+Committing is much harder than rolling back. The primary difficulty lies in
+tracking exactly what this transaction has changed in order to copy those
+changed bucket entries over to the HEAD. The good news is that only the actual
+datapointers for that transaction need to be copied over - the actual data
+sectors are left untouched.
+
+The key to the solution lay in the decoupled nature of the code I was writing
+along with the fact that every piece of the code had access to the engine
+object, if needed. Committing (and rolling back) are both handled by the
+Engine object. To get that information into the engine, each bucket modified
+by the transaction would inform the engine object that it had been modified by
+that transaction. When a commit occurs, the engine objet iterates over the
+modified buckets and transfers over the new datapointer and discards the old
+one.
+
+=head2 Deleted marker
+
+After some more tests, a final edge-case was found. Transactions are performed
+copy-on-write. This means that if there isn't an entry for that transaction,
+the HEAD is looked at. This doesn't work if a key has been deleted within a
+transaction. So, the entry must be marked as deleted within the transaction so
+that the HEAD isn't checekd.
+
+Likewise, when a new key is created in a transaction, the HEAD doesn't have an
+entry for that key. Consider the following situation:
+
+  ok( !exists $db1->{foo} );
+  ok( !exists $db2->{foo} );
+
+  $db1->begin_work();
+  $db1->{foo} = 'bar';
+
+  ok( !exists $db2->{foo} );
+
+The entry for the HEAD for 'foo' needs to be marked as deleted so that
+transactions which don't have 'foo' don't find something in the HEAD. To add
+this, I originally used a separate flag for each datapointer to indicate if it
+had been marked as deleted or not. I quickly recognized that a data-pointer
+can never have a value of 0 or 1 as those would point to the first and second
+bytes of the datafile, respectively. As these are part of the header, those
+are nonsensical values, so can be re-used for metadata. 0 now means "This
+slot has never been written to" and 1 means "This slot has been explicitly
+deleted."
+
+=head2 Freespace management
+
+Pre-1.0000 versions of L<DBM::Deep|DBM::Deep> didn't have any form of
+freespace management. This meant that whenever a value was deleted, the old
+value just sat around taking up space, even though it would never be accessed
+again. While barely acceptable for non-transactional uses, this was made
+transactions unusable because transactions, as I've implemented them, are
+predicated on the concept of parallel values that are (presumably) cleaned up
+after the transaction is done with them.
+
+Freespace had never been added before because it requires a different file
+format than the one used in the pre-1.0000 versions. Because I had to change
+the file format anyways B<and> I needed the feature, adding freespace now
+seemed like a good plan.
+
+Freespace was implemented by regularizing all the records so that
+L<DBM::Deep|DBM::Deep> only has three different record sizes - Index,
+BucketList, and Data. Each record type has a fixed length based on various
+parameters the L<DBM::Deep|DBM::Deep> datafile is created with. (In order to
+accomodate values of various sizes, Data records chain.) Whenever the engine
+is finished with a sector, it is freed and added to a list of free sectors of
+that sector's size. Whenever a new sector is requested, the freelist is
+checked first. If the freelist has a sector, it's reused, otherwise a new
+sector is added to the end of the datafile.
+
+Just like everything else, I wrote a mess of tests for adding freespace
+management. One of the tests I thought up was the following:
+
+  $db->{foo} = [ 1 .. 3];
+  my $arr = $db->{foo};
+
+  is( $arr->[1], 2 ); # This always has worked.
+
+  delete $db->{foo};
+
+  isnt( $arr->[1], 2 );
+
+If this was a Perl datastructure, the last test should pass. In the past, that
+test would fail. The key concept I realized was that the C<$arr> variable is
+pointing to a stale area in memory. So, by adding a staleness counter that is
+incremented whenever the sector in use is deleted, I am able to determine if
+the variable in question is looking for a stale version of the sector. At this
+point, L<DBM::Deep|DBM::Deep> returns undef because, at some point, the entry
+was deleted.
+
+=head2 Transactional staleness counters
+
+Once it was implemented for freespace management, staleness counters proved to
+be a very powerful concept for transactions themselves. Back in L</Protection
+from changes>, I mentioned that other processes modifying the HEAD will
+protect all running transactions from their effects. This provides
+I<Isolation>. But, the running transaction doesn't know about these entries.
+This is both a benefit and a drawback. It's a benefit that it makes tracking
+modified buckets very simple (q.v. L</Committing>). But, it means that changes
+made to protect the transaction are not tracked.  If they're not cleaned up,
+they will be seen the next time a transaction uses that transaction ID.
+
+By providing a staleness counter for transactions, the costs of cleaning up
+finished transactions is deferred until the space is actually used again. This
+is at the cost of having less-than-optimal space utilization. Changing this in
+the future would be completely transparent to users, so I felt it was an
+acceptable tradeoff for quick delivery of a functional product.
+
+=head2 Fiddly bits
+
+At this point, all the major pieces were in place. All that was left was to
+get all the fiddly bits into place. This included handling the behavior of
+C<keys()>, simultaneous transactions with commits and rollbacks in various
+order, and making sure that transactions played nicely when a new Index sector
+needed to be created due to reindexing a full Bucketlist sector. Of these,
+C<keys()> was the hardest. This is when I actually implemented the Iterator classes
+to handle walking the index/bucketlist chain.
+
+=head1 The future
+
+Basic transactions are only the first step. There are several features that
+can be added on top of what's been provided. If and in which order any of
+these are implemented is completely up to user-feedback. (Note: these are
+advanced topics - I cannot be held responsible for any bleeding ears.)
+
+=head2 Conflict resolution
+
+Conflict, in this context, is what happens when two transactions run
+simultaneously and change the same piece of data. Like most relational databases,
+L<DBM::Deep|DBM::Deep> uses a very simplistic form of conflict resolution -
+last commit wins. This works quite well for a row-based RDBMS, but doesn't work
+as well for fractal structures like hashes.
+
+Contrast this with how Subversion handles conflict. It tracks when each
+transaction was started. If the HEAD was changed after the transaction
+started, the commit is rejected. It is up to the developer to pull in the
+latest changes, mediate any conflicts, and then recommit. There are several
+other ways to handle conflict resolution, many of which can be pulled from
+Haskell's use of Software Transactional Memory (STM).
+
+=head2 Checkpoints
+
+A transaction may have several steps within it. The first three may succeed,
+but the fourth might fail. Instead of rolling back all the way to the
+beginning, you might want to rollback to the last successful step and try
+again. This is a checkpoint. Most RDBMSes provide them and they aren't very
+difficult, conceptually, but I've seen just how "easy" some features can be
+once you start really exploring the problemspace.
+
+=head2 Sub-transactions
+
+Similar to L</Checkpoints>, sub-transactions provide a mechanism for trying
+something within a transaction without affecting the transaction. However,
+instead of saying "These steps are safely finished," sub-transactions still
+provides for the ability to rollback the primary transaction all the way.
+Sub-transactions can also work better with libraries that may want to use
+transactions themselves.
+
+This, of all the features listed, is the one I'm most interested in
+implementing next. 
+
+=head2 Durability
+
+As mentioned in L</What are transactions?>, the 'D' in ACID stands for
+I<Durable>. L<DBM::Deep|DBM::Deep> does not satisfy that criterion because
+durability almost always requires another file (or files) for a commit log. I
+deemed this unacceptable for this release because one of the
+L<DBM::Deep|DBM::Deep>'s features is the single datafile. To be honest, I
+don't anticipate this to be an issue for most users because the niche that
+L<DBM::Deep|DBM::Deep> occupies is one that is tolerant to failure and a small
+chance of potential dataloss.
+
+However, Berkley DB does provide durability with only a single file. If it
+becomes necessary, cribbing from them could be an option.
+
+=cut

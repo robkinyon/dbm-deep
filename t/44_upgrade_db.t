@@ -1,0 +1,163 @@
+$|++;
+use strict;
+use Test::More;
+
+# Add skips here
+BEGIN {
+    my @failures;
+    eval { use Pod::Usage; }; push @failures, 'Pod::Usage' if $@;
+    eval { use IO::Scalar; }; push @failures, 'IO::Scalar' if $@;
+    if ( @failures ) {
+        my $missing = join ',', @failures;
+        plan skip_all => "'$missing' must be installed to run these tests";
+    }
+}
+
+plan tests => 116;
+
+use t::common qw( new_fh );
+use File::Spec;
+use Test::Deep;
+
+my $PROG = File::Spec->catfile( qw( utils upgrade_db.pl ) );
+
+my $short = get_pod( $PROG, 0 );
+my $long = get_pod( $PROG, 1 );
+
+is( run_prog( $PROG ), "Missing required parameters.\n$long", "Failed no params" );
+is( run_prog( $PROG, '-input foo' ), "Missing required parameters.\n$long", "Failed only -input" );
+is( run_prog( $PROG, '-output foo' ), "Missing required parameters.\n$long", "Failed only -output" );
+is(
+    run_prog( $PROG, '-input foo', '-output foo' ),
+    "Cannot use the same filename for both input and output.\n$short",
+    "Failed same name",
+);
+
+is(
+    run_prog( $PROG, '-input foo', '-output bar' ),
+    "'foo' is not a file.\n$short",
+    "Failed input does not exist",
+);
+
+my (undef, $input_filename) = new_fh();
+my (undef, $output_filename) = new_fh();
+
+is(
+    run_prog( $PROG, "-input $input_filename", "-output $output_filename" ),
+    "'$input_filename' is not a DBM::Deep file.\n$short",
+    "Input is not a DBM::Deep file",
+);
+
+# All files are of the form:
+#   $db->{foo} = [ 1 .. 3 ];
+
+my @input_files = (
+    '0-983',
+    '0-99_04',
+    '1-0000',
+);
+
+my @output_versions = (
+    '0.91', '0.92', '0.93', '0.94', '0.95', '0.96', '0.97', '0.98',
+    '0.981', '0.982', '0.983',
+    '0.99_01', '0.99_02', '0.99_03', '0.99_04',
+    '1.00', '1.000', '1.0000',
+);
+
+foreach my $input_filename (
+    map { 
+        File::Spec->catfile( qw( t etc ), "db-$_" )
+    } @input_files
+) {
+    # chmod it writable because old DBM::Deep versions don't handle readonly
+    # files correctly. This is fixed in DBM::Deep 1.0000
+    chmod 0600, $input_filename;
+
+    foreach my $v ( @output_versions ) {
+        my (undef, $output_filename) = new_fh();
+        my $output = run_prog(
+            $PROG,
+            "-input $input_filename",
+            "-output $output_filename",
+            "-version $v",
+        );
+
+        if ( $input_filename =~ /_/ ) {
+            is(
+                $output, "'$input_filename' is a dev release and not supported.\n$short",
+                "Input file is a dev release - not supported",
+            );
+
+            next;
+        }
+
+        if ( $v =~ /_/ ) {
+            is(
+                $output, "-version '$v' is a dev release and not supported.\n$short",
+                "Output version is a dev release - not supported",
+            );
+
+            next;
+        }
+
+        # Now, read the output file with the right version.
+        ok( !$output, "A successful run produces no output" );
+        die "$output\n" if $output;
+
+        my $db;
+        if ( $v =~ /^0/ ) {
+            push @INC, File::Spec->catdir( 'utils', 'lib' );
+            eval "use DBM::Deep::09830";
+            $db = DBM::Deep::09830->new( $output_filename );
+        }
+        elsif ( $v =~ /^1/ ) {
+            push @INC, 'lib';
+            eval "use DBM::Deep";
+            $db = DBM::Deep->new( $output_filename );
+        }
+        else {
+            die "How did we get here?!\n";
+        }
+
+        ok( $db, "Writing to version $v made a file" );
+
+        cmp_deeply(
+            $db->export,
+            { foo => [ 1 .. 3 ] },
+            "We can read the output file",
+        );
+    }
+}
+
+################################################################################
+
+#XXX This needs to be made OS-portable
+sub run_prog {
+    open( my $fh, '-|', "@_ 2>&1" )
+      or die "Cannot launch '@_' as a piped filehandle: $!\n";
+    return join '', <$fh>;
+}
+
+# In 5.8, we could use in-memory filehandles and have done:
+#     open( my $fh, '>', \my $pod ) or die "Cannot open in-memory filehandle: $!\n";
+#     ...
+#     return $pod;
+# However, DBM::Deep requires 5.6, so this set of contortions will have to do.
+sub get_pod {
+    my ($p,$v) = @_;
+
+    my ($fh, $fn) = new_fh();
+    close $fh;
+
+    open $fh, '>', $fn;
+    pod2usage({
+        -input   => $p,
+        -output  => $fh,
+        -verbose => $v,
+        -exitval => 'NOEXIT',
+    });
+    close $fh;
+
+    open $fh, '<', $fn;
+    return join '', <$fh>;
+}

@@ -3,23 +3,25 @@
 ##
 $|++;
 use strict;
-use Test::More tests => 6;
+use Test::More tests => 23;
 use Test::Exception;
+use Test::Warn;
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
 
-my ($fh, $filename) = new_fh();
-
-##
 # test a corrupted file
-##
-open FH, ">$filename";
-print FH 'DPDB';
-close FH;
-throws_ok {
-    DBM::Deep->new( $filename );
-} qr/DBM::Deep: Old file version found/, "Fail if there's a bad header";
+{
+    my ($fh, $filename) = new_fh();
+
+    open FH, ">$filename";
+    print FH 'DPDB';
+    close FH;
+
+    throws_ok {
+        DBM::Deep->new( $filename );
+    } qr/DBM::Deep: Pre-1.00 file version found/, "Fail if there's a bad header";
+}
 
 {
     my ($fh, $filename) = new_fh();
@@ -51,4 +53,85 @@ throws_ok {
     throws_ok {
         DBM::Deep->new( file => $filename, type => DBM::Deep->TYPE_HASH )
     } qr/DBM::Deep: File type mismatch/, "Fail if we try and open an array file with a hash";
+}
+
+{
+    my %floors = (
+        max_buckets => 16,
+        num_txns => 1,
+        data_sector_size => 32,
+    );
+
+    while ( my ($attr, $floor) = each %floors ) {
+        {
+            my ($fh, $filename) = new_fh();
+            warning_like {
+                my $db = DBM::Deep->new(
+                    file => $filename,
+                    $attr => undef,
+                );
+            } qr{Floor of $attr is $floor\. Setting it to $floor from '\Q(undef)\E'},
+             "Warning for $attr => undef is correct";
+        }
+        {
+            my ($fh, $filename) = new_fh();
+            warning_like {
+                my $db = DBM::Deep->new(
+                    file => $filename,
+                    $attr => '',
+                );
+            } qr{Floor of $attr is $floor\. Setting it to $floor from ''},
+             "Warning for $attr => '' is correct";
+        }
+        {
+            my ($fh, $filename) = new_fh();
+            warning_like {
+                my $db = DBM::Deep->new(
+                    file => $filename,
+                    $attr => 'abcd',
+                );
+            } qr{Floor of $attr is $floor\. Setting it to $floor from 'abcd'},
+             "Warning for $attr => 'abcd' is correct";
+        }
+        {
+            my ($fh, $filename) = new_fh();
+            my $val = $floor - 1;
+            warning_like {
+                my $db = DBM::Deep->new(
+                    file => $filename,
+                    $attr => $val,
+                );
+            } qr{Floor of $attr is $floor\. Setting it to $floor from '$val'},
+             "Warning for $attr => $val is correct";
+        }
+    }
+
+    my %ceilings = (
+        max_buckets => 256,
+        num_txns => 255,
+        data_sector_size => 256,
+    );
+
+    while ( my ($attr, $ceiling) = each %ceilings ) {
+        my ($fh, $filename) = new_fh();
+        warning_like {
+            my $db = DBM::Deep->new(
+                file => $filename,
+                $attr => 1000,
+            );
+        } qr{Ceiling of $attr is $ceiling\. Setting it to $ceiling from '1000'},
+          "Warning for $attr => 1000 is correct";
+    }
+}
+
+{
+    throws_ok {
+        DBM::Deep->new( 't/etc/db-0-983' );
+    } qr/DBM::Deep: Pre-1.00 file version found/, "Fail if opening a pre-1.00 file";
+}
+
+{
+    throws_ok {
+        DBM::Deep->new( 't/etc/db-0-99_04' );
+    } qr/DBM::Deep: Wrong file version found - 1 - expected 2/, "Fail if opening a file version 1";
 }

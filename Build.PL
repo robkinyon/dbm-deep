@@ -22,6 +22,7 @@ my $build = Module::Build->new(
         'Test::Warn'      => '0.08',
         'Test::More'      => '0.47',
         'Test::Exception' => '0.21',
+        'IO::Scalar'      => '0.01',
     },
     create_makefile_pl => 'traditional',
     add_to_cleanup => [

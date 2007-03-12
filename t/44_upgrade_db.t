@@ -133,7 +133,7 @@ foreach my $input_filename (
 
 #XXX This needs to be made OS-portable
 sub run_prog {
-    open( my $fh, '-|', "@_ 2>&1" )
+    open( my $fh, '-|', "$^X @_ 2>&1" )
       or die "Cannot launch '@_' as a piped filehandle: $!\n";
     return join '', <$fh>;
 }

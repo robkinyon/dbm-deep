@@ -1,6 +1,14 @@
 Revision history for DBM::Deep.
 
-1.0000 Feb 26 22:30:00 2007 EDT
+1.0001 Mar 12 16:15:00 2007 EDT
+    - (This version is compatible with 1.0000)
+    - Added a missing dependency on IO::Scalar (RT #25387)
+    - Fixed how t/44_upgrade_db.t and utils/upgrade_db.pl worked
+      - utils/upgrade_db.pl now uses #!perl, not #!/usr/bin/perl
+      - t/44_upgrade_db.t now explicitly calls $^X
+        (Thanks merlyn!)
+
+1.0000 Feb 26 22:30:00 2007 EST
     - THIS VERSION IS INCOMPATIBLE WITH FILES FROM ALL OTHER PRIOR VERSIONS.
       - To aid in this form of upgrades, DBM::Deep now checks the file format
         version to make sure that it knows how to read it.
@@ -15,14 +23,14 @@ Revision history for DBM::Deep.
       - data_sector_size - this determines the default size of a data sector.
     - Correctly handle opening readonly files
 
-0.99_04 Jan 24 22:30:00 2007 EDT
+0.99_04 Jan 24 22:30:00 2007 EST
     - Added the missing lib/DBM/Deep.pod file to the MANIFEST
     - Fixed a poorly-designed test that was failing depending on what Clone::Any
       was using.
     - All "use 5.6.0;" lines are now "use 5.006_000;" to avoid warnings about
       unsupported vstrings in 5.9.x
 
-0.99_03 Jan 23 22:30:00 2007 EDT
+0.99_03 Jan 23 22:30:00 2007 EST
     - THIS VERSION IS INCOMPATIBLE WITH FILES FROM ALL OTHER PRIOR VERSIONS.
       - The fileformat changed completely. I will be writing a converter, but
         it's not there right now. Do NOT expect that this module will

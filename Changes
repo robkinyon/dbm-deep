@@ -1,5 +1,16 @@
 Revision history for DBM::Deep.
 
+1.0002 Sep 20 22:00:00 2007 EDT
+    - (This version is compatible with 1.0001)
+    - Expanded _throw_error() so that it provides better information.
+      (Thanks brian d foy!)
+    - Fixed how shift, unshift, and splice work when there are references
+      being moved. It now no longer dies.
+    - Added diag in t/17_import.t to note that the failing tests on blead
+      are due to Clone being broken, not DBM::Deep. The tests will still
+      fail because I don't want users to install something that's broken
+      and deal with those bug reports.
+
 1.0001 Mar 12 16:15:00 2007 EDT
     - (This version is compatible with 1.0000)
     - Added a missing dependency on IO::Scalar (RT #25387)

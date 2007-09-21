@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0001);
+our $VERSION = q(1.0002);
 
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative
@@ -251,6 +251,24 @@ sub PUSH {
     return $length;
 }
 
+# XXX This really needs to be something more direct within the file, not a
+# fetch and re-store. -RobK, 2007-09-20
+sub _move_value {
+    my $self = shift;
+    my ($old_key, $new_key) = @_;
+
+    my $val = $self->FETCH( $old_key );
+    if ( eval { local $SIG{'__DIE__'}; $val->isa( 'DBM::Deep::Hash' ) } ) {
+        $self->STORE( $new_key, { %$val } );
+    }
+    elsif ( eval { local $SIG{'__DIE__'}; $val->isa( 'DBM::Deep::Array' ) } ) {
+        $self->STORE( $new_key, [ @$val ] );
+    }
+    else {
+        $self->STORE( $new_key, $val );
+    }
+}
+
 sub SHIFT {
     my $self = shift->_get_self;
 
@@ -262,7 +280,7 @@ sub SHIFT {
         my $content = $self->FETCH( 0 );
 
         for (my $i = 0; $i < $length - 1; $i++) {
-            $self->STORE( $i, $self->FETCH($i + 1) );
+            $self->_move_value( $i+1, $i );
         }
         $self->DELETE( $length - 1 );
 
@@ -287,7 +305,7 @@ sub UNSHIFT {
 
     if ($length) {
         for (my $i = $length - 1; $i >= 0; $i--) {
-            $self->STORE( $i + $new_size, $self->FETCH($i) );
+            $self->_move_value( $i, $i+$new_size );
         }
     }
 
@@ -335,12 +353,12 @@ sub SPLICE {
     if ( $new_size != $splice_length ) {
         if ($new_size > $splice_length) {
             for (my $i = $length - 1; $i >= $offset + $splice_length; $i--) {
-                $self->STORE( $i + ($new_size - $splice_length), $self->FETCH($i) );
+                $self->_move_value( $i, $i + ($new_size - $splice_length) );
             }
         }
         else {
             for (my $i = $offset + $splice_length; $i < $length; $i++) {
-                $self->STORE( $i + ($new_size - $splice_length), $self->FETCH($i) );
+                $self->_move_value( $i, $i + ($new_size - $splice_length) );
             }
             for (my $i = 0; $i < $splice_length - $new_size; $i++) {
                 $self->DELETE( $length - 1 );

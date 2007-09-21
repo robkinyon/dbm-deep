@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0001);
+our $VERSION = q(1.0002);
 
 use Fcntl qw( :flock );
 
@@ -390,6 +390,14 @@ sub _fh {
 
 sub _throw_error {
     die "DBM::Deep: $_[1]\n";
+    my $n = 0;
+    while( 1 ) {
+        my @caller = caller( ++$n );
+        next if $caller[0] =~ m/^DBM::Deep/;
+
+        die "DBM::Deep: $_[1] at $0 line $caller[2]\n";
+        last;
+    }
 }
 
 sub STORE {

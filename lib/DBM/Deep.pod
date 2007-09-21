@@ -45,15 +45,10 @@ Windows.
 
 =head1 VERSION DIFFERENCES
 
-B<NOTE>: 0.99_03 has significant file format differences from prior versions.
-THere will be a backwards-compatibility layer in 1.00, but that is slated for
-a later 0.99_x release. This version is B<NOT> backwards compatible with any
-other release of DBM::Deep.
-
-B<NOTE>: 0.99_01 and above have significant file format differences from 0.983 and
-before. There will be a backwards-compatibility layer in 1.00, but that is
-slated for a later 0.99_x release. This version is B<NOT> backwards compatible
-with 0.983 and before.
+B<NOTE>: 1.0000 has significant file format differences from prior versions.
+THere is a backwards-compatibility layer at C<utils/upgrade_db.pl>. Files
+created by 1.0000 or higher are B<NOT> compatible with scripts using prior
+versions.
 
 =head1 SETUP
 
@@ -1164,16 +1159,16 @@ reference to be imported in order to explicitly leave it untied.
 B<Devel::Cover> is used to test the code coverage of the tests. Below is the
 B<Devel::Cover> report on this distribution's test suite.
 
-  ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  File                           stmt   bran   cond    sub    pod   time  total
-  ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm           96.8   87.9   90.5  100.0   89.5    4.5   95.2
-  blib/lib/DBM/Deep/Array.pm    100.0   94.3  100.0  100.0  100.0    4.8   98.7
-  blib/lib/DBM/Deep/Engine.pm    97.2   86.4   86.0  100.0    0.0   56.8   91.0
-  blib/lib/DBM/Deep/File.pm      98.1   83.3   66.7  100.0    0.0   31.4   88.0
-  blib/lib/DBM/Deep/Hash.pm     100.0  100.0  100.0  100.0  100.0    2.5  100.0
-  Total                          97.7   88.1   86.6  100.0   31.6  100.0   93.0
-  ---------------------------- ------ ------ ------ ------ ------ ------ ------
+  ----------------------------------- ------ ------ ------ ------ ------ ------
+  File                                  stmt   bran   cond    sub   time  total
+  ----------------------------------- ------ ------ ------ ------ ------ ------
+  blib/lib/DBM/Deep.pm                  94.4   85.0   90.5  100.0    5.0   93.4
+  blib/lib/DBM/Deep/Array.pm           100.0   94.6  100.0  100.0    4.7   98.8
+  blib/lib/DBM/Deep/Engine.pm           97.2   85.8   82.4  100.0   51.3   93.8
+  blib/lib/DBM/Deep/File.pm             97.2   81.6   66.7  100.0   36.5   91.9
+  blib/lib/DBM/Deep/Hash.pm            100.0  100.0  100.0  100.0    2.5  100.0
+  Total                                 97.2   87.4   83.9  100.0  100.0   94.6
+  ----------------------------------- ------ ------ ------ ------ ------ ------
 
 =head1 MORE INFORMATION
 

@@ -56,6 +56,9 @@ use_ok( 'DBM::Deep' );
 }
 
 {
+    diag "\nThere seems to be a bug in Clone on Perl 5.9+ that is causing\nthese tests to fail."
+        if $] >= 5.009;
+
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new({
         file => $filename,

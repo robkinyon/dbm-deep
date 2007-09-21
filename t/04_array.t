@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 116;
+use Test::More tests => 124;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -239,3 +239,31 @@ throws_ok {
     $db->exists();
 } qr/Cannot use an undefined array index/, "EXISTS fails on an undefined key";
 
+# Bug reported by Mike Schilli
+{
+    my ($fh, $filename) = new_fh();
+    my $db = DBM::Deep->new(
+        file => $filename,
+        type => DBM::Deep->TYPE_ARRAY
+    );
+
+    push @{$db}, 1, { foo => 1 };
+    lives_ok {
+        shift @{$db};
+    } "Shift doesn't die moving references around";
+    is( $db->[0]{foo}, 1, "Right hashref there" );
+
+    lives_ok {
+        unshift @{$db}, [ 1 .. 3 ];
+        unshift @{$db}, 1;
+    } "Unshift doesn't die moving references around";
+    is( $db->[1][1], 2, "Right arrayref there" );
+    is( $db->[2]{foo}, 1, "Right hashref there" );
+
+    # Add test for splice moving references around
+    lives_ok {
+        splice @{$db}, 0, 0, 1 .. 3;
+    } "Splice doesn't die moving references around";
+    is( $db->[4][1], 2, "Right arrayref there" );
+    is( $db->[5]{foo}, 1, "Right hashref there" );
+}

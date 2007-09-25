@@ -4,6 +4,10 @@ DBM::Deep::Internals
 
 =head1 DESCRIPTION
 
+B<NOTE>: This document is out-of-date. It describes an intermediate file
+format used during the development from 0.983 to 1.0000. It will be rewritten
+soon.
+
 This is a document describing the internal workings of L<DBM::Deep/>. It is
 not necessary to read this document if you only intend to be a user. This
 document is intended for people who either want a deeper understanding of

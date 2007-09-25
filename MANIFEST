@@ -14,6 +14,7 @@ lib/DBM/Deep/Hash.pm
 lib/DBM/Deep/Internals.pod
 utils/upgrade_db.pl
 utils/lib/DBM/Deep/09830.pm
+utils/lib/DBM/Deep/10002.pm
 t/01_basic.t
 t/02_hash.t
 t/03_bighash.t
@@ -57,7 +58,11 @@ t/41_transaction_multilevel.t
 t/42_transaction_indexsector.t
 t/43_transaction_maximum.t
 t/44_upgrade_db.t
+t/45_references.t
+t/98_pod.t
+t/99_pod_coverage.t
 t/common.pm
 t/etc/db-0-983
 t/etc/db-0-99_04
 t/etc/db-1-0000
+t/etc/db-1-0003

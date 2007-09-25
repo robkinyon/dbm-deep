@@ -1,5 +1,12 @@
 Revision history for DBM::Deep.
 
+1.0009_01 Sep 24 14:00:00 2007 EDT
+    - THIS VERSION IS INCOMPATIBLE WITH FILES FROM ALL OTHER PRIOR VERSIONS.
+    - Further fixes for unshift/shift/splice and references (RT# 29583)
+    - To fix that, I had to put support for real references in.
+      - the 16 and 22 tests are now re-enabled.
+      - Yes, this means that real references work. See t/45_references.t
+
 1.0002 Sep 20 22:00:00 2007 EDT
     - (This version is compatible with 1.0001)
     - Expanded _throw_error() so that it provides better information.

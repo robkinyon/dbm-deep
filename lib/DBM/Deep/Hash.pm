@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0002);
+our $VERSION = q(1.0003);
 
 use base 'DBM::Deep';
 
@@ -52,7 +52,7 @@ sub FETCH {
 sub STORE {
     my $self = shift->_get_self;
     DBM::Deep->_throw_error( "Cannot use an undefined hash key." ) unless defined $_[0];
-	my $key = ($self->_storage->{filter_store_key})
+    my $key = ($self->_storage->{filter_store_key})
         ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
     my $value = $_[1];
@@ -63,7 +63,7 @@ sub STORE {
 sub EXISTS {
     my $self = shift->_get_self;
     DBM::Deep->_throw_error( "Cannot use an undefined hash key." ) unless defined $_[0];
-	my $key = ($self->_storage->{filter_store_key})
+    my $key = ($self->_storage->{filter_store_key})
         ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
 
@@ -73,7 +73,7 @@ sub EXISTS {
 sub DELETE {
     my $self = shift->_get_self;
     DBM::Deep->_throw_error( "Cannot use an undefined hash key." ) unless defined $_[0];
-	my $key = ($self->_storage->{filter_store_key})
+    my $key = ($self->_storage->{filter_store_key})
         ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
 
@@ -81,45 +81,45 @@ sub DELETE {
 }
 
 sub FIRSTKEY {
-	##
-	# Locate and return first key (in no particular order)
-	##
+    ##
+    # Locate and return first key (in no particular order)
+    ##
     my $self = shift->_get_self;
 
-	##
-	# Request shared lock for reading
-	##
-	$self->lock( $self->LOCK_SH );
-	
-	my $result = $self->_engine->get_next_key( $self );
-	
-	$self->unlock();
-	
-	return ($result && $self->_storage->{filter_fetch_key})
+    ##
+    # Request shared lock for reading
+    ##
+    $self->lock( $self->LOCK_SH );
+    
+    my $result = $self->_engine->get_next_key( $self );
+    
+    $self->unlock();
+    
+    return ($result && $self->_storage->{filter_fetch_key})
         ? $self->_storage->{filter_fetch_key}->($result)
         : $result;
 }
 
 sub NEXTKEY {
-	##
-	# Return next key (in no particular order), given previous one
-	##
+    ##
+    # Return next key (in no particular order), given previous one
+    ##
     my $self = shift->_get_self;
 
-	my $prev_key = ($self->_storage->{filter_store_key})
+    my $prev_key = ($self->_storage->{filter_store_key})
         ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
 
-	##
-	# Request shared lock for reading
-	##
-	$self->lock( $self->LOCK_SH );
-	
-	my $result = $self->_engine->get_next_key( $self, $prev_key );
-	
-	$self->unlock();
-	
-	return ($result && $self->_storage->{filter_fetch_key})
+    ##
+    # Request shared lock for reading
+    ##
+    $self->lock( $self->LOCK_SH );
+    
+    my $result = $self->_engine->get_next_key( $self, $prev_key );
+    
+    $self->unlock();
+    
+    return ($result && $self->_storage->{filter_fetch_key})
         ? $self->_storage->{filter_fetch_key}->($result)
         : $result;
 }

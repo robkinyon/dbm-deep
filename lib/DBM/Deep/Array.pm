@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0002);
+our $VERSION = q(1.0003);
 
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative
@@ -257,16 +257,7 @@ sub _move_value {
     my $self = shift;
     my ($old_key, $new_key) = @_;
 
-    my $val = $self->FETCH( $old_key );
-    if ( eval { local $SIG{'__DIE__'}; $val->isa( 'DBM::Deep::Hash' ) } ) {
-        $self->STORE( $new_key, { %$val } );
-    }
-    elsif ( eval { local $SIG{'__DIE__'}; $val->isa( 'DBM::Deep::Array' ) } ) {
-        $self->STORE( $new_key, [ @$val ] );
-    }
-    else {
-        $self->STORE( $new_key, $val );
-    }
+    return $self->_engine->make_reference( $self, $old_key, $new_key );
 }
 
 sub SHIFT {
@@ -276,22 +267,21 @@ sub SHIFT {
 
     my $length = $self->FETCHSIZE();
 
-    if ($length) {
-        my $content = $self->FETCH( 0 );
-
-        for (my $i = 0; $i < $length - 1; $i++) {
-            $self->_move_value( $i+1, $i );
-        }
-        $self->DELETE( $length - 1 );
-
-        $self->unlock;
-
-        return $content;
-    }
-    else {
+    if ( !$length ) {
         $self->unlock;
         return;
     }
+
+    my $content = $self->FETCH( 0 );
+
+    for (my $i = 0; $i < $length - 1; $i++) {
+        $self->_move_value( $i+1, $i );
+    }
+    $self->DELETE( $length - 1 );
+
+    $self->unlock;
+
+    return $content;
 }
 
 sub UNSHIFT {
@@ -307,6 +297,8 @@ sub UNSHIFT {
         for (my $i = $length - 1; $i >= 0; $i--) {
             $self->_move_value( $i, $i+$new_size );
         }
+
+        $self->STORESIZE( $length + $new_size );
     }
 
     for (my $i = 0; $i < $new_size; $i++) {
@@ -355,6 +347,7 @@ sub SPLICE {
             for (my $i = $length - 1; $i >= $offset + $splice_length; $i--) {
                 $self->_move_value( $i, $i + ($new_size - $splice_length) );
             }
+            $self->STORESIZE( $length + $new_size - $splice_length );
         }
         else {
             for (my $i = $offset + $splice_length; $i < $length; $i++) {

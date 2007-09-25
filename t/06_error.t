@@ -133,5 +133,5 @@ use_ok( 'DBM::Deep' );
 {
     throws_ok {
         DBM::Deep->new( 't/etc/db-0-99_04' );
-    } qr/DBM::Deep: Wrong file version found - 1 - expected 2/, "Fail if opening a file version 1";
+    } qr/DBM::Deep: Wrong file version found - 1 - expected 3/, "Fail if opening a file version 1";
 }

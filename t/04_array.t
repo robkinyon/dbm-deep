@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 124;
+use Test::More tests => 125;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -77,6 +77,7 @@ is( $db->length, 3, "... and we have three after shifting" );
 is( $db->[0], 'elem1', "0th element still there after shifting" );
 is( $db->[1], 'elem2', "1st element still there after shifting" );
 is( $db->[2], 'elem3', "2nd element still there after shifting" );
+is( $db->[3], undef, "There is no third element now" );
 is( $shifted, 'elem0', "Shifted value is correct" );
 
 ##
@@ -240,6 +241,7 @@ throws_ok {
 } qr/Cannot use an undefined array index/, "EXISTS fails on an undefined key";
 
 # Bug reported by Mike Schilli
+# Also, RT #29583 reported by HANENKAMP
 {
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new(
@@ -247,23 +249,23 @@ throws_ok {
         type => DBM::Deep->TYPE_ARRAY
     );
 
-    push @{$db}, 1, { foo => 1 };
+    push @{$db}, 3, { foo => 1 };
     lives_ok {
         shift @{$db};
     } "Shift doesn't die moving references around";
     is( $db->[0]{foo}, 1, "Right hashref there" );
 
     lives_ok {
-        unshift @{$db}, [ 1 .. 3 ];
+        unshift @{$db}, [ 1 .. 3, [ 1 .. 3 ] ];
         unshift @{$db}, 1;
     } "Unshift doesn't die moving references around";
-    is( $db->[1][1], 2, "Right arrayref there" );
+    is( $db->[1][3][1], 2, "Right arrayref there" );
     is( $db->[2]{foo}, 1, "Right hashref there" );
 
     # Add test for splice moving references around
     lives_ok {
         splice @{$db}, 0, 0, 1 .. 3;
     } "Splice doesn't die moving references around";
-    is( $db->[4][1], 2, "Right arrayref there" );
+    is( $db->[4][3][1], 2, "Right arrayref there" );
     is( $db->[5]{foo}, 1, "Right hashref there" );
 }

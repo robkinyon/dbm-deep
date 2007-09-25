@@ -17,7 +17,8 @@ use Pod::Usage;
 
 my %headerver_to_module = (
   '0' => 'DBM::Deep::09830',
-  '2' => 'DBM::Deep', 
+  '2' => 'DBM::Deep::10002', 
+  '3' => 'DBM::Deep',
 );
 
 my %is_dev = (
@@ -27,8 +28,8 @@ my %is_dev = (
 my %opts = (
   man => 0,
   help => 0,
-  version => '1.0002',
-  autobless => 0,
+  version => '1.0003',
+  autobless => 1,
 );
 GetOptions( \%opts,
   'input=s', 'output=s', 'version:s', 'autobless:i',
@@ -75,6 +76,9 @@ my %db;
   }
   elsif ( $ver =~ /^1\.000?[0-2]?/) {
     $ver = 2;
+  }
+  elsif ( $ver =~ /^1\.000[3]/) {
+    $ver = 3;
   }
   else {
     _exit( "'$ver' is an unrecognized version." );
@@ -177,8 +181,8 @@ of the database.
 
 =item B<-autobless>
 
-In pre-1.0000 versions, autoblessing was an optional setting. This defaults to
-false.
+In pre-1.0000 versions, autoblessing was an optional setting defaulting to
+false. Autobless in upgrade_db.pl defaults to true.
 
 =item B<-help>
 
@@ -203,7 +207,7 @@ This will require about twice the diskspace of the input file.
 =item * Feature support
 
 Not all versions support the same features. In particular, internal references
-were supported in 0.983 and support was removed in 1.000. There is no
+were supported in 0.983, removed in 1.000, and re-added in 1.0003. There is no
 detection of this by upgrade_db.pl.
 
 =back

@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0003);
+our $VERSION = q(1.0004);
 
 use Scalar::Util ();
 
@@ -564,8 +564,8 @@ sub get_txn_staleness_counter {
 
     return unpack( $StP{$STALE_SIZE},
         $self->storage->read_at(
-            $self->trans_loc + 4 + $STALE_SIZE * ($trans_id - 1),
-            4,
+            $self->trans_loc + $self->txn_bitfield_len + $STALE_SIZE * ($trans_id - 1),
+            $STALE_SIZE,
         )
     );
 }
@@ -575,10 +575,10 @@ sub inc_txn_staleness_counter {
     my ($trans_id) = @_;
 
     # Hardcode staleness of 0 for the HEAD
-    return unless $trans_id;
+    return 0 unless $trans_id;
 
     $self->storage->print_at(
-        $self->trans_loc + 4 + $STALE_SIZE * ($trans_id - 1),
+        $self->trans_loc + $self->txn_bitfield_len + $STALE_SIZE * ($trans_id - 1),
         pack( $StP{$STALE_SIZE}, $self->get_txn_staleness_counter( $trans_id ) + 1 ),
     );
 }
@@ -874,6 +874,99 @@ sub set_trans_loc { $_[0]{trans_loc} = $_[1] }
 
 sub chains_loc     { $_[0]{chains_loc} }
 sub set_chains_loc { $_[0]{chains_loc} = $_[1] }
+
+sub _dump_file {
+    my $self = shift;
+
+    # Read the header
+    my $spot = $self->_read_file_header();
+
+    my %types = (
+        0 => 'B',
+        1 => 'D',
+        2 => 'I',
+    );
+
+    my %sizes = (
+        'D' => $self->data_sector_size,
+        'B' => DBM::Deep::Engine::Sector::BucketList->new({engine=>$self,offset=>1})->size,
+        'I' => DBM::Deep::Engine::Sector::Index->new({engine=>$self,offset=>1})->size,
+    );
+
+    my $return = "";
+    # Read the free sector chains
+    my %sectors;
+    foreach my $multiple ( 0 .. 2 ) {
+        $return .= "Chains($types{$multiple}):";
+        my $old_loc = $self->chains_loc + $multiple * $self->byte_size;
+        while ( 1 ) {
+            my $loc = unpack(
+                $StP{$self->byte_size},
+                $self->storage->read_at( $old_loc, $self->byte_size ),
+            );
+
+            # We're now out of free sectors of this kind.
+            unless ( $loc ) {
+                last;
+            }
+
+            $sectors{ $types{$multiple} }{ $loc } = undef;
+            $old_loc = $loc + SIG_SIZE + $STALE_SIZE;
+            $return .= " $loc";
+        }
+        $return .= $/;
+    }
+
+    SECTOR:
+    while ( $spot < $self->storage->{end} ) {
+        # Read each sector in order.
+        my $sector = $self->_load_sector( $spot );
+        if ( !$sector ) {
+            # Find it in the free-sectors that were found already
+            foreach my $type ( keys %sectors ) {
+                if ( exists $sectors{$type}{$spot} ) {
+                    my $size = $sizes{$type};
+                    $return .= sprintf "%08d: %s %04d\n", $spot, 'F' . $type, $size;
+                    $spot += $size;
+                    next SECTOR;
+                }
+            }
+
+            die "********\n$return\nDidn't find free sector for $spot in chains\n********\n";
+        }
+        else {
+            $return .= sprintf "%08d: %s  %04d", $spot, $sector->type, $sector->size;
+            if ( $sector->type eq 'D' ) {
+                $return .= ' ' . $sector->data;
+            }
+            elsif ( $sector->type eq 'A' || $sector->type eq 'H' ) {
+                $return .= ' REF: ' . $sector->get_refcount;
+            }
+            elsif ( $sector->type eq 'B' ) {
+                foreach my $bucket ( $sector->chopped_up ) {
+                    $return .= "\n    ";
+                    $return .= sprintf "%08d", unpack($StP{$self->byte_size},
+                        substr( $bucket->[-1], $self->hash_size, $self->byte_size),
+                    );
+                    foreach my $txn ( 0 .. $self->num_txns - 1 ) {
+                        my $l = unpack( $StP{$self->byte_size},
+                            substr( $bucket->[-1],
+                                $self->hash_size + $self->byte_size + $txn * ($self->byte_size + $STALE_SIZE),
+                                $self->byte_size,
+                            ),
+                        );
+                        $return .= sprintf " %08d", $l;
+                    }
+                }
+            }
+            $return .= $/;
+
+            $spot += $sector->size;
+        }
+    }
+
+    return $return;
+}
 
 ################################################################################
 
@@ -1279,23 +1372,6 @@ sub _init {
     return;
 }
 
-sub free {
-    my $self = shift;
-
-    # We're not ready to be removed yet.
-    if ( $self->decrement_refcount > 0 ) {
-        return;
-    }
-
-    my $blist_loc = $self->get_blist_loc;
-    $self->engine->_load_sector( $blist_loc )->free if $blist_loc;
-
-    my $class_loc = $self->get_class_offset;
-    $self->engine->_load_sector( $class_loc )->free if $class_loc;
-
-    $self->SUPER::free();
-}
-
 sub staleness { $_[0]{staleness} }
 
 sub get_data_for {
@@ -1405,6 +1481,8 @@ sub delete_key {
 
     my @trans_ids = $self->engine->get_running_txn_ids;
 
+    # If we're the HEAD and there are running txns, then we need to clone this value to the other
+    # transactions to preserve Isolation.
     if ( $self->engine->trans_id == 0 ) {
         if ( @trans_ids ) {
             foreach my $other_trans_id ( @trans_ids ) {
@@ -1563,6 +1641,7 @@ sub get_bucket_list {
             );
         }
 
+        $sector->clear;
         $sector->free;
 
         $sector = $blist_cache{ ord( substr( $args->{key_md5}, $i, 1 ) ) };
@@ -1595,44 +1674,64 @@ sub get_classname {
 }
 
 #XXX Add singleton handling here
-sub data {
-    my $self = shift;
+{
+    my %cache;
+    # XXX This is insufficient
+#    sub _clear_cache { %cache = (); }
+    sub data {
+        my $self = shift;
 
-    my $new_obj = DBM::Deep->new({
-        type        => $self->type,
-        base_offset => $self->offset,
-        staleness   => $self->staleness,
-        storage     => $self->engine->storage,
-        engine      => $self->engine,
-    });
+#        unless ( $cache{ $self->offset } ) {
+            my $new_obj = DBM::Deep->new({
+                type        => $self->type,
+                base_offset => $self->offset,
+                staleness   => $self->staleness,
+                storage     => $self->engine->storage,
+                engine      => $self->engine,
+            });
 
-    if ( $self->engine->storage->{autobless} ) {
-        my $classname = $self->get_classname;
-        if ( defined $classname ) {
-            bless $new_obj, $classname;
-        }
+            if ( $self->engine->storage->{autobless} ) {
+                my $classname = $self->get_classname;
+                if ( defined $classname ) {
+                    bless $new_obj, $classname;
+                }
+            }
+
+            $cache{$self->offset} = $new_obj;
+#        }
+        return $cache{$self->offset};
     }
 
-    return $new_obj;
+    sub free {
+        my $self = shift;
+
+        # We're not ready to be removed yet.
+        if ( $self->decrement_refcount > 0 ) {
+            return;
+        }
+
+        # Rebless the object into DBM::Deep::Null.
+#        %{$cache{ $self->offset }} = ();
+#        bless $cache{$self->offset}, 'DBM::Deep::Null';
+
+        my $blist_loc = $self->get_blist_loc;
+        $self->engine->_load_sector( $blist_loc )->free if $blist_loc;
+
+        my $class_loc = $self->get_class_offset;
+        $self->engine->_load_sector( $class_loc )->free if $class_loc;
+
+        $self->SUPER::free();
+    }
 }
 
 sub increment_refcount {
     my $self = shift;
 
-    my $e = $self->engine;
-    my $refcount = unpack(
-        $StP{$e->byte_size},
-        $e->storage->read_at(
-            $self->offset + $self->base_size + 2 * $e->byte_size, $e->byte_size,
-        ),
-    );
+    my $refcount = $self->get_refcount;
 
     $refcount++;
 
-    $e->storage->print_at(
-        $self->offset + $self->base_size + 2 * $e->byte_size,
-        pack( $StP{$e->byte_size}, $refcount ),
-    );
+    $self->write_refcount( $refcount );
 
     return $refcount;
 }
@@ -1640,20 +1739,11 @@ sub increment_refcount {
 sub decrement_refcount {
     my $self = shift;
 
-    my $e = $self->engine;
-    my $refcount = unpack(
-        $StP{$e->byte_size},
-        $e->storage->read_at(
-            $self->offset + $self->base_size + 2 * $e->byte_size, $e->byte_size,
-        ),
-    );
+    my $refcount = $self->get_refcount;
 
     $refcount--;
 
-    $e->storage->print_at(
-        $self->offset + $self->base_size + 2 * $e->byte_size,
-        pack( $StP{$e->byte_size}, $refcount ),
-    );
+    $self->write_refcount( $refcount );
 
     return $refcount;
 }
@@ -1667,6 +1757,17 @@ sub get_refcount {
         $e->storage->read_at(
             $self->offset + $self->base_size + 2 * $e->byte_size, $e->byte_size,
         ),
+    );
+}
+
+sub write_refcount {
+    my $self = shift;
+    my ($num) = @_;
+
+    my $e = $self->engine;
+    $e->storage->print_at(
+        $self->offset + $self->base_size + 2 * $e->byte_size,
+        pack( $StP{$e->byte_size}, $num ),
     );
 }
 
@@ -1697,6 +1798,13 @@ sub _init {
     return $self;
 }
 
+sub clear {
+    my $self = shift;
+    $self->engine->storage->print_at( $self->offset + $self->base_size,
+        chr(0) x ($self->size - $self->base_size), # Zero-fill the data
+    );
+}
+
 sub size {
     my $self = shift;
     unless ( $self->{size} ) {
@@ -1708,6 +1816,31 @@ sub size {
 }
 
 sub free_meth { return '_add_free_blist_sector' }
+
+sub free {
+    my $self = shift;
+
+    my $e = $self->engine;
+    foreach my $bucket ( $self->chopped_up ) {
+        my $rest = $bucket->[-1];
+
+        # Delete the keysector
+        my $l = unpack( $StP{$e->byte_size}, substr( $rest, $e->hash_size, $e->byte_size ) );
+        my $s = $e->_load_sector( $l ); $s->free if $s;
+
+        foreach my $txn ( 0 .. $e->num_txns - 1 ) {
+            my $l = unpack( $StP{$e->byte_size},
+                substr( $rest,
+                    $e->hash_size + $e->byte_size + $txn * ($e->byte_size + $STALE_SIZE),
+                    $e->byte_size,
+                ),
+            );
+            my $s = $e->_load_sector( $l ); $s->free if $s;
+        }
+    }
+
+    $self->SUPER::free();
+}
 
 sub bucket_size {
     my $self = shift;
@@ -2069,6 +2202,18 @@ sub set_entry {
         pack( $StP{$e->byte_size}, $loc ),
     );
 }
+
+# This was copied from MARCEL's Class::Null. However, I couldn't use it because
+# I need an undef value, not an implementation of the Null Class pattern.
+package DBM::Deep::Null;
+
+use overload
+    'bool'   => sub { undef},
+    '""'     => sub { undef },
+    '0+'     => sub { undef},
+    fallback => 1;
+
+sub AUTOLOAD { return; }
 
 1;
 __END__

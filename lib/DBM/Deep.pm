@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0003);
+our $VERSION = q(1.0004);
 
 use Fcntl qw( :flock );
 
@@ -245,12 +245,13 @@ sub optimize {
         type => $self->_type,
 
         # Bring over all the parameters that we need to bring over
-        num_txns => $self->_engine->num_txns,
-        byte_size => $self->_engine->byte_size,
-        max_buckets => $self->_engine->max_buckets,
+        ( map { $_ => $self->_engine->$_ } qw(
+            byte_size max_buckets data_sector_size num_txns
+        )),
     );
 
     $self->lock();
+    #DBM::Deep::Engine::Sector::Reference->_clear_cache;
     $self->_copy_node( $db_temp );
     undef $db_temp;
 
@@ -319,9 +320,6 @@ sub clone {
     );
 
     sub set_filter {
-        ##
-        # Setup filter function for storing or fetching the key or value
-        ##
         my $self = shift->_get_self;
         my $type = lc shift;
         my $func = shift;
@@ -333,6 +331,11 @@ sub clone {
 
         return;
     }
+
+    sub filter_store_key   { $_[0]->set_filter( store_key   => $_[1] ); }
+    sub filter_store_value { $_[0]->set_filter( store_value => $_[1] ); }
+    sub filter_fetch_key   { $_[0]->set_filter( fetch_key   => $_[1] ); }
+    sub filter_fetch_value { $_[0]->set_filter( fetch_value => $_[1] ); }
 }
 
 sub begin_work {
@@ -389,14 +392,12 @@ sub _fh {
 ##
 
 sub _throw_error {
-    die "DBM::Deep: $_[1]\n";
     my $n = 0;
     while( 1 ) {
         my @caller = caller( ++$n );
         next if $caller[0] =~ m/^DBM::Deep/;
 
         die "DBM::Deep: $_[1] at $0 line $caller[2]\n";
-        last;
     }
 }
 
@@ -551,6 +552,8 @@ sub fetch { (shift)->FETCH( @_ ) }
 sub delete { (shift)->DELETE( @_ ) }
 sub exists { (shift)->EXISTS( @_ ) }
 sub clear { (shift)->CLEAR( @_ ) }
+
+sub _dump_file {shift->_get_self->_engine->_dump_file;}
 
 1;
 __END__

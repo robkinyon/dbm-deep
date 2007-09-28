@@ -1,6 +1,18 @@
 Revision history for DBM::Deep.
 
-1.0009_01 Sep 24 14:00:00 2007 EDT
+1.0004 Sep 28 12:15:00 2007 EDT
+    - (This version is compatible with 1.0003)
+    - Fixed the Changes file (wrong version was displayed for 1.0003)
+    - Added filter sugar methods to be more API-compatible with other DBMs
+      - This was added to support a patch provided to IO::All so it can
+        use DBM::Deep as a DBM provider.
+    - Implemented _dump_file in order to display the file structure. As a
+      result, the following bugs were fixed:
+      - Arrays and hashes now clean up after themselves better.
+      - Bucketlists now clean up after themselves better.
+      - Reindexing properly clears the old bucketlist before freeing it.
+
+1.0003 Sep 24 14:00:00 2007 EDT
     - THIS VERSION IS INCOMPATIBLE WITH FILES FROM ALL OTHER PRIOR VERSIONS.
     - Further fixes for unshift/shift/splice and references (RT# 29583)
     - To fix that, I had to put support for real references in.

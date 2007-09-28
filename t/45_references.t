@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 10;
+use Test::More tests => 15;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -10,7 +10,17 @@ use_ok( 'DBM::Deep' );
 
 my ($fh, $filename) = new_fh();
 my $db = DBM::Deep->new(
-	file => $filename,
+    file => $filename,
+    locking => 1,
+    autoflush => 1,
+    num_txns  => 16,
+);
+
+my $db2 = DBM::Deep->new(
+    file => $filename,
+    locking => 1,
+    autoflush => 1,
+    num_txns  => 16,
 );
 
 $db->{foo} = 5;
@@ -37,3 +47,37 @@ is( $db->{bar}[3], 42, "Bar[3] is also 42" );
 
 delete $db->{foo};
 is( $db->{bar}[3], 42, "After delete Foo, Bar[3] is still 42" );
+
+$db->{foo} = $db->{bar};
+$db2->begin_work;
+
+    delete $db2->{bar};
+    delete $db2->{foo};
+
+    is( $db2->{bar}, undef, "It's deleted in the transaction" );
+    is( $db->{bar}[3], 42, "... but not in the main" );
+
+$db2->rollback;
+
+# Why hasn't this failed!? Is it because stuff isn't getting deleted as expected?
+# I need a test that walks the sectors
+is( $db->{bar}[3], 42, "After delete Foo, Bar[3] is still 42" );
+is( $db2->{bar}[3], 42, "After delete Foo, Bar[3] is still 42" );
+
+delete $db->{foo};
+
+is( $db->{bar}[3], 42, "After delete Foo, Bar[3] is still 42" );
+
+__END__
+warn "-2\n";
+$db2->begin_work;
+
+warn "-1\n";
+  delete $db2->{bar};
+
+warn "0\n";
+$db2->commit;
+
+warn "1\n";
+ok( !exists $db->{bar}, "After commit, bar is gone" );
+warn "2\n";

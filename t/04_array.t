@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 125;
+use Test::More tests => 128;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -196,6 +196,11 @@ is($db->length(), 2);
 is($db->[0], "elem first");
 is($db->[1], "elem last");
 is($returned[0], "middle ABC");
+
+@returned = $db->splice;
+is( $db->length, 0 );
+is( $returned[0], "elem first" );
+is( $returned[1], "elem last" );
 
 $db->[0] = [ 1 .. 3 ];
 $db->[1] = { a => 'foo' };

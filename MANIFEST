@@ -59,6 +59,7 @@ t/42_transaction_indexsector.t
 t/43_transaction_maximum.t
 t/44_upgrade_db.t
 t/45_references.t
+t/97_dump_file.t
 t/98_pod.t
 t/99_pod_coverage.t
 t/common.pm

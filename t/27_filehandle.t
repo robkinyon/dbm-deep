@@ -20,16 +20,14 @@ use_ok( 'DBM::Deep' );
     {
         open(my $fh, '<', $filename) || die("Can't open '$filename' for reading: $!\n");
 
-        my $db;
-
         # test if we can open and read a db using its filehandle
 
-        ok(($db = DBM::Deep->new(fh => $fh)), "open db in filehandle");
-        ok($db->{hash}->{foo}->[1] eq 'b', "and get at stuff in the database");
+        my $db;
+        ok( ($db = DBM::Deep->new( fh => $fh )), "open db in filehandle" );
+        ok( $db->{hash}{foo}[1] eq 'b', "and get at stuff in the database" );
         throws_ok {
             $db->{foo} = 1;
-        } qr/Cannot write to a readonly filehandle/,
-        "Can't write to a read-only filehandle";
+        } qr/Cannot write to a readonly filehandle/, "Can't write to a read-only filehandle";
         ok( !$db->exists( 'foo' ), "foo doesn't exist" );
 
         my $db_obj = $db->_get_self;

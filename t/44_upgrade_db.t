@@ -13,7 +13,7 @@ BEGIN {
     }
 }
 
-plan tests => 192;
+plan tests => 202;
 
 use t::common qw( new_fh );
 use File::Spec;
@@ -63,7 +63,7 @@ my @output_versions = (
     '0.981', '0.982', '0.983',
     '0.99_01', '0.99_02', '0.99_03', '0.99_04',
     '1.00', '1.000', '1.0000', '1.0001', '1.0002',
-    '1.0003',
+    '1.0003', '1.0004',
 );
 
 foreach my $input_filename (
@@ -117,7 +117,7 @@ foreach my $input_filename (
             eval "use DBM::Deep::10002";
             $db = DBM::Deep::10002->new( $output_filename );
         }
-        elsif ( $v =~ /^1\.000[3]/ ) {
+        elsif ( $v =~ /^1\.000[34]/ ) {
             push @INC, 'lib';
             eval "use DBM::Deep";
             $db = DBM::Deep->new( $output_filename );

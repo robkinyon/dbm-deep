@@ -53,10 +53,10 @@ ok( exists $db->{key2}, "Key2 exists" );
 ##
 # Now clear all filters, and make sure all is unfiltered
 ##
-ok( $db->set_filter( 'store_key', undef ), "Unset store_key filter" );
-ok( $db->set_filter( 'store_value', undef ), "Unset store_value filter" );
-ok( $db->set_filter( 'fetch_key', undef ), "Unset fetch_key filter" );
-ok( $db->set_filter( 'fetch_value', undef ), "Unset fetch_value filter" );
+ok( $db->filter_store_key( undef ), "Unset store_key filter" );
+ok( $db->filter_store_value( undef ), "Unset store_value filter" );
+ok( $db->filter_fetch_key( undef ), "Unset fetch_key filter" );
+ok( $db->filter_fetch_value( undef ), "Unset fetch_value filter" );
 
 is( $db->{MYFILTERkey2}, "MYFILTERvalue2", "We get the right unfiltered value" );
 

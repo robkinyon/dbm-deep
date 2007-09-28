@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0003);
+our $VERSION = q(1.0004);
 
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative
@@ -47,6 +47,7 @@ sub FETCH {
     $self->lock( $self->LOCK_SH );
 
     if ( !defined $key ) {
+        $self->unlock;
         DBM::Deep->_throw_error( "Cannot use an undefined array index." );
     }
     elsif ( $key =~ /^-?\d+$/ ) {
@@ -79,6 +80,7 @@ sub STORE {
     my $size;
     my $idx_is_numeric;
     if ( !defined $key ) {
+        $self->unlock;
         DBM::Deep->_throw_error( "Cannot use an undefined array index." );
     }
     elsif ( $key =~ /^-?\d+$/ ) {
@@ -117,6 +119,7 @@ sub EXISTS {
     $self->lock( $self->LOCK_SH );
 
     if ( !defined $key ) {
+        $self->unlock;
         DBM::Deep->_throw_error( "Cannot use an undefined array index." );
     }
     elsif ( $key =~ /^-?\d+$/ ) {
@@ -148,6 +151,7 @@ sub DELETE {
 
     my $size = $self->FETCHSIZE;
     if ( !defined $key ) {
+        $self->unlock;
         DBM::Deep->_throw_error( "Cannot use an undefined array index." );
     }
     elsif ( $key =~ /^-?\d+$/ ) {

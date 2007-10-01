@@ -1,6 +1,7 @@
 use strict;
 
 use Test::More tests => 16;
+use Test::Deep;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -19,8 +20,8 @@ $db->{hash} = \%hash;
 isa_ok( tied(%hash), 'DBM::Deep::Hash' );
 
 is( $db->{hash}{foo}, 1 );
-is_deeply( $db->{hash}{bar}, [ 1 .. 3 ] );
-is_deeply( $db->{hash}{baz}, { a => 42 } );
+cmp_deeply( $db->{hash}{bar}, noclass([ 1 .. 3 ]) );
+cmp_deeply( $db->{hash}{baz}, noclass({ a => 42 }) );
 
 $hash{foo} = 2;
 is( $db->{hash}{foo}, 2 );
@@ -39,8 +40,8 @@ $db->{array} = \@array;
 isa_ok( tied(@array), 'DBM::Deep::Array' );
 
 is( $db->{array}[0], 1 );
-is_deeply( $db->{array}[1], [ 1 .. 3 ] );
-is_deeply( $db->{array}[2], { a => 42 } );
+cmp_deeply( $db->{array}[1], noclass([ 1 .. 3 ]) );
+cmp_deeply( $db->{array}[2], noclass({ a => 42 }) );
 
 $array[0] = 2;
 is( $db->{array}[0], 2 );

@@ -10,14 +10,14 @@ my $db1 = DBM::Deep->new(
     file => $filename,
     locking => 1,
     autoflush => 1,
-    num_txns  => 16,
+    num_txns  => 2,
 );
 
 my $db2 = DBM::Deep->new(
     file => $filename,
     locking => 1,
     autoflush => 1,
-    num_txns  => 16,
+    num_txns  => 2,
 );
 
 $db1->{x} = { foo => 'y' };

@@ -11,6 +11,7 @@ my $db = DBM::Deep->new(
 );
 
 is( $db->_dump_file, <<"__END_DUMP__", "Dump of initial file correct" );
+NumTxns: 1
 Chains(B):
 Chains(D):
 Chains(I):
@@ -20,6 +21,7 @@ __END_DUMP__
 $db->{foo} = 'bar';
 
 is( $db->_dump_file, <<"__END_DUMP__", "Dump of initial file correct" );
+NumTxns: 1
 Chains(B):
 Chains(D):
 Chains(I):

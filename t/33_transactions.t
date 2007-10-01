@@ -233,7 +233,3 @@ SKIP: {
 }
 
 __END__
-
-Tests to add:
-* Two transactions running at the same time
-* Doing a clear on the head while a transaction is running

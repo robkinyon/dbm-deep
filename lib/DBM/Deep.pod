@@ -945,12 +945,13 @@ the reference. Again, this would generally be considered a feature.
 
 =back
 
-=head2 Data::Dumper and references
+=head2 External references and transactions
 
-As of 1.0003, support for independent Perl datastructures was added (q.v. L</CIRCULAR REFERENCES>
-for more info). However, because DBM::Deep doesn't properly provide the same
-in-memory data-structure for a given location on disk, Data::Dumper (and
-friends) doesn't properly note this. This will be addressed in a future release.
+If you do C<my $x = $db-E<gt>{foo};>, then start a transaction, $x will be
+referencing the database from outside the transaction. A fix for this (and other
+issues with how external references into the database) is being looked into. This
+is the skipped set of tests in t/39_singletons.t and a related issue is the focus
+of t/37_delete_edge_cases.t
 
 =head2 File corruption
 
@@ -1026,12 +1027,12 @@ B<Devel::Cover> report on this distribution's test suite.
   ------------------------------------------ ------ ------ ------ ------ ------
   File                                         stmt   bran   cond    sub  total
   ------------------------------------------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm                         94.5   85.0   90.5  100.0   93.6
-  blib/lib/DBM/Deep/Array.pm                  100.0   94.3  100.0  100.0   98.7
-  blib/lib/DBM/Deep/Engine.pm                  95.9   84.9   81.7  100.0   92.8
+  blib/lib/DBM/Deep.pm                         96.9   88.3   90.5  100.0   95.7
+  blib/lib/DBM/Deep/Array.pm                  100.0   95.7  100.0  100.0   99.0
+  blib/lib/DBM/Deep/Engine.pm                  95.5   84.7   81.6   98.4   92.4
   blib/lib/DBM/Deep/File.pm                    97.2   81.6   66.7  100.0   91.9
   blib/lib/DBM/Deep/Hash.pm                   100.0  100.0  100.0  100.0  100.0
-  Total                                        96.5   86.5   83.5  100.0   94.0
+  Total                                        96.7   87.0   83.3   99.2   94.1
   ------------------------------------------ ------ ------ ------ ------ ------
 
 =head1 MORE INFORMATION

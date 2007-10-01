@@ -1,5 +1,14 @@
 Revision history for DBM::Deep.
 
+1.0005 Oct 01 11:15:00 2007 EDT
+    - (This version is compatible with 1.0004)
+    - Added proper singleton support. This means that the following now works:
+        $db->{foo} = [ 1 .. 3];
+        my $x = $db->{foo};
+        my $y = $db->{foo};
+        is( $x, $y ); # Now passes
+      - This means that Data::Dumper now properly reports when $db->{foo} = $db->{bar}
+
 1.0004 Sep 28 12:15:00 2007 EDT
     - (This version is compatible with 1.0003)
     - Fixed the Changes file (wrong version was displayed for 1.0003)

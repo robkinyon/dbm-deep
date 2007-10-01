@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0004);
+our $VERSION = q(1.0005);
 
 use Scalar::Util ();
 
@@ -725,7 +725,7 @@ sub _load_sector {
     my ($offset) = @_;
 
     # Add a catch for offset of 0 or 1
-    return if $offset <= 1;
+    return if !$offset || $offset <= 1;
 
     my $type = $self->storage->read_at( $offset, 1 );
     return if $type eq chr(0);
@@ -875,6 +875,9 @@ sub set_trans_loc { $_[0]{trans_loc} = $_[1] }
 sub chains_loc     { $_[0]{chains_loc} }
 sub set_chains_loc { $_[0]{chains_loc} = $_[1] }
 
+sub cache       { $_[0]{cache} ||= {} }
+sub clear_cache { %{$_[0]->cache} = () }
+
 sub _dump_file {
     my $self = shift;
 
@@ -894,6 +897,10 @@ sub _dump_file {
     );
 
     my $return = "";
+
+    # Header values
+    $return .= "NumTxns: " . $self->num_txns . $/;
+
     # Read the free sector chains
     my %sectors;
     foreach my $multiple ( 0 .. 2 ) {
@@ -948,10 +955,17 @@ sub _dump_file {
                     $return .= sprintf "%08d", unpack($StP{$self->byte_size},
                         substr( $bucket->[-1], $self->hash_size, $self->byte_size),
                     );
-                    foreach my $txn ( 0 .. $self->num_txns - 1 ) {
+                    my $l = unpack( $StP{$self->byte_size},
+                        substr( $bucket->[-1],
+                            $self->hash_size + $self->byte_size,
+                            $self->byte_size,
+                        ),
+                    );
+                    $return .= sprintf " %08d", $l;
+                    foreach my $txn ( 0 .. $self->num_txns - 2 ) {
                         my $l = unpack( $StP{$self->byte_size},
                             substr( $bucket->[-1],
-                                $self->hash_size + $self->byte_size + $txn * ($self->byte_size + $STALE_SIZE),
+                                $self->hash_size + 2 * $self->byte_size + $txn * ($self->byte_size + $STALE_SIZE),
                                 $self->byte_size,
                             ),
                         );
@@ -1673,55 +1687,50 @@ sub get_classname {
     return $self->engine->_load_sector( $class_offset )->data;
 }
 
-#XXX Add singleton handling here
-{
-    my %cache;
-    # XXX This is insufficient
-#    sub _clear_cache { %cache = (); }
-    sub data {
-        my $self = shift;
+sub data {
+    my $self = shift;
 
-#        unless ( $cache{ $self->offset } ) {
-            my $new_obj = DBM::Deep->new({
-                type        => $self->type,
-                base_offset => $self->offset,
-                staleness   => $self->staleness,
-                storage     => $self->engine->storage,
-                engine      => $self->engine,
-            });
+    unless ( $self->engine->cache->{ $self->offset } ) {
+        my $new_obj = DBM::Deep->new({
+            type        => $self->type,
+            base_offset => $self->offset,
+            staleness   => $self->staleness,
+            storage     => $self->engine->storage,
+            engine      => $self->engine,
+        });
 
-            if ( $self->engine->storage->{autobless} ) {
-                my $classname = $self->get_classname;
-                if ( defined $classname ) {
-                    bless $new_obj, $classname;
-                }
+        if ( $self->engine->storage->{autobless} ) {
+            my $classname = $self->get_classname;
+            if ( defined $classname ) {
+                bless $new_obj, $classname;
             }
-
-            $cache{$self->offset} = $new_obj;
-#        }
-        return $cache{$self->offset};
-    }
-
-    sub free {
-        my $self = shift;
-
-        # We're not ready to be removed yet.
-        if ( $self->decrement_refcount > 0 ) {
-            return;
         }
 
-        # Rebless the object into DBM::Deep::Null.
-#        %{$cache{ $self->offset }} = ();
-#        bless $cache{$self->offset}, 'DBM::Deep::Null';
-
-        my $blist_loc = $self->get_blist_loc;
-        $self->engine->_load_sector( $blist_loc )->free if $blist_loc;
-
-        my $class_loc = $self->get_class_offset;
-        $self->engine->_load_sector( $class_loc )->free if $class_loc;
-
-        $self->SUPER::free();
+        $self->engine->cache->{$self->offset} = $new_obj;
     }
+    return $self->engine->cache->{$self->offset};
+}
+
+sub free {
+    my $self = shift;
+
+    # We're not ready to be removed yet.
+    if ( $self->decrement_refcount > 0 ) {
+        return;
+    }
+
+    # Rebless the object into DBM::Deep::Null.
+    %{ $self->engine->cache->{ $self->offset } } = ();
+    bless $self->engine->cache->{ $self->offset }, 'DBM::Deep::Null';
+    delete $self->engine->cache->{ $self->offset };
+
+    my $blist_loc = $self->get_blist_loc;
+    $self->engine->_load_sector( $blist_loc )->free if $blist_loc;
+
+    my $class_loc = $self->get_class_offset;
+    $self->engine->_load_sector( $class_loc )->free if $class_loc;
+
+    $self->SUPER::free();
 }
 
 sub increment_refcount {
@@ -1828,10 +1837,19 @@ sub free {
         my $l = unpack( $StP{$e->byte_size}, substr( $rest, $e->hash_size, $e->byte_size ) );
         my $s = $e->_load_sector( $l ); $s->free if $s;
 
-        foreach my $txn ( 0 .. $e->num_txns - 1 ) {
+        # Delete the HEAD sector
+        $l = unpack( $StP{$e->byte_size},
+            substr( $rest,
+                $e->hash_size + $e->byte_size,
+                $e->byte_size,
+            ),
+        );
+        $s = $e->_load_sector( $l ); $s->free if $s;
+
+        foreach my $txn ( 0 .. $e->num_txns - 2 ) {
             my $l = unpack( $StP{$e->byte_size},
                 substr( $rest,
-                    $e->hash_size + $e->byte_size + $txn * ($e->byte_size + $STALE_SIZE),
+                    $e->hash_size + 2 * $e->byte_size + $txn * ($e->byte_size + $STALE_SIZE),
                     $e->byte_size,
                 ),
             );
@@ -2208,10 +2226,11 @@ sub set_entry {
 package DBM::Deep::Null;
 
 use overload
-    'bool'   => sub { undef},
+    'bool'   => sub { undef },
     '""'     => sub { undef },
-    '0+'     => sub { undef},
-    fallback => 1;
+    '0+'     => sub { undef },
+    fallback => 1,
+    nomethod => 'AUTOLOAD';
 
 sub AUTOLOAD { return; }
 

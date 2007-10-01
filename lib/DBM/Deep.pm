@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0004);
+our $VERSION = q(1.0005);
 
 use Fcntl qw( :flock );
 
@@ -16,6 +16,10 @@ use Scalar::Util ();
 
 use DBM::Deep::Engine;
 use DBM::Deep::File;
+
+use overload
+    '""' => sub { overload::StrVal( $_[0] ) },
+    fallback => 1;
 
 ##
 # Setup constants for users to pass to new()
@@ -251,7 +255,7 @@ sub optimize {
     );
 
     $self->lock();
-    #DBM::Deep::Engine::Sector::Reference->_clear_cache;
+    $self->_engine->clear_cache;
     $self->_copy_node( $db_temp );
     undef $db_temp;
 

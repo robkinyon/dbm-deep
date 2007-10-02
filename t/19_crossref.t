@@ -40,12 +40,12 @@ SKIP: {
     ##
     # Create structure in $db
     ##
-    $db->import(
+    $db->import({
         hash1 => {
             subkey1 => "subvalue1",
             subkey2 => "subvalue2",
         }
-    );
+    });
     is( $db->{hash1}{subkey1}, 'subvalue1', "Value imported correctly" );
     is( $db->{hash1}{subkey2}, 'subvalue2', "Value imported correctly" );
 

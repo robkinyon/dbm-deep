@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0005);
+our $VERSION = q(1.0006);
 
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative
@@ -20,16 +20,7 @@ sub _get_self {
     eval { local $SIG{'__DIE__'}; tied( @{$_[0]} ) } || $_[0]
 }
 
-sub _repr { shift;[ @_ ] }
-
-sub _import {
-    my $self = shift;
-    my ($struct) = @_;
-
-    $self->push( @$struct );
-
-    return 1;
-}
+sub _repr { [] }
 
 sub TIEARRAY {
     my $class = shift;

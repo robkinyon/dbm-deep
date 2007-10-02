@@ -7,11 +7,10 @@ my $build = Module::Build->new(
     license => 'perl',
     requires => {
         'perl'              => '5.006_000',
-        'Clone'             => '0.01',
-        'Digest::MD5'       => '1.00',
         'Fcntl'             => '0.01',
-        'FileHandle::Fmode' => '0.05',
         'Scalar::Util'      => '1.14',
+        'Digest::MD5'       => '1.00',
+        'FileHandle::Fmode' => '0.05',
     },
     optional => {
     },
@@ -26,7 +25,7 @@ my $build = Module::Build->new(
     },
     create_makefile_pl => 'traditional',
     add_to_cleanup => [
-        'META.yml', '*.bak', '*.gz', 'Makefile.PL', 't/test*.db', 'cover_db',
+        'META.yml', '*.bak', '*.gz', 'Makefile.PL', 'cover_db',
     ],
     test_files => 't/??_*.t',
 );

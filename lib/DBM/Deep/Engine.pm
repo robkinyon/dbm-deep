@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0005);
+our $VERSION = q(1.0006);
 
 use Scalar::Util ();
 
@@ -1720,7 +1720,8 @@ sub free {
     }
 
     # Rebless the object into DBM::Deep::Null.
-    %{ $self->engine->cache->{ $self->offset } } = ();
+    eval { %{ $self->engine->cache->{ $self->offset } } = (); };
+    eval { @{ $self->engine->cache->{ $self->offset } } = (); };
     bless $self->engine->cache->{ $self->offset }, 'DBM::Deep::Null';
     delete $self->engine->cache->{ $self->offset };
 

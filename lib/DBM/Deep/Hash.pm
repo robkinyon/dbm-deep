@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0005);
+our $VERSION = q(1.0006);
 
 use base 'DBM::Deep';
 
@@ -13,19 +13,7 @@ sub _get_self {
     eval { local $SIG{'__DIE__'}; tied( %{$_[0]} ) } || $_[0]
 }
 
-#XXX Need to add a check here for @_ % 2
-sub _repr { shift;return { @_ } }
-
-sub _import {
-    my $self = shift;
-    my ($struct) = @_;
-
-    foreach my $key (keys %$struct) {
-        $self->put($key, $struct->{$key});
-    }
-
-    return 1;
-}
+sub _repr { return {} }
 
 sub TIEHASH {
     ##

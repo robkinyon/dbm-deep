@@ -33,7 +33,7 @@ my $db = DBM::Deep->new({
 ##
 # Create structure in DB
 ##
-$db->import( %struct );
+$db->import( \%struct );
 
 ##
 # Export entire thing

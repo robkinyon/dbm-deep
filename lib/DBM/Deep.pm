@@ -5,11 +5,10 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0005);
+our $VERSION = q(1.0006);
 
 use Fcntl qw( :flock );
 
-use Clone ();
 use Digest::MD5 ();
 use FileHandle::Fmode ();
 use Scalar::Util ();
@@ -202,28 +201,84 @@ sub export {
     return $temp;
 }
 
+sub _check_legality {
+    my $self = shift;
+    my ($val) = @_;
+
+    my $r = Scalar::Util::reftype( $val );
+
+    return $r if !defined $r || '' eq $r;
+    return $r if 'HASH' eq $r;
+    return $r if 'ARRAY' eq $r;
+
+    DBM::Deep->_throw_error(
+        "Storage of references of type '$r' is not supported."
+    );
+}
+
 sub import {
-    ##
-    # Recursively import Perl hash/array structure
-    ##
-    if (!ref($_[0])) { return; } # Perl calls import() on use -- ignore
+    # Perl calls import() on use -- ignore
+    return if !ref $_[0];
 
     my $self = shift->_get_self;
     my ($struct) = @_;
 
-    # struct is not a reference, so just import based on our type
-    if (!ref($struct)) {
-        $struct = $self->_repr( @_ );
+    my $type = $self->_check_legality( $struct );
+    if ( !$type ) {
+        DBM::Deep->_throw_error( "Cannot import a scalar" );
     }
 
-    #XXX This isn't the best solution. Better would be to use Data::Walker,
-    #XXX but that's a lot more thinking than I want to do right now.
-    eval {
-        local $SIG{'__DIE__'};
-        $self->_import( Clone::clone( $struct ) );
-    }; if ( my $e = $@ ) {
-        die $e;
+    if ( substr( $type, 0, 1 ) ne $self->_type ) {
+        DBM::Deep->_throw_error(
+            "Cannot import " . ('HASH' eq $type ? 'a hash' : 'an array')
+            . " into " . ('HASH' eq $type ? 'an array' : 'a hash')
+        );
     }
+
+    my %seen;
+    my $recurse;
+    $recurse = sub {
+        my ($db, $val) = @_;
+
+        my $obj = 'HASH' eq Scalar::Util::reftype( $db ) ? tied(%$db) : tied(@$db);
+        $obj ||= $db;
+
+        my $r = $self->_check_legality( $val );
+        if ( 'HASH' eq $r ) {
+            while ( my ($k, $v) = each %$val ) {
+                my $r = $self->_check_legality( $v );
+                if ( $r ) {
+                    my $temp = 'HASH' eq $r ? {} : [];
+                    if ( my $c = Scalar::Util::blessed( $v ) ) {
+                        bless $temp, $c;
+                    }
+                    $obj->put( $k, $temp );
+                    $recurse->( $temp, $v );
+                }
+                else {
+                    $obj->put( $k, $v );
+                }
+            }
+        }
+        elsif ( 'ARRAY' eq $r ) {
+            foreach my $k ( 0 .. $#$val ) {
+                my $v = $val->[$k];
+                my $r = $self->_check_legality( $v );
+                if ( $r ) {
+                    my $temp = 'HASH' eq $r ? {} : [];
+                    if ( my $c = Scalar::Util::blessed( $v ) ) {
+                        bless $temp, $c;
+                    }
+                    $obj->put( $k, $temp );
+                    $recurse->( $temp, $v );
+                }
+                else {
+                    $obj->put( $k, $v );
+                }
+            }
+        }
+    };
+    $recurse->( $self, $struct );
 
     return 1;
 }
@@ -244,6 +299,7 @@ sub optimize {
 
     #XXX Do we have to lock the tempfile?
 
+    #XXX Should we use tempfile() here instead of a hard-coded name?
     my $db_temp = DBM::Deep->new(
         file => $self->_storage->{file} . '.tmp',
         type => $self->_type,

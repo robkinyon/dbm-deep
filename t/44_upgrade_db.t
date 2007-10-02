@@ -13,7 +13,7 @@ BEGIN {
     }
 }
 
-plan tests => 212;
+plan tests => 222;
 
 use t::common qw( new_fh );
 use File::Spec;
@@ -63,7 +63,7 @@ my @output_versions = (
     '0.981', '0.982', '0.983',
     '0.99_01', '0.99_02', '0.99_03', '0.99_04',
     '1.00', '1.000', '1.0000', '1.0001', '1.0002',
-    '1.0003', '1.0004', '1.0005',
+    '1.0003', '1.0004', '1.0005', '1.0006',
 );
 
 foreach my $input_filename (
@@ -83,6 +83,15 @@ foreach my $input_filename (
             "-output $output_filename",
             "-version $v",
         );
+
+        # Clone was removed as a requirement in 1.0006
+        if ( $output =~ /Can\'t locate Clone\.pm in \@INC/ ) {
+            ok( 1 );
+            unless ( $input_filename =~ /_/ || $v =~ /_/ ) {
+                ok( 1 ); ok( 1 );
+            }
+            next;
+        }
 
         if ( $input_filename =~ /_/ ) {
             is(
@@ -117,7 +126,7 @@ foreach my $input_filename (
             eval "use DBM::Deep::10002";
             $db = DBM::Deep::10002->new( $output_filename );
         }
-        elsif ( $v =~ /^1\.000[3-5]/ ) {
+        elsif ( $v =~ /^1\.000[3-6]/ ) {
             push @INC, 'lib';
             eval "use DBM::Deep";
             $db = DBM::Deep->new( $output_filename );

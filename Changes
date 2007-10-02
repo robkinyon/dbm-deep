@@ -1,5 +1,15 @@
 Revision history for DBM::Deep.
 
+1.0006 Oct 01 23:15:00 2007 EDT
+    - (This version is compatible with 1.0005)
+    - Removed Clone and replaced it with a hand-written datastructure walker.
+      - This greatly reduces the footprint of a large import
+      - This bypasses a failure of Clone under Perl 5.9.5
+      - Moved t/37_delete_edge_cases.t to t_attic because it wasn't really used
+    - import() has a stricter API now. This is a potentially incompatible API
+      change. Only HASH and ARRAY refs are now allowed and they must match the type
+      of the object being imported into.
+
 1.0005 Oct 01 11:15:00 2007 EDT
     - (This version is compatible with 1.0004)
     - Added proper singleton support. This means that the following now works:

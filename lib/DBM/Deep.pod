@@ -387,16 +387,26 @@ value.
 
 =item * lock() / unlock()
 
-q.v. Locking.
+q.v. L</LOCKING> for more info.
 
 =item * optimize()
 
-Recover lost disk space. This is important to do, especially if you use
-transactions.
+This will compress the datafile so that it takes up as little space as possible.
+There is a freespace manager so that when space is freed up, it is used before
+extending the size of the datafile. But, that freespace just sits in the datafile
+unless C<optimize()> is called.
 
-=item * import() / export()
+=item * import()
 
-Data going in and out.
+Unlike simple assignment, C<import()> does not tie the right-hand side. Instead,
+a copy of your data is put into the DB. C<import()> takes either an arrayref (if
+your DB is an array) or a hashref (if your DB is a hash). C<import()> will die
+if anything else is passed in.
+
+=item * export()
+
+This returns a complete copy of the data structure at the point you do the export.
+This copy is in RAM, not on disk like the DB is.
 
 =item * begin_work() / commit() / rollback()
 
@@ -1027,12 +1037,12 @@ B<Devel::Cover> report on this distribution's test suite.
   ------------------------------------------ ------ ------ ------ ------ ------
   File                                         stmt   bran   cond    sub  total
   ------------------------------------------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm                         96.9   88.3   90.5  100.0   95.7
+  blib/lib/DBM/Deep.pm                         97.2   90.9   83.3  100.0   95.4
   blib/lib/DBM/Deep/Array.pm                  100.0   95.7  100.0  100.0   99.0
-  blib/lib/DBM/Deep/Engine.pm                  95.5   84.7   81.6   98.4   92.4
+  blib/lib/DBM/Deep/Engine.pm                  95.6   84.7   81.6   98.4   92.5
   blib/lib/DBM/Deep/File.pm                    97.2   81.6   66.7  100.0   91.9
   blib/lib/DBM/Deep/Hash.pm                   100.0  100.0  100.0  100.0  100.0
-  Total                                        96.7   87.0   83.3   99.2   94.1
+  Total                                        96.7   87.5   82.2   99.2   94.1
   ------------------------------------------ ------ ------ ------ ------ ------
 
 =head1 MORE INFORMATION

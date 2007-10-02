@@ -2,11 +2,48 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 11;
+use Test::More tests => 17;
 use Test::Deep;
+use Test::Exception;
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
+
+# Failure cases to make sure that things are caught right.
+foreach my $type ( DBM::Deep->TYPE_HASH, DBM::Deep->TYPE_ARRAY ) {
+    my ($fh, $filename) = new_fh();
+    my $db = DBM::Deep->new({
+        file => $filename,
+        type => $type,
+    });
+
+    # Load a scalar
+    throws_ok {
+        $db->import( 'foo' );
+    } qr/Cannot import a scalar/, "Importing a scalar to type '$type' fails";
+
+    # Load a ref of the wrong type
+    # Load something with bad stuff in it
+    my $x = 3;
+    if ( $type eq 'A' ) {
+        throws_ok {
+            $db->import( { foo => 'bar' } );
+        } qr/Cannot import a hash into an array/, "Wrong type fails";
+
+        throws_ok {
+            $db->import( [ \$x ] );
+        } qr/Storage of references of type 'SCALAR' is not supported/, "Bad stuff fails";
+    }
+    else {
+        throws_ok {
+            $db->import( [ 1 .. 3 ] );
+        } qr/Cannot import an array into a hash/, "Wrong type fails";
+
+        throws_ok {
+            $db->import( { foo => \$x } );
+        } qr/Storage of references of type 'SCALAR' is not supported/, "Bad stuff fails";
+    }
+}
 
 {
     my ($fh, $filename) = new_fh();
@@ -25,7 +62,7 @@ use_ok( 'DBM::Deep' );
         hash1 => {
             subkey1 => "subvalue1",
             subkey2 => "subvalue2",
-            subkey3 => bless( {}, 'Foo' ),
+            subkey3 => bless( { a => 'b' }, 'Foo' ),
         }
     };
 
@@ -40,7 +77,7 @@ use_ok( 'DBM::Deep' );
             hash1 => {
                 subkey1 => "subvalue1",
                 subkey2 => "subvalue2",
-                subkey3 => useclass( bless {}, 'Foo' ),
+                subkey3 => useclass( bless { a => 'b' }, 'Foo' ),
             },
         }),
         "Everything matches",
@@ -56,9 +93,6 @@ use_ok( 'DBM::Deep' );
 }
 
 {
-    diag "\nThere seems to be a bug in Clone on Perl 5.9+ that is causing\nthese tests to fail."
-        if $] >= 5.009;
-
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new({
         file => $filename,

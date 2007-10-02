@@ -28,7 +28,7 @@ my %is_dev = (
 my %opts = (
   man => 0,
   help => 0,
-  version => '1.0005',
+  version => '1.0006',
   autobless => 1,
 );
 GetOptions( \%opts,
@@ -58,6 +58,9 @@ my %db;
 
   my $mod = $headerver_to_module{ $ver };
   eval "use $mod;";
+  if ( $@ ) {
+      _exit( "Cannot load '$mod' to read header version '$ver':\n\t$@" );
+  }
   $db{input} = $mod->new({
     file      => $opts{input},
     locking   => 1,
@@ -77,7 +80,7 @@ my %db;
   elsif ( $ver =~ /^1\.000?[0-2]?/) {
     $ver = 2;
   }
-  elsif ( $ver =~ /^1\.000[3-5]/) {
+  elsif ( $ver =~ /^1\.000[3-6]/) {
     $ver = 3;
   }
   else {
@@ -93,6 +96,9 @@ my %db;
 
   my $mod = $headerver_to_module{ $ver };
   eval "use $mod;";
+  if ( $@ ) {
+      _exit( "Cannot load '$mod' to read header version '$ver':\n\t$@" );
+  }
   $db{output} = $mod->new({
     file      => $opts{output},
     locking   => 1,

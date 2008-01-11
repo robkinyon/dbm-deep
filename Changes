@@ -1,5 +1,17 @@
 Revision history for DBM::Deep.
 
+1.0007 Jan 10 00:00:00 2008 EDT
+    - (This version is compatible with 1.0006)
+    - Applied a patch+failing test submitted by sprout@cpan.org. Thanks!
+      - Turns out that the case of 17 keys with the same first character in the
+        MD5 hash wasn't being tested for. This was a crashbug.
+    - A fix has been made to upgrade_db.pl (RT# 30067)
+      - The version determinations were in the wrong order or evaluation. This
+        meant that upgrade_db.pl wouldn't work as expected (or at all).
+    - Added a minimum Pod::Usage requirement (RT# 29976)
+      - It's an optional item in Build.PL
+      - utils/upgrade_db.pl now checks for that version, as does the test.
+
 1.0006 Oct 01 23:15:00 2007 EDT
     - (This version is compatible with 1.0005)
     - Removed Clone and replaced it with a hand-written datastructure walker.

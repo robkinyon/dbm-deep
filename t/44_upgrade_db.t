@@ -5,7 +5,7 @@ use Test::More;
 # Add skips here
 BEGIN {
     my @failures;
-    eval { use Pod::Usage; }; push @failures, 'Pod::Usage' if $@;
+    eval { use Pod::Usage 1.3; }; push @failures, 'Pod::Usage' if $@;
     eval { use IO::Scalar; }; push @failures, 'IO::Scalar' if $@;
     if ( @failures ) {
         my $missing = join ',', @failures;
@@ -13,7 +13,7 @@ BEGIN {
     }
 }
 
-plan tests => 222;
+plan tests => 232;
 
 use t::common qw( new_fh );
 use File::Spec;
@@ -48,6 +48,8 @@ is(
     "Input is not a DBM::Deep file",
 );
 
+unlink $input_filename;unlink $output_filename;
+
 # All files are of the form:
 #   $db->{foo} = [ 1 .. 3 ];
 
@@ -63,7 +65,7 @@ my @output_versions = (
     '0.981', '0.982', '0.983',
     '0.99_01', '0.99_02', '0.99_03', '0.99_04',
     '1.00', '1.000', '1.0000', '1.0001', '1.0002',
-    '1.0003', '1.0004', '1.0005', '1.0006',
+    '1.0003', '1.0004', '1.0005', '1.0006', '1.0007',
 );
 
 foreach my $input_filename (
@@ -116,20 +118,20 @@ foreach my $input_filename (
         die "$output\n" if $output;
 
         my $db;
-        if ( $v =~ /^0/ ) {
-            push @INC, File::Spec->catdir( 'utils', 'lib' );
-            eval "use DBM::Deep::09830";
-            $db = DBM::Deep::09830->new( $output_filename );
+        if ( $v =~ /^1\.000[3-7]/ ) {
+            push @INC, 'lib';
+            eval "use DBM::Deep";
+            $db = DBM::Deep->new( $output_filename );
         }
         elsif ( $v =~ /^1\.000?[0-2]?/ ) {
             push @INC, File::Spec->catdir( 'utils', 'lib' );
             eval "use DBM::Deep::10002";
             $db = DBM::Deep::10002->new( $output_filename );
         }
-        elsif ( $v =~ /^1\.000[3-6]/ ) {
-            push @INC, 'lib';
-            eval "use DBM::Deep";
-            $db = DBM::Deep->new( $output_filename );
+        elsif ( $v =~ /^0/ ) {
+            push @INC, File::Spec->catdir( 'utils', 'lib' );
+            eval "use DBM::Deep::09830";
+            $db = DBM::Deep::09830->new( $output_filename );
         }
         else {
             die "How did we get here?!\n";

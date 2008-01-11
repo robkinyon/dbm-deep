@@ -13,7 +13,7 @@ use lib File::Spec->catdir( $FindBin::Bin, 'lib' );
 use lib File::Spec->catdir( $FindBin::Bin, '..', 'lib' );
 
 use Getopt::Long qw( GetOptions );
-use Pod::Usage;
+use Pod::Usage 1.3;
 
 my %headerver_to_module = (
   '0' => 'DBM::Deep::09830',
@@ -28,7 +28,7 @@ my %is_dev = (
 my %opts = (
   man => 0,
   help => 0,
-  version => '1.0006',
+  version => '1.0007',
   autobless => 1,
 );
 GetOptions( \%opts,
@@ -71,17 +71,17 @@ my %db;
 
 {
   my $ver = $opts{version};
-  if ( $ver =~ /^0\.9[1-8]/ ) {
-    $ver = 0;
-  }
-  elsif ( $ver =~ /^0\.99/) { 
-    $ver = 1;
+  if ( $ver =~ /^1\.000[3-7]/) {
+    $ver = 3;
   }
   elsif ( $ver =~ /^1\.000?[0-2]?/) {
     $ver = 2;
   }
-  elsif ( $ver =~ /^1\.000[3-6]/) {
-    $ver = 3;
+  elsif ( $ver =~ /^0\.99/) { 
+    $ver = 1;
+  }
+  elsif ( $ver =~ /^0\.9[1-8]/ ) {
+    $ver = 0;
   }
   else {
     _exit( "'$ver' is an unrecognized version." );

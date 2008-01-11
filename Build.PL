@@ -13,6 +13,7 @@ my $build = Module::Build->new(
         'FileHandle::Fmode' => '0.05',
     },
     optional => {
+        'Pod::Usage'        => '1.3',
     },
     build_requires => {
         'File::Path'      => '0.01',

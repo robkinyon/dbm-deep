@@ -1,4 +1,5 @@
-package t::common;
+package # Hide from PAUSE
+    t::common;
 
 use 5.006_000;
 
@@ -18,6 +19,7 @@ use Fcntl qw( :flock );
 
 my $parent = $ENV{WORK_DIR} || File::Spec->tmpdir;
 my $dir = tempdir( CLEANUP => 1, DIR => $parent );
+#my $dir = tempdir( DIR => '.' );
 
 sub new_fh {
     my ($fh, $filename) = tempfile( 'tmpXXXX', DIR => $dir );
@@ -30,4 +32,3 @@ sub new_fh {
 
 1;
 __END__
-

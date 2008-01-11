@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0006);
+our $VERSION = q(1.0007);
 
 use Scalar::Util ();
 
@@ -1599,7 +1599,12 @@ sub get_bucket_list {
     $sector->find_md5( $args->{key_md5} );
 
     # See whether or not we need to reindex the bucketlist
-    if ( !$sector->has_md5 && $args->{create} && $sector->{idx} == -1 ) {
+    # Yes, the double-braces are there for a reason. if() doesn't create a redo-able block,
+    # so we have to create a bare block within the if() for redo-purposes. Patch and idea
+    # submitted by sprout@cpan.org. -RobK, 2008-01-09
+    if ( !$sector->has_md5 && $args->{create} && $sector->{idx} == -1 ) {{
+        my $redo;
+
         my $new_index = DBM::Deep::Engine::Sector::Index->new({
             engine => $engine,
         });
@@ -1625,23 +1630,48 @@ sub get_bucket_list {
         # Handle the new item separately.
         {
             my $idx = ord( substr( $args->{key_md5}, $i, 1 ) );
-            my $blist = $blist_cache{$idx}
-                ||= DBM::Deep::Engine::Sector::BucketList->new({
-                    engine => $engine,
+
+            # If all the previous blist's items have been thrown into one
+            # blist and the new item belongs in there too, we need
+            # another index.
+            if ( keys %blist_cache == 1 and each %blist_cache == $idx ) {
+                ++$i, ++$redo;
+            } else {
+                my $blist = $blist_cache{$idx}
+                    ||= DBM::Deep::Engine::Sector::BucketList->new({
+                        engine => $engine,
+                    });
+    
+                $new_index->set_entry( $idx => $blist->offset );
+    
+                #XXX THIS IS HACKY!
+                $blist->find_md5( $args->{key_md5} );
+                $blist->write_md5({
+                    key     => $args->{key},
+                    key_md5 => $args->{key_md5},
+                    value   => DBM::Deep::Engine::Sector::Null->new({
+                        engine => $engine,
+                        data   => undef,
+                    }),
                 });
-
-            $new_index->set_entry( $idx => $blist->offset );
-
-            #XXX THIS IS HACKY!
-            $blist->find_md5( $args->{key_md5} );
-            $blist->write_md5({
-                key     => $args->{key},
-                key_md5 => $args->{key_md5},
-                value   => DBM::Deep::Engine::Sector::Null->new({
-                    engine => $engine,
-                    data   => undef,
-                }),
-            });
+            }
+#            my $blist = $blist_cache{$idx}
+#                ||= DBM::Deep::Engine::Sector::BucketList->new({
+#                    engine => $engine,
+#                });
+#
+#            $new_index->set_entry( $idx => $blist->offset );
+#
+#            #XXX THIS IS HACKY!
+#            $blist->find_md5( $args->{key_md5} );
+#            $blist->write_md5({
+#                key     => $args->{key},
+#                key_md5 => $args->{key_md5},
+#                value   => DBM::Deep::Engine::Sector::Null->new({
+#                    engine => $engine,
+#                    data   => undef,
+#                }),
+#            });
         }
 
         if ( $last_sector ) {
@@ -1658,9 +1688,15 @@ sub get_bucket_list {
         $sector->clear;
         $sector->free;
 
+        if ( $redo ) {
+            (undef, $sector) = %blist_cache;
+            $last_sector = $new_index;
+            redo;
+        }
+
         $sector = $blist_cache{ ord( substr( $args->{key_md5}, $i, 1 ) ) };
         $sector->find_md5( $args->{key_md5} );
-    }
+    }}
 
     return $sector;
 }

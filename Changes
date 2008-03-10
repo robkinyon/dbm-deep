@@ -1,5 +1,17 @@
 Revision history for DBM::Deep.
 
+1.0008 Mar 09 20:00:00 2008 EDT
+    - (This version is compatible with 1.0007)
+    - Fixed a number of Win32 issues (Reported by Steven Samelson - thank you!)
+        - Much thanks to Nigel Sandever and David Golden for their help
+          debugging the issues, particularly with DBM::Deep's usage of
+          File::Temp (which removes a number of warnings).
+        - Autovivification now works on Win32. It turns out that when a
+          process takes a shared flock on a file, it's not allowed to write to
+          it under Win32, unlike *nix. This is probably a good catch.
+            - Note: The fix is a hack. All locks are now exclusive until a
+              better fix is found.
+
 1.0007 Jan 10 00:00:00 2008 EDT
     - (This version is compatible with 1.0006)
     - Applied a patch+failing test submitted by sprout@cpan.org. Thanks!

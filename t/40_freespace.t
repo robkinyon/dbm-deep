@@ -12,6 +12,7 @@ use_ok( 'DBM::Deep' );
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new({
         file => $filename,
+        fh => $fh,
         autoflush => 1,
     });
 
@@ -63,6 +64,7 @@ use_ok( 'DBM::Deep' );
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new({
         file => $filename,
+        fh => $fh,
         autoflush => 1,
     });
 
@@ -74,7 +76,7 @@ use_ok( 'DBM::Deep' );
     # trigger a reindex. This requires knowing how much space is taken. Good thing
     # we wrote this dreck ...
     my $size = -s $filename;
-    
+
     my $data_sector_size = $db->_engine->data_sector_size;
     my $expected = $size + 9 * ( 2 * $data_sector_size );
 

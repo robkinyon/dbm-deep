@@ -4,6 +4,9 @@ use Test::More;
 
 # Add skips here
 BEGIN {
+    plan skip_all => "Skipping the upgrade_db.pl tests on Win32/cygwin for now."
+        if ( $^O eq 'MSWin32' || $^O eq 'cygwin' );
+
     my @failures;
     eval { use Pod::Usage 1.3; }; push @failures, 'Pod::Usage' if $@;
     eval { use IO::Scalar; }; push @failures, 'IO::Scalar' if $@;

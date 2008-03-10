@@ -10,8 +10,9 @@ use_ok( 'DBM::Deep' );
 
 my ($fh, $filename) = new_fh();
 my $db = DBM::Deep->new(
-	file => $filename,
-	type => DBM::Deep->TYPE_ARRAY
+    file => $filename,
+    fh => $fh,
+    type => DBM::Deep->TYPE_ARRAY
 );
 
 ##
@@ -62,7 +63,7 @@ is( $db->fetch(4), 'elem4.1' );
 
 throws_ok {
     $db->[-6] = 'whoops!';
-} qr/Modification of non-creatable array value attempted, subscript -6/, "Correct error thrown"; 
+} qr/Modification of non-creatable array value attempted, subscript -6/, "Correct error thrown";
 
 my $popped = $db->pop;
 is( $db->length, 4, "... and we have four after popping" );
@@ -251,6 +252,7 @@ throws_ok {
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new(
         file => $filename,
+        fh => $fh,
         type => DBM::Deep->TYPE_ARRAY
     );
 

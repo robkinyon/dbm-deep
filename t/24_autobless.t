@@ -16,6 +16,7 @@ my ($fh, $filename) = new_fh();
 {
     my $db = DBM::Deep->new(
         file     => $filename,
+        fh => $fh,
         autobless => 1,
     );
 
@@ -52,6 +53,7 @@ my ($fh, $filename) = new_fh();
     is( $db->{unblessed}{b}[2], 3 );
 
     $db->{blessed_long} = bless {}, 'a' x 1000;
+    $db->_get_self->_storage->close( $db->_get_self );
 }
 
 {
@@ -87,6 +89,7 @@ my ($fh, $filename) = new_fh();
     is( $db->{blessed}{c}, 'new' );
 
     isa_ok( $db->{blessed_long}, 'a' x 1000 );
+    $db->_get_self->_storage->close( $db->_get_self );
 }
 
 {
@@ -98,7 +101,7 @@ my ($fh, $filename) = new_fh();
 
     my $structure = $db->export();
     use Data::Dumper;print Dumper $structure;
-    
+
     my $obj = $structure->{blessed};
     isa_ok( $obj, 'Foo' );
     can_ok( $obj, 'export', 'foo' );
@@ -121,6 +124,7 @@ my ($fh, $filename) = new_fh();
     is( $structure->{unblessed}{b}[0], 1 );
     is( $structure->{unblessed}{b}[1], 2 );
     is( $structure->{unblessed}{b}[2], 3 );
+    $db->_get_self->_storage->close( $db->_get_self );
 }
 
 {
@@ -151,6 +155,7 @@ my ($fh, $filename) = new_fh();
     is( $db->{unblessed}{b}[0], 1 );
     is( $db->{unblessed}{b}[1], 2 );
     is( $db->{unblessed}{b}[2], 3 );
+    $db->_get_self->_storage->close( $db->_get_self );
 }
 
 {
@@ -158,6 +163,7 @@ my ($fh, $filename) = new_fh();
     {
         my $db = DBM::Deep->new(
             file     => $filename2,
+            fh => $fh2,
             autobless => 1,
         );
         my $obj = bless {
@@ -166,6 +172,7 @@ my ($fh, $filename) = new_fh();
         }, 'Foo';
 
         $db->import( { blessed => $obj } );
+        $db->_get_self->_storage->close( $db->_get_self );
     }
 
     {
@@ -177,18 +184,20 @@ my ($fh, $filename) = new_fh();
         my $blessed = $db->{blessed};
         isa_ok( $blessed, 'Foo' );
         is( $blessed->{a}, 1 );
+        $db->_get_self->_storage->close( $db->_get_self );
     }
 }
 
 {
-	##
-	# test blessing hash into short named class (Foo), then re-blessing into
-	# longer named class (FooFoo) and replacing key in db file, then validating
-	# content after that point in file to check for corruption.
-	##
+    ##
+    # test blessing hash into short named class (Foo), then re-blessing into
+    # longer named class (FooFoo) and replacing key in db file, then validating
+    # content after that point in file to check for corruption.
+    ##
     my ($fh3, $filename3) = new_fh();
     my $db = DBM::Deep->new(
         file     => $filename3,
+        fh => $fh3,
         autobless => 1,
     );
 
@@ -196,9 +205,9 @@ my ($fh, $filename) = new_fh();
 
     $db->{blessed} = $obj;
     $db->{after} = "hello";
-    
+
     my $obj2 = bless {}, 'FooFoo';
-    
+
     $db->{blessed} = $obj2;
 
     is( $db->{after}, "hello" );

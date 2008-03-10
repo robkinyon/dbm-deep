@@ -211,7 +211,7 @@ cmp_bag( [ keys %$db1 ], [qw( foo z )], "DB1 keys correct" );
 cmp_bag( [ keys %$db2 ], [qw( foo z )], "DB2 keys correct" );
 
 SKIP: {
-    skip "Optimize tests skipped on Win32", 5
+    skip "Optimize tests skipped on Win32", 7
         if $^O eq 'MSWin32' || $^O eq 'cygwin';
 
     $db1->optimize;

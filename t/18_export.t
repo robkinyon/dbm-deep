@@ -27,6 +27,7 @@ my %struct = (
 my ($fh, $filename) = new_fh();
 my $db = DBM::Deep->new({
     file      => $filename,
+    fh => $fh,
     autobless => 1,
 });
 

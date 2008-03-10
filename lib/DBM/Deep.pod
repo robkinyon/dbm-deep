@@ -582,6 +582,12 @@ L<Fcntl/> module.
   # something here
   $db->unlock();
 
+=head2 Win32/Cygwin
+
+Due to Win32 actually enforcing the read-only status of a shared lock, all
+locks on Win32 and cygwin are exclusive. This is because of how autovivification
+currently works. Hopefully, this will go away in a future release.
+
 =head1 IMPORTING/EXPORTING
 
 You can import existing complex structures by calling the C<import()> method,
@@ -1031,8 +1037,8 @@ reference to be imported in order to explicitly leave it untied.
 
 =head1 CODE COVERAGE
 
-B<Devel::Cover> is used to test the code coverage of the tests. Below is the
-B<Devel::Cover> report on this distribution's test suite.
+L<Devel::Cover/> is used to test the code coverage of the tests. Below is the
+L<Devel::Cover/> report on this distribution's test suite.
 
   ------------------------------------------ ------ ------ ------ ------ ------
   File                                         stmt   bran   cond    sub  total

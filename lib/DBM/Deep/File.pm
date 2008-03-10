@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0007);
+our $VERSION = q(1.0008);
 
 use Fcntl qw( :DEFAULT :flock :seek );
 
@@ -110,7 +110,7 @@ sub print_at {
         seek( $fh, $loc + $self->{file_offset}, SEEK_SET );
     }
 
-    print( $fh @_ );
+    print( $fh @_ ) or die "Internal Error (print_at($loc)): $!\n";
 
     return 1;
 }
@@ -163,8 +163,17 @@ sub lock {
 
     $type = LOCK_EX unless defined $type;
 
+    #XXX This is a temporary fix for Win32 and autovivification. It
+    # needs to improve somehow. -RobK, 2008-03-09
+    if ( $^O eq 'MSWin32' || $^O eq 'cygwin' ) {
+        $type = LOCK_EX;
+    }
+
     if (!defined($self->{fh})) { return; }
 
+    #XXX This either needs to allow for upgrading a shared lock to an
+    # exclusive lock or something else with autovivification.
+    # -RobK, 2008-03-09
     if ($self->{locking}) {
         if (!$self->{locked}) {
             flock($self->{fh}, $type);

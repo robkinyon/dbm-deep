@@ -22,7 +22,7 @@ my $dir = tempdir( CLEANUP => 1, DIR => $parent );
 #my $dir = tempdir( DIR => '.' );
 
 sub new_fh {
-    my ($fh, $filename) = tempfile( 'tmpXXXX', DIR => $dir );
+    my ($fh, $filename) = tempfile( 'tmpXXXX', DIR => $dir, UNLINK => 1 );
 
     # This is because tempfile() returns a flock'ed $fh on MacOSX.
     flock $fh, LOCK_UN;

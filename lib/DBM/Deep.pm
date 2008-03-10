@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0007);
+our $VERSION = q(1.0008);
 
 use Fcntl qw( :flock );
 

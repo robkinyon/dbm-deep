@@ -9,7 +9,10 @@ use t::common qw( new_fh );
 use_ok( 'DBM::Deep' );
 
 my ($fh, $filename) = new_fh();
-my $db = DBM::Deep->new( $filename );
+my $db = DBM::Deep->new(
+    file => $filename,
+    fh => $fh,
+);
 
 ##
 # put/get key
@@ -112,7 +115,11 @@ is( $db->get("key1"), "value222222222222222222222222", "We set a value before cl
 # Make sure DB still works after closing / opening
 ##
 undef $db;
-$db = DBM::Deep->new( $filename );
+open $fh, '+<', $filename;
+$db = DBM::Deep->new(
+    file => $filename,
+    fh => $fh,
+);
 is( $db->get("key1"), "value222222222222222222222222", "The value we set is still there after closure" );
 
 ##

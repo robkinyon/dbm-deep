@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0007);
+our $VERSION = q(1.0008);
 
 use Scalar::Util ();
 
@@ -2121,6 +2121,7 @@ sub get_data_location_for {
     );
     my ($loc, $staleness) = unpack( $StP{$e->byte_size} . ' ' . $StP{$STALE_SIZE}, $buffer );
 
+    # XXX Merge the two if-clauses below
     if ( $args->{trans_id} ) {
         # We have found an entry that is old, so get rid of it
         if ( $staleness != (my $s = $e->get_txn_staleness_counter( $args->{trans_id} ) ) ) {
@@ -2141,6 +2142,7 @@ sub get_data_location_for {
             idx        => $args->{idx},
         });
     }
+
     return $loc <= 1 ? 0 : $loc;
 }
 

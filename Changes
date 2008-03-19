@@ -1,5 +1,11 @@
 Revision history for DBM::Deep.
 
+1.0009 Mar 19 12:00:00 2008 EDT
+    - (This version is compatible with 1.0008)
+    - Internal refactorings to prepare for some optimizations.
+        - _fh() has been removed. It was marked as private, so don't complain.
+    - Skip a test that was spuriously failing on Win32 (Thanks, Alias!)
+
 1.0008 Mar 09 20:00:00 2008 EDT
     - (This version is compatible with 1.0007)
     - Fixed a number of Win32 issues (Reported by Steven Samelson - thank you!)

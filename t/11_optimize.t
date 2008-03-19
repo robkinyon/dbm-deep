@@ -49,9 +49,9 @@ delete $db->{a}{b};
 ##
 # take byte count readings before, and after optimize
 ##
-my $before = (stat($db->_fh()))[7];
+my $before = (stat($filename))[7];
 my $result = $db->optimize();
-my $after = (stat($db->_fh()))[7];
+my $after = (stat($filename))[7];
 
 ok( $result, "optimize succeeded" );
 ok( $after < $before, "file size has shrunk" ); # make sure file shrunk

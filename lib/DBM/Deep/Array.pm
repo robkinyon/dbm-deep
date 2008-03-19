@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0008);
+our $VERSION = q(1.0009);
 
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative
@@ -137,6 +137,7 @@ sub EXISTS {
 sub DELETE {
     my $self = shift->_get_self;
     my ($key) = @_;
+    warn "ARRAY::DELETE($self,$key)\n" if DBM::Deep::DEBUG;
 
     $self->lock( $self->LOCK_EX );
 
@@ -257,6 +258,7 @@ sub _move_value {
 
 sub SHIFT {
     my $self = shift->_get_self;
+    warn "SHIFT($self)\n" if DBM::Deep::DEBUG;
 
     $self->lock( $self->LOCK_EX );
 
@@ -272,6 +274,7 @@ sub SHIFT {
     for (my $i = 0; $i < $length - 1; $i++) {
         $self->_move_value( $i+1, $i );
     }
+
     $self->DELETE( $length - 1 );
 
     $self->unlock;

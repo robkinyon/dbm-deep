@@ -18,7 +18,7 @@ my ($default, $small, $medium, $large);
     );
     $db->{key1} = "value1";
     $db->{key2} = "value2";
-    $default = (stat($db->_fh()))[7];
+    $default = (stat($filename))[7];
 }
 
 {
@@ -32,7 +32,7 @@ my ($default, $small, $medium, $large);
 
         $db->{key1} = "value1";
         $db->{key2} = "value2";
-        $medium = (stat($db->_fh()))[7];
+        $medium = (stat($filename))[7];
     }
 
     # This tests the header to verify that the pack_size is really there
@@ -59,7 +59,7 @@ my ($default, $small, $medium, $large);
 
         $db->{key1} = "value1";
         $db->{key2} = "value2";
-        $small = (stat($db->_fh()))[7];
+        $small = (stat($filename))[7];
     }
 
     # This tests the header to verify that the pack_size is really there
@@ -89,7 +89,7 @@ SKIP: {
 
         $db->{key1} = "value1";
         $db->{key2} = "value2";
-        $large = (stat($db->_fh()))[7];
+        $large = (stat($filename))[7];
     }
 
     # This tests the header to verify that the pack_size is really there

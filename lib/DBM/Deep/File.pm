@@ -5,9 +5,10 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0008);
+our $VERSION = q(1.0009);
 
 use Fcntl qw( :DEFAULT :flock :seek );
+use FileHandle::Fmode ();
 
 sub new {
     my $class = shift;
@@ -233,6 +234,23 @@ sub flush {
     select $old_fh;
 
     return 1;
+}
+
+sub is_writable {
+    my $self = shift;
+    return FileHandle::Fmode::is_W( $self->{fh} );
+}
+
+sub copy_stats {
+    my $self = shift;
+    my ($temp_filename) = @_;
+
+    my @stats = stat( $self->{fh} );
+    my $perms = $stats[2] & 07777;
+    my $uid = $stats[4];
+    my $gid = $stats[5];
+    chown( $uid, $gid, $temp_filename );
+    chmod( $perms, $temp_filename );
 }
 
 1;

@@ -5,12 +5,9 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0008);
+our $VERSION = q(1.0009);
 
 use Fcntl qw( :flock );
-
-use Digest::MD5 ();
-use FileHandle::Fmode ();
 use Scalar::Util ();
 
 use DBM::Deep::Engine;
@@ -19,6 +16,8 @@ use DBM::Deep::File;
 use overload
     '""' => sub { overload::StrVal( $_[0] ) },
     fallback => 1;
+
+use constant DEBUG => 0;
 
 ##
 # Setup constants for users to pass to new()
@@ -300,8 +299,9 @@ sub optimize {
     #XXX Do we have to lock the tempfile?
 
     #XXX Should we use tempfile() here instead of a hard-coded name?
+    my $temp_filename = $self->_storage->{file} . '.tmp';
     my $db_temp = DBM::Deep->new(
-        file => $self->_storage->{file} . '.tmp',
+        file => $temp_filename,
         type => $self->_type,
 
         # Bring over all the parameters that we need to bring over
@@ -318,12 +318,7 @@ sub optimize {
     ##
     # Attempt to copy user, group and permissions over to new file
     ##
-    my @stats = stat($self->_fh);
-    my $perms = $stats[2] & 07777;
-    my $uid = $stats[4];
-    my $gid = $stats[5];
-    chown( $uid, $gid, $self->_storage->{file} . '.tmp' );
-    chmod( $perms, $self->_storage->{file} . '.tmp' );
+    $self->_storage->copy_stats( $temp_filename );
 
     # q.v. perlport for more information on this variable
     if ( $^O eq 'MSWin32' || $^O eq 'cygwin' ) {
@@ -337,8 +332,8 @@ sub optimize {
         $self->_storage->close;
     }
 
-    if (!rename $self->_storage->{file} . '.tmp', $self->_storage->{file}) {
-        unlink $self->_storage->{file} . '.tmp';
+    if (!rename $temp_filename, $self->_storage->{file}) {
+        unlink $temp_filename;
         $self->unlock();
         $self->_throw_error("Optimize failed: Cannot copy temp file over original: $!");
     }
@@ -442,11 +437,6 @@ sub _staleness {
     return $self->{staleness};
 }
 
-sub _fh {
-    my $self = $_[0]->_get_self;
-    return $self->_storage->{fh};
-}
-
 ##
 # Utility methods
 ##
@@ -467,8 +457,9 @@ sub STORE {
     ##
     my $self = shift->_get_self;
     my ($key, $value) = @_;
+    warn "STORE($self, $key, $value)\n" if DEBUG;
 
-    if ( !FileHandle::Fmode::is_W( $self->_fh ) ) {
+    unless ( $self->_storage->is_writable ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
@@ -496,6 +487,7 @@ sub FETCH {
     ##
     my $self = shift->_get_self;
     my ($key) = @_;
+    warn "FETCH($self,$key)\n" if DEBUG;
 
     ##
     # Request shared lock for reading
@@ -519,8 +511,9 @@ sub DELETE {
     ##
     my $self = shift->_get_self;
     my ($key) = @_;
+    warn "DELETE($self,$key)\n" if DEBUG;
 
-    if ( !FileHandle::Fmode::is_W( $self->_fh ) ) {
+    unless ( $self->_storage->is_writable ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
@@ -549,6 +542,7 @@ sub EXISTS {
     ##
     my $self = shift->_get_self;
     my ($key) = @_;
+    warn "EXISTS($self,$key)\n" if DEBUG;
 
     ##
     # Request shared lock for reading
@@ -567,8 +561,9 @@ sub CLEAR {
     # Clear all keys from hash, or all elements from array.
     ##
     my $self = shift->_get_self;
+    warn "CLEAR($self)\n" if DEBUG;
 
-    if ( !FileHandle::Fmode::is_W( $self->_fh ) ) {
+    unless ( $self->_storage->is_writable ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 

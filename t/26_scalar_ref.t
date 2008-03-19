@@ -28,7 +28,7 @@ my $x = 25;
     'Storage of code refs not supported';
 
     throws_ok {
-        $db->{scalarref} = $db->_get_self->_fh;
+        $db->{scalarref} = $fh;
     } qr/Storage of references of type 'GLOB' is not supported/,
     'Storage of glob refs not supported';
 

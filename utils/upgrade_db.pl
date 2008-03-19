@@ -71,7 +71,7 @@ my %db;
 
 {
   my $ver = $opts{version};
-  if ( $ver =~ /^1\.000[3-7]/) {
+  if ( $ver =~ /^1\.000[3-9]/) {
     $ver = 3;
   }
   elsif ( $ver =~ /^1\.000?[0-2]?/) {

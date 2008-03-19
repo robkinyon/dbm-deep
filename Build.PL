@@ -12,12 +12,10 @@ my $build = Module::Build->new(
         'Digest::MD5'       => '1.00',
         'FileHandle::Fmode' => '0.05',
     },
-    optional => {
-        'Pod::Usage'        => '1.3',
-    },
     build_requires => {
         'File::Path'      => '0.01',
         'File::Temp'      => '0.01',
+        'Pod::Usage'      => '1.3',
         'Test::Deep'      => '0.095',
         'Test::Warn'      => '0.08',
         'Test::More'      => '0.47',

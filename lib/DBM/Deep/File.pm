@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0009);
+our $VERSION = q(1.0010);
 
 use Fcntl qw( :DEFAULT :flock :seek );
 use FileHandle::Fmode ();

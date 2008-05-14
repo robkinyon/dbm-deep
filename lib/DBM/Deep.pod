@@ -99,7 +99,7 @@ the wrong type is passed in.
 Alternately, you can create a DBM::Deep handle by using Perl's built-in
 tie() function. The object returned from tie() can be used to call methods,
 such as lock() and unlock(). (That object can be retrieved from the tied
-variable at any time using tied() - please see L<perltie/> for more info.
+variable at any time using tied() - please see L<perltie> for more info.
 
   my %hash;
   my $db = tie %hash, "DBM::Deep", "foo.db";
@@ -576,7 +576,7 @@ You can pass C<lock()> an optional argument, which specifies which mode to use
 (exclusive or shared). Use one of these two constants:
 C<DBM::Deep-E<gt>LOCK_EX> or C<DBM::Deep-E<gt>LOCK_SH>. These are passed
 directly to C<flock()>, and are the same as the constants defined in Perl's
-L<Fcntl/> module.
+L<Fcntl> module.
 
   $db->lock( $db->LOCK_SH );
   # something here
@@ -718,7 +718,7 @@ remove a filter, set the function reference to C<undef>:
 
 =head2 Examples
 
-Please read L<DBM::Deep::Manual/> for examples of filters.
+Please read L<DBM::Deep::Manual> for examples of filters.
 
 =head1 ERROR HANDLING
 
@@ -889,7 +889,7 @@ welcome.
 
 Right now, importing is done using C<Clone::clone()> to make a complete copy
 in memory, then tying that copy. It would be much better to use
-L<Data::Walker/> to walk the data structure instead, particularly in the case
+L<Data::Walker> to walk the data structure instead, particularly in the case
 of large datastructures.
 
 =head2 Different contention resolution mechanisms
@@ -952,7 +952,7 @@ all to support a feature that has never been requested.
 
 =item * CODE
 
-L<Data::Dump::Streamer/> provides a mechanism for serializing coderefs,
+L<Data::Dump::Streamer> provides a mechanism for serializing coderefs,
 including saving off all closure state. This would allow for DBM::Deep to
 store the code for a subroutine. Then, whenever the subroutine is read, the
 code could be C<eval()>'ed into being. However, just as for SCALAR and REF,
@@ -1037,8 +1037,8 @@ reference to be imported in order to explicitly leave it untied.
 
 =head1 CODE COVERAGE
 
-L<Devel::Cover/> is used to test the code coverage of the tests. Below is the
-L<Devel::Cover/> report on this distribution's test suite.
+L<Devel::Cover> is used to test the code coverage of the tests. Below is the
+L<Devel::Cover> report on this distribution's test suite.
 
   ------------------------------------------ ------ ------ ------ ------ ------
   File                                         stmt   bran   cond    sub  total

@@ -4,7 +4,7 @@ DBM::Deep::Cookbook
 
 =head1 DESCRIPTION
 
-This is the Cookbook for L<DBM::Deep/>. It contains useful tips and tricks,
+This is the Cookbook for L<DBM::Deep>. It contains useful tips and tricks,
 plus some examples of how to do common tasks.
 
 =head1 RECIPES
@@ -24,7 +24,7 @@ In 5.6, you will have to do the following:
   $db->set_filter( 'retrieve_value' => sub { pack "C*", unpack "U0C*", $_[0] } );
 
 In a future version, you will be able to specify C<utf8 =E<gt> 1> and
-L<DBM::Deep/> will do these things for you.
+L<DBM::Deep> will do these things for you.
 
 =head2 Real-time Encryption Example
 

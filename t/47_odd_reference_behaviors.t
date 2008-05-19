@@ -4,11 +4,30 @@ use strict;
 use warnings FATAL => 'all';
 
 use Scalar::Util qw( reftype );
-use Test::More tests => 10;
+use Test::More tests => 12;
 
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
+
+# This is bug #34819, reported by EJS
+{
+    my ($fh, $filename) = new_fh();
+    my $db = DBM::Deep->new(
+        file => $filename,
+        fh => $fh,
+    );
+
+    my $bar = bless { foo => 'bar' }, 'Foo';
+
+    eval {
+        $db->{bar} = $bar;
+        $db->{bar} = $bar;
+    };
+
+    ok(!$@, "repeated object assignment");
+    isa_ok($db->{bar}, 'Foo');
+}
 
 # This is bug #29957, reported by HANENKAMP
 TODO: {

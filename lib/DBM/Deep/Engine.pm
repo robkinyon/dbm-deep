@@ -7,8 +7,8 @@ use warnings;
 
 our $VERSION = q(1.0010);
 
-use Scalar::Util ();
-
+use Scalar::Util qw(refaddr reftype);
+use Data::Dumper;
 # File-wide notes:
 # * Every method in here assumes that the storage has been appropriately
 #   safeguarded. This can be anything from flock() to some sort of manual
@@ -279,7 +279,53 @@ sub write_value {
         $class = 'DBM::Deep::Engine::Sector::Null';
     }
     elsif ( $r eq 'ARRAY' || $r eq 'HASH' ) {
-        my $is_dbm_deep = eval { local $SIG{'__DIE__'}; $value->isa( 'DBM::Deep' ); };
+
+    #
+    # Checking if $value is tied and getting it's underlying variable
+    #
+    my $tmpvar;
+    if ( $r eq 'ARRAY' ) {
+        $tmpvar = tied @$value;
+    } elsif ( $r eq 'HASH' ) {
+        $tmpvar = tied %$value;
+    }
+
+    #
+    # Checking if underlying variable is a DBM::Deep instance
+    #
+    my $is_ref_dbm_deep = eval { local $SIG{'__DIE__'}; $tmpvar->isa( 'DBM::Deep' ); };
+    if ( $is_ref_dbm_deep ) {
+        #
+        # Checking if storage of destination and source variables is the same
+        #
+        if ( $tmpvar->_engine->storage == $self->storage ) {
+            #
+            # If yes - loading source sector and getting it's data reference address
+            #
+            my $value_sector = $self->_load_sector( $tmpvar->_base_offset );
+            my $data_addr = refaddr $value_sector->data;
+            my $origin_addr;
+            #
+            # Getting destination reference address for data by key
+            #
+            if ( reftype $sector->data eq 'ARRAY' ) {
+                $origin_addr = refaddr ${$sector->data}[$key];
+            } elsif ( reftype $sector->data eq 'HASH' ) {
+                $origin_addr = refaddr ${$sector->data}{$key};
+            }
+
+            #
+            # Do nothing if reference addresses of source and destination data are same
+            #
+            if (defined $data_addr && defined $origin_addr) {
+                return 1 if ($data_addr == $origin_addr);
+            }
+        } else {
+            DBM::Deep->_throw_error( "Cannot store values across DBM::Deep files. Please use export() instead." );
+        }
+    }
+
+    my $is_dbm_deep = eval { local $SIG{'__DIE__'}; $value->isa( 'DBM::Deep' ); };
         if ( $is_dbm_deep ) {
             if ( $value->_engine->storage == $self->storage ) {
                 my $value_sector = $self->_load_sector( $value->_base_offset );
@@ -317,7 +363,6 @@ sub write_value {
         data   => $value,
         type   => $type,
     });
-
     $sector->write_data({
         key     => $key,
         key_md5 => $self->_apply_digest( $key ),

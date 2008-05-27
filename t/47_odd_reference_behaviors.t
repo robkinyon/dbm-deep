@@ -18,10 +18,11 @@ use_ok( 'DBM::Deep' );
         fh => $fh,
     );
 
-    my $bar = bless { foo => 'bar' }, 'Foo';
+    my $bar = bless { foo => 'ope' }, 'Foo';
 
     eval {
         $db->{bar} = $bar;
+        warn "$db->{bar}: $bar\n";
         $db->{bar} = $bar;
     };
 

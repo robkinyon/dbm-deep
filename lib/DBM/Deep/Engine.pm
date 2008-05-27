@@ -10,7 +10,8 @@ our $VERSION = q(1.0010);
 # Never import symbols into our namespace. We are a class, not a library.
 # -RobK, 2008-05-27
 use Scalar::Util ();
-use Data::Dumper ();
+
+#use Data::Dumper ();
 
 # File-wide notes:
 # * Every method in here assumes that the storage has been appropriately
@@ -274,7 +275,7 @@ sub write_value {
         or DBM::Deep->_throw_error( "Cannot write to a deleted spot in DBM::Deep." );
 
     if ( $sector->staleness != $obj->_staleness ) {
-        DBM::Deep->_throw_error( "Cannot write to a deleted spot in DBM::Deep.n" );
+        DBM::Deep->_throw_error( "Cannot write to a deleted spot in DBM::Deep." );
     }
 
     my ($class, $type);
@@ -282,10 +283,6 @@ sub write_value {
         $class = 'DBM::Deep::Engine::Sector::Null';
     }
     elsif ( $r eq 'ARRAY' || $r eq 'HASH' ) {
-
-        #
-        # Checking if $value is tied and getting it's underlying variable
-        #
         my $tmpvar;
         if ( $r eq 'ARRAY' ) {
             $tmpvar = tied @$value;
@@ -293,55 +290,32 @@ sub write_value {
             $tmpvar = tied %$value;
         }
 
-        #
-        # Checking if underlying variable is a DBM::Deep instance
-        #
-        my $is_ref_dbm_deep = eval { local $SIG{'__DIE__'}; $tmpvar->isa( 'DBM::Deep' ); };
-        if ( $is_ref_dbm_deep ) {
-            #
-            # Checking if storage of destination and source variables is the same
-            #
-            if ( $tmpvar->_engine->storage == $self->storage ) {
-                #
-                # If yes - loading source sector and getting its data reference address
-                #
-                my $value_sector = $self->_load_sector( $tmpvar->_base_offset );
-                my $data_addr = Scalar::Util::refaddr( $value_sector->data );
-                my $origin_addr;
-                #
-                # Getting destination reference address for data by key
-                #
-                if ( Scalar::Util::reftype( $sector->data ) eq 'ARRAY' ) {
-                    $origin_addr = Scalar::Util::refaddr( ${$sector->data}[$key] );
-                } elsif ( Scalar::Util::reftype( $sector->data ) eq 'HASH' ) {
-                    $origin_addr = Scalar::Util::refaddr( ${$sector->data}{$key} );
-                }
-
-                #
-                # Do nothing if reference addresses of source and destination data are same
-                #
-                if (defined $data_addr && defined $origin_addr) {
-                    return 1 if ($data_addr == $origin_addr);
-                }
-            } else {
+        my $is_dbm_deep = eval { local $SIG{'__DIE__'}; $tmpvar->isa( 'DBM::Deep' ); };
+        if ( $is_dbm_deep ) {
+            unless ( $tmpvar->_engine->storage == $self->storage ) {
                 DBM::Deep->_throw_error( "Cannot store values across DBM::Deep files. Please use export() instead." );
             }
-        }
 
-        my $is_dbm_deep = eval { local $SIG{'__DIE__'}; $value->isa( 'DBM::Deep' ); };
-        if ( $is_dbm_deep ) {
-            if ( $value->_engine->storage == $self->storage ) {
-                my $value_sector = $self->_load_sector( $value->_base_offset );
-                $sector->write_data({
-                    key     => $key,
-                    key_md5 => $self->_apply_digest( $key ),
-                    value   => $value_sector,
-                });
-                $value_sector->increment_refcount;
+            # First, verify if we're storing the same thing to this spot. If we are, then
+            # this should be a no-op. -EJS, 2008-05-19
+            my $loc = $sector->get_data_location_for({
+                key_md5 => $self->_apply_digest( $key ),
+                allow_head => 1,
+            });
+
+            if ( defined($loc) && $loc == $tmpvar->_base_offset ) {
                 return 1;
             }
 
-            DBM::Deep->_throw_error( "Cannot store values across DBM::Deep files. Please use export() instead." );
+            my $value_sector = $self->_load_sector( $tmpvar->_base_offset );
+            $sector->write_data({
+                key     => $key,
+                key_md5 => $self->_apply_digest( $key ),
+                value   => $value_sector,
+            });
+            $value_sector->increment_refcount;
+
+            return 1;
         }
         if ( $r eq 'ARRAY' && tied(@$value) ) {
             DBM::Deep->_throw_error( "Cannot store something that is tied." );
@@ -1437,7 +1411,7 @@ sub _init {
 
 sub staleness { $_[0]{staleness} }
 
-sub get_data_for {
+sub get_data_location_for {
     my $self = shift;
     my ($args) = @_;
 
@@ -1460,6 +1434,16 @@ sub get_data_for {
     my $location = $blist->get_data_location_for({
         allow_head => $args->{allow_head},
     }) or return;
+
+    return $location;
+}
+
+sub get_data_for {
+    my $self = shift;
+    my ($args) = @_;
+
+    my $location = $self->get_data_location_for( $args )
+        or return;
 
     return $self->engine->_load_sector( $location );
 }

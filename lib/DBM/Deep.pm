@@ -7,6 +7,7 @@ use warnings;
 
 our $VERSION = q(1.0010);
 
+use Data::Dumper ();
 use Fcntl qw( :flock );
 use Scalar::Util ();
 
@@ -152,21 +153,35 @@ sub _copy_value {
     if ( !ref $value ) {
         ${$spot} = $value;
     }
-    elsif ( eval { local $SIG{__DIE__}; $value->isa( 'DBM::Deep' ) } ) {
-        ${$spot} = $value->_repr;
-        $value->_copy_node( ${$spot} );
-    }
     else {
+        # This assumes hash or array only. This is a bad assumption moving forward.
+        # -RobK, 2008-05-27
         my $r = Scalar::Util::reftype( $value );
-        my $c = Scalar::Util::blessed( $value );
+        my $tied;
         if ( $r eq 'ARRAY' ) {
-            ${$spot} = [ @{$value} ];
+            $tied = tied(@$value);
         }
         else {
-            ${$spot} = { %{$value} };
+            $tied = tied(%$value);
         }
-        ${$spot} = bless ${$spot}, $c
-            if defined $c;
+
+        if ( eval { local $SIG{__DIE__}; $tied->isa( 'DBM::Deep' ) } ) {
+            ${$spot} = $tied->_repr;
+            $tied->_copy_node( ${$spot} );
+        }
+        else {
+            if ( $r eq 'ARRAY' ) {
+                ${$spot} = [ @{$value} ];
+            }
+            else {
+                ${$spot} = { %{$value} };
+            }
+        }
+
+        my $c = Scalar::Util::blessed( $value );
+        if ( defined $c && !$c->isa( 'DBM::Deep') ) {
+            ${$spot} = bless ${$spot}, $c
+        }
     }
 
     return 1;

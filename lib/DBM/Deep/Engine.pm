@@ -290,8 +290,13 @@ sub write_value {
             $tmpvar = tied %$value;
         }
 
-        my $is_dbm_deep = eval { local $SIG{'__DIE__'}; $tmpvar->isa( 'DBM::Deep' ); };
-        if ( $is_dbm_deep ) {
+        if ( $tmpvar ) {
+            my $is_dbm_deep = eval { local $SIG{'__DIE__'}; $tmpvar->isa( 'DBM::Deep' ); };
+
+            unless ( $is_dbm_deep ) {
+                DBM::Deep->_throw_error( "Cannot store something that is tied." );
+            }
+
             unless ( $tmpvar->_engine->storage == $self->storage ) {
                 DBM::Deep->_throw_error( "Cannot store values across DBM::Deep files. Please use export() instead." );
             }
@@ -307,6 +312,7 @@ sub write_value {
                 return 1;
             }
 
+            #XXX Can this use $loc?
             my $value_sector = $self->_load_sector( $tmpvar->_base_offset );
             $sector->write_data({
                 key     => $key,
@@ -317,12 +323,7 @@ sub write_value {
 
             return 1;
         }
-        if ( $r eq 'ARRAY' && tied(@$value) ) {
-            DBM::Deep->_throw_error( "Cannot store something that is tied." );
-        }
-        if ( $r eq 'HASH' && tied(%$value) ) {
-            DBM::Deep->_throw_error( "Cannot store something that is tied." );
-        }
+
         $class = 'DBM::Deep::Engine::Sector::Reference';
         $type = substr( $r, 0, 1 );
     }
@@ -1319,6 +1320,8 @@ sub chain_loc {
 
 sub data {
     my $self = shift;
+#    my ($args) = @_;
+#    $args ||= {};
 
     my $data;
     while ( 1 ) {
@@ -1549,7 +1552,7 @@ sub delete_key {
         $blist->mark_deleted( $args );
 
         if ( $old_value ) {
-            $data = $old_value->data;
+            $data = $old_value->data({ export => 1 });
             $old_value->free;
         }
     }
@@ -1758,9 +1761,12 @@ sub get_classname {
 
 sub data {
     my $self = shift;
+    my ($args) = @_;
+    $args ||= {};
 
-    unless ( $self->engine->cache->{ $self->offset } ) {
-        my $new_obj = DBM::Deep->new({
+    my $obj;
+    unless ( $obj = $self->engine->cache->{ $self->offset } ) {
+        $obj = DBM::Deep->new({
             type        => $self->type,
             base_offset => $self->offset,
             staleness   => $self->staleness,
@@ -1771,13 +1777,24 @@ sub data {
         if ( $self->engine->storage->{autobless} ) {
             my $classname = $self->get_classname;
             if ( defined $classname ) {
-                bless $new_obj, $classname;
+                bless $obj, $classname;
             }
         }
 
-        $self->engine->cache->{$self->offset} = $new_obj;
+        $self->engine->cache->{$self->offset} = $obj;
     }
-    return $self->engine->cache->{$self->offset};
+
+    # We're not exporting, so just return.
+    unless ( $args->{export} ) {
+        return $obj;
+    }
+
+    # We shouldn't export if this is still referred to.
+    if ( $self->get_refcount > 1 ) {
+        return $obj;
+    }
+
+    return $obj->export;
 }
 
 sub free {
@@ -2122,7 +2139,7 @@ sub delete_md5 {
     $key_sector->free;
 
     my $data_sector = $self->engine->_load_sector( $location );
-    my $data = $data_sector->data;
+    my $data = $data_sector->data({ export => 1 });
     $data_sector->free;
 
     return $data;

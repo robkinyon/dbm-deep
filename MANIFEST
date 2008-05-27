@@ -60,6 +60,7 @@ t/44_upgrade_db.t
 t/45_references.t
 t/46_blist_reindex.t
 t/47_odd_reference_behaviors.t
+t/48_autoexport_after_delete.t
 t/97_dump_file.t
 t/98_pod.t
 t/99_pod_coverage.t

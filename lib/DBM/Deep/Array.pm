@@ -269,13 +269,16 @@ sub SHIFT {
         return;
     }
 
-    my $content = $self->FETCH( 0 );
+    my $content = $self->DELETE( 0 );
 
-    for (my $i = 0; $i < $length - 1; $i++) {
-        $self->_move_value( $i+1, $i );
+    # Unless the deletion above has cleared the array ...
+    if ( $length > 1 ) {
+        for (my $i = 0; $i < $length - 1; $i++) {
+            $self->_move_value( $i+1, $i );
+        }
+
+        $self->DELETE( $length - 1 );
     }
-
-    $self->DELETE( $length - 1 );
 
     $self->unlock;
 
@@ -388,8 +391,7 @@ sub _copy_node {
 
     my $length = $self->length();
     for (my $index = 0; $index < $length; $index++) {
-        my $value = $self->get($index);
-        $self->_copy_value( \$db_temp->[$index], $value );
+        $self->_copy_value( \$db_temp->[$index], $self->get($index) );
     }
 
     return 1;

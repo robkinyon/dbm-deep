@@ -3,8 +3,9 @@ use 5.006;
 use strict;
 use warnings FATAL => 'all';
 
-use Scalar::Util qw( reftype );
-use Test::More tests => 12;
+use Test::More tests => 13;
+use Test::Exception;
+use Test::Deep;
 
 use t::common qw( new_fh );
 
@@ -22,7 +23,6 @@ use_ok( 'DBM::Deep' );
 
     eval {
         $db->{bar} = $bar;
-        warn "$db->{bar}: $bar\n";
         $db->{bar} = $bar;
     };
 
@@ -31,8 +31,7 @@ use_ok( 'DBM::Deep' );
 }
 
 # This is bug #29957, reported by HANENKAMP
-TODO: {
-    todo_skip "This crashes the code", 4;
+{
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new(
         file => $filename,
@@ -42,11 +41,14 @@ TODO: {
     $db->{foo} = [];
 
     for my $value ( 1 .. 3 ) {
-        my $ref = $db->{foo};
-        push @$ref, $value;
-        $db->{foo} = $ref;
-        ok( 1, "T $value" );
+        lives_ok {
+            my $ref = $db->{foo};
+            push @$ref, $value;
+            $db->{foo} = $ref;
+        } "Successfully added value $value";
     }
+
+    cmp_deeply( [1,2,3], noclass($db->{foo}), "Everything looks ok" );
 }
 
 # This is bug #33863, reported by PJS
@@ -62,10 +64,9 @@ TODO: {
     cmp_ok( @{ $db->{foo} }, '==', 0, "Shifting a scalar leaves no values" );
     cmp_ok( $foo, '==', 42, "... And the value is correct." );
 
-#    $db->{bar} = [ [] ];
-#    my $bar = shift @{ $db->{bar} };
-#    cmp_ok( @{ $db->{bar} }, '==', 0, "Shifting an arrayref leaves no values" );
-#    use Data::Dumper; warn Dumper $bar;
+    $db->{bar} = [ [] ];
+    my $bar = shift @{ $db->{bar} };
+    cmp_ok( @{ $db->{bar} }, '==', 0, "Shifting an arrayref leaves no values" );
 
     $db->{baz} = { foo => [ 1 .. 3 ] };
     $db->{baz2} = [ $db->{baz} ];

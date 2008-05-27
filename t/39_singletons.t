@@ -21,11 +21,11 @@ use_ok( 'DBM::Deep' );
     is( $x, $y, "The references are the same" );
 
     delete $db->{foo};
-    is( $x, undef );
-    is( $y, undef );
-    is( $x + 0, undef );
-    is( $y + 0, undef );
-    is( $db->{foo}, undef );
+    is( $x, undef, "After deleting the DB location, external references are also undef (\$x)" );
+    is( $y, undef, "After deleting the DB location, external references are also undef (\$y)" );
+    is( $x + 0, undef, "DBM::Deep::Null can be added to." );
+    is( $y + 0, undef, "DBM::Deep::Null can be added to." );
+    is( $db->{foo}, undef, "The {foo} location is also undef." );
 
     # These shenanigans work to get another hashref
     # into the same data location as $db->{foo} was.
@@ -34,8 +34,8 @@ use_ok( 'DBM::Deep' );
     $db->{foo} = {};
     $db->{bar} = {};
 
-    is( $x, undef );
-    is( $y, undef );
+    is( $x, undef, "After re-assigning to {foo}, external references to old values are still undef (\$x)" );
+    is( $y, undef, "After re-assigning to {foo}, external references to old values are still undef (\$y)" );
 }
 
 SKIP: {

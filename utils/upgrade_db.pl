@@ -28,7 +28,7 @@ my %is_dev = (
 my %opts = (
   man => 0,
   help => 0,
-  version => '1.0007',
+  version => '1.0010',
   autobless => 1,
 );
 GetOptions( \%opts,
@@ -71,7 +71,10 @@ my %db;
 
 {
   my $ver = $opts{version};
-  if ( $ver =~ /^1\.000[3-9]/) {
+  if ( $ver =~ /^1\.0010/) {
+    $ver = 3;
+  }
+  elsif ( $ver =~ /^1\.000[3-9]/) {
     $ver = 3;
   }
   elsif ( $ver =~ /^1\.000?[0-2]?/) {

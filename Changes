@@ -1,8 +1,14 @@
 Revision history for DBM::Deep.
 
-1.0010 May 14 12:00:00 2008 EST
+1.0010 May 27 12:00:00 2008 EST
     - (This version is compatible with 1.0009)
     - Fix for RT#35140 (invalid POD links)
+    - Fix for RT#34819 (Cannot assign the same value back to the same location)
+    - Fix for RT#29957 (Cannot assign the same value back to the same location)
+    - Fix for RT#33863 (Cannot shift an arrayref from an array)
+    - When something is deleted from a DB, the value is export()ed, allowing it
+      to be saved.
+      - This exporting is only done if the refcount == 0 after the deletion.
 
 1.0009 Mar 19 12:00:00 2008 EDT
     - (This version is compatible with 1.0008)

@@ -5,10 +5,9 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0010);
+our $VERSION = q(1.0012);
 
 use Fcntl qw( :DEFAULT :flock :seek );
-use FileHandle::Fmode ();
 
 sub new {
     my $class = shift;
@@ -236,9 +235,17 @@ sub flush {
     return 1;
 }
 
+# Taken from http://www.perlmonks.org/?node_id=691054
 sub is_writable {
     my $self = shift;
-    return FileHandle::Fmode::is_W( $self->{fh} );
+
+    my $fh = $self->{fh};
+    return unless defined $fh;
+    return unless defined fileno $fh;
+    local $\ = '';  # just in case
+    no warnings;    # temporarily disable warnings
+    local $^W;      # temporarily disable warnings
+    return print $fh '';
 }
 
 sub copy_stats {

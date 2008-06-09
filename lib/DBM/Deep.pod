@@ -870,7 +870,7 @@ immediately, please submit many testcases.
 
 =head2 Caching
 
-If a user is willing to assert upon opening the file that this process will be
+If a client is willing to assert upon opening the file that this process will be
 the only consumer of that datafile, then there are a number of caching
 possibilities that can be taken advantage of. This does, however, mean that
 DBM::Deep is more vulnerable to losing data due to unflushed changes. It also
@@ -884,13 +884,6 @@ datastore. This could just as easily be a large string as a file. By using
 substr, the STM capabilities of DBM::Deep could be used within a
 single-process. I have no idea how I'd specify this, though. Suggestions are
 welcome.
-
-=head2 Importing using Data::Walker
-
-Right now, importing is done using C<Clone::clone()> to make a complete copy
-in memory, then tying that copy. It would be much better to use
-L<Data::Walker> to walk the data structure instead, particularly in the case
-of large datastructures.
 
 =head2 Different contention resolution mechanisms
 
@@ -1007,12 +1000,17 @@ These functions cause every element in the array to move, which can be murder
 on DBM::Deep, as every element has to be fetched from disk, then stored again in
 a different location. This will be addressed in a future version.
 
+This has been somewhat addressed so that the cost is constant, regardless of
+what is stored at those locations. So, small arrays with huge data structures in
+them are faster. But, large arrays are still large.
+
 =head2 Writeonly Files
 
-If you pass in a filehandle to new(), you may have opened it in either a readonly or
-writeonly mode. STORE will verify that the filehandle is writable. However, there
-doesn't seem to be a good way to determine if a filehandle is readable. And, if the
-filehandle isn't readable, it's not clear what will happen. So, don't do that.
+If you pass in a filehandle to new(), you may have opened it in either a
+readonly or writeonly mode. STORE will verify that the filehandle is writable.
+However, there doesn't seem to be a good way to determine if a filehandle is
+readable. And, if the filehandle isn't readable, it's not clear what will
+happen. So, don't do that.
 
 =head2 Assignments Within Transactions
 

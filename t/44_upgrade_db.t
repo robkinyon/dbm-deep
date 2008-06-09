@@ -7,6 +7,10 @@ BEGIN {
     plan skip_all => "Skipping the upgrade_db.pl tests on Win32/cygwin for now."
         if ( $^O eq 'MSWin32' || $^O eq 'cygwin' );
 
+    plan skip_all => "Skipping the upgrade_db.pl tests on *bsd for now."
+        if ( $^O =~ /bsd/i );
+
+
     my @failures;
     eval { use Pod::Usage 1.3; }; push @failures, 'Pod::Usage' if $@;
     eval { use IO::Scalar; }; push @failures, 'IO::Scalar' if $@;
@@ -16,7 +20,7 @@ BEGIN {
     }
 }
 
-plan tests => 252;
+plan tests => 282;
 
 use t::common qw( new_fh );
 use File::Spec;
@@ -68,7 +72,7 @@ my @output_versions = (
     '0.981', '0.982', '0.983',
     '0.99_01', '0.99_02', '0.99_03', '0.99_04',
     '1.00', '1.000', '1.0000', '1.0001', '1.0002',
-    '1.0003', '1.0004', '1.0005', '1.0006', '1.0007', '1.0008', '1.0009',
+    '1.0003', '1.0004', '1.0005', '1.0006', '1.0007', '1.0008', '1.0009', '1.0010', '1.0011', '1.0012',
 );
 
 foreach my $input_filename (
@@ -121,7 +125,7 @@ foreach my $input_filename (
         die "$output\n" if $output;
 
         my $db;
-        if ( $v =~ /^1\.000[3-9]/ ) {
+        if ( $v =~ /^1\.001[0-2]/ || $v =~ /^1\.000[3-9]/ ) {
             push @INC, 'lib';
             eval "use DBM::Deep";
             $db = DBM::Deep->new( $output_filename );

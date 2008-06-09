@@ -1,5 +1,18 @@
 Revision history for DBM::Deep.
 
+1.0012 Jun 09 15:00:00 2008 EST
+    - (This version is compatible with 1.0011)
+    - Fix for RT#30085 (Remove dependency on XS module)
+        - Thank you very much tachyon-II@Perlmonks!!
+    - Updated the POD with fixes that were made, but still on the TODO list.
+    - Bypass for RT#36419 (t/44_upgrade_db.t fails on *BSD)
+        - We're just going to skip that for now. It's a number-of-processes-open
+        issue. Best is to do a port to another module to do the heavy lifting.
+
+1.0011 May 27 15:00:00 2008 EST
+    - (This version is compatible with 1.0010)
+    - A test has the wrong plan.
+
 1.0010 May 27 12:00:00 2008 EST
     - (This version is compatible with 1.0009)
     - Fix for RT#35140 (invalid POD links)

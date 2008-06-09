@@ -10,7 +10,6 @@ my $build = Module::Build->new(
         'Fcntl'             => '0.01',
         'Scalar::Util'      => '1.14',
         'Digest::MD5'       => '1.00',
-        'FileHandle::Fmode' => '0.05',
     },
     build_requires => {
         'File::Path'      => '0.01',

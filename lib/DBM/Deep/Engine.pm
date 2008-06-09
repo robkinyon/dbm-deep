@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0010);
+our $VERSION = q(1.0012);
 
 # Never import symbols into our namespace. We are a class, not a library.
 # -RobK, 2008-05-27

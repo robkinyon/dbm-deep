@@ -10,10 +10,10 @@ BEGIN {
     plan skip_all => "Skipping the upgrade_db.pl tests on *bsd for now."
         if ( $^O =~ /bsd/i );
 
-
     my @failures;
     eval { use Pod::Usage 1.3; }; push @failures, 'Pod::Usage' if $@;
     eval { use IO::Scalar; }; push @failures, 'IO::Scalar' if $@;
+    eval { use FileHandle::Fmode; }; push @failures, 'FileHandle::Fmode' if $@;
     if ( @failures ) {
         my $missing = join ',', @failures;
         plan skip_all => "'$missing' must be installed to run these tests";

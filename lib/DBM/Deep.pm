@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0012);
+our $VERSION = q(1.0013);
 
 use Data::Dumper ();
 use Fcntl qw( :flock );
@@ -328,7 +328,7 @@ sub optimize {
     $self->lock();
     $self->_engine->clear_cache;
     $self->_copy_node( $db_temp );
-    $dbtemp->_storage->close;
+    $db_temp->_storage->close;
     undef $db_temp;
 
     ##

@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0012);
+our $VERSION = q(1.0013);
 
 use base 'DBM::Deep';
 

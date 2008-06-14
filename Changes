@@ -1,5 +1,10 @@
 Revision history for DBM::Deep.
 
+1.0013 Jun 18 00:00:00 2008 EST
+    - (This version is compatible with 1.0012)
+    - Fix for RT#30144 (Optimization failure on Win32)
+    - Fixed a bug in reindex_entry (Thanks, Wulfram Humann!)
+
 1.0012 Jun 09 15:00:00 2008 EST
     - (This version is compatible with 1.0011)
     - Fix for RT#30085 (Remove dependency on XS module)

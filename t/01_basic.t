@@ -25,3 +25,5 @@ if ( $@ ) {
 
 isa_ok( $db, 'DBM::Deep' );
 ok(1, "We can successfully open a file!" );
+
+$db->{foo} = 'bar';

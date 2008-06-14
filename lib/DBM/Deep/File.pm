@@ -5,9 +5,11 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0012);
+our $VERSION = q(1.0013);
 
 use Fcntl qw( :DEFAULT :flock :seek );
+
+use constant DEBUG => 0;
 
 sub new {
     my $class = shift;
@@ -110,6 +112,12 @@ sub print_at {
         seek( $fh, $loc + $self->{file_offset}, SEEK_SET );
     }
 
+    if ( DEBUG ) {
+        my $caller = join ':', (caller)[0,2];
+        my $len = length( join '', @_ );
+        warn "($caller) print_at( " . (defined $loc ? $loc : '<undef>') . ", $len )\n";
+    }
+
     print( $fh @_ ) or die "Internal Error (print_at($loc)): $!\n";
 
     return 1;
@@ -124,6 +132,11 @@ sub read_at {
     my $fh = $self->{fh};
     if ( defined $loc ) {
         seek( $fh, $loc + $self->{file_offset}, SEEK_SET );
+    }
+
+    if ( DEBUG ) {
+        my $caller = join ':', (caller)[0,2];
+        warn "($caller) read_at( " . (defined $loc ? $loc : '<undef>') . ", $size )\n";
     }
 
     my $buffer;

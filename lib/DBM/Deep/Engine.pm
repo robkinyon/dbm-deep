@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings;
 
-our $VERSION = q(1.0012);
+our $VERSION = q(1.0013);
 
 # Never import symbols into our namespace. We are a class, not a library.
 # -RobK, 2008-05-27
@@ -628,12 +628,10 @@ sub reindex_entry {
 
     TRANS:
     while ( my ($trans_id, $locs) = each %{ $self->{entries} } ) {
-        foreach my $orig_loc ( keys %{ $locs } ) {
-            if ( $orig_loc == $old_loc ) {
-                delete $locs->{orig_loc};
-                $locs->{$new_loc} = undef;
-                next TRANS;
-            }
+        if ( exists $locs->{$old_loc} ) {
+            delete $locs->{$old_loc};
+            $locs->{$new_loc} = undef;
+            next TRANS;
         }
     }
 }

@@ -1,6 +1,6 @@
 Revision history for DBM::Deep.
 
-1.0013 Jun 18 00:00:00 2008 EST
+1.0013 Jun 13 23:15:00 2008 EST
     - (This version is compatible with 1.0012)
     - Fix for RT#30144 (Optimization failure on Win32)
     - Fixed a bug in reindex_entry (Thanks, Wulfram Humann!)
@@ -9,6 +9,7 @@ Revision history for DBM::Deep.
     - (This version is compatible with 1.0011)
     - Fix for RT#30085 (Remove dependency on XS module)
         - Thank you very much tachyon-II@Perlmonks!!
+        - This also resolves RT#35424 (DBM::Deep breaks XML::Twig).
     - Updated the POD with fixes that were made, but still on the TODO list.
     - Bypass for RT#36419 (t/44_upgrade_db.t fails on *BSD)
         - We're just going to skip that for now. It's a number-of-processes-open

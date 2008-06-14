@@ -328,6 +328,7 @@ sub optimize {
     $self->lock();
     $self->_engine->clear_cache;
     $self->_copy_node( $db_temp );
+    $dbtemp->_storage->close;
     undef $db_temp;
 
     ##

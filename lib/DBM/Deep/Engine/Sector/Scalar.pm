@@ -32,16 +32,17 @@ sub _init {
     my $engine = $self->engine;
 
     unless ( $self->offset ) {
-        my $data_section = $self->size - $self->base_size - $engine->byte_size - 1;
-
         $self->{offset} = $engine->_request_data_sector( $self->size );
-
         my $data = delete $self->{data};
         my $dlen = length $data;
-        my $continue = 1;
-        my $curr_offset = $self->offset;
-        while ( $continue ) {
 
+        my $data_section = $self->size - $self->base_size - $engine->byte_size - 1;
+
+
+
+        my $curr_offset = $self->offset;
+        my $continue = 1;
+        while ( $continue ) {
             my $next_offset = 0;
 
             my ($leftover, $this_len, $chunk);
@@ -62,14 +63,17 @@ sub _init {
                 $continue = 0;
             }
 
-            $engine->storage->print_at( $curr_offset, $self->type ); # Sector type
-            # Skip staleness
-            $engine->storage->print_at( $curr_offset + $self->base_size,
-                pack( $engine->StP($engine->byte_size), $next_offset ),  # Chain loc
-                pack( $engine->StP(1), $this_len ),                      # Data length
-                $chunk,                                          # Data to be stored in this sector
-                chr(0) x $leftover,                              # Zero-fill the rest
+            my $string = chr(0) x $self->size;
+            substr( $string, 0, 1, $self->type );
+            substr( $string, $self->base_size, $engine->byte_size + 1,
+                pack( $engine->StP($engine->byte_size), $next_offset ) # Chain loc
+              . pack( $engine->StP(1), $this_len ),                    # Data length
             );
+            substr( $string, $self->base_size + $engine->byte_size + 1, $this_len,
+                $chunk,
+            );
+
+            $engine->storage->print_at( $curr_offset, $string );
 
             $curr_offset = $next_offset;
         }

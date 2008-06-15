@@ -3,7 +3,7 @@ package DBM::Deep;
 use 5.006_000;
 
 use strict;
-use warnings;
+use warnings FATAL => 'all';
 
 our $VERSION = q(1.0013);
 

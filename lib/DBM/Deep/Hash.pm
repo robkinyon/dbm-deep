@@ -3,9 +3,7 @@ package DBM::Deep::Hash;
 use 5.006_000;
 
 use strict;
-use warnings;
-
-our $VERSION = q(1.0013);
+use warnings FATAL => 'all';
 
 use base 'DBM::Deep';
 

@@ -3,9 +3,7 @@ package DBM::Deep::Array;
 use 5.006_000;
 
 use strict;
-use warnings;
-
-our $VERSION = q(1.0013);
+use warnings FATAL => 'all';
 
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative

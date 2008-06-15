@@ -3,9 +3,7 @@ package DBM::Deep::File;
 use 5.006_000;
 
 use strict;
-use warnings;
-
-our $VERSION = q(1.0013);
+use warnings FATAL => 'all';
 
 use Fcntl qw( :DEFAULT :flock :seek );
 

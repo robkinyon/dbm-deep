@@ -15,14 +15,11 @@ sub _init {
     my $engine = $self->engine;
 
     unless ( $self->offset ) {
-        my $leftover = $self->size - $self->base_size;
-
         $self->{offset} = $engine->_request_blist_sector( $self->size );
-        $engine->storage->print_at( $self->offset, $engine->SIG_BLIST ); # Sector type
-        # Skip staleness counter
-        $engine->storage->print_at( $self->offset + $self->base_size,
-            chr(0) x $leftover, # Zero-fill the data
-        );
+
+        my $string = chr(0) x $self->size;
+        substr( $string, 0, 1, $engine->SIG_BLIST );
+        $engine->storage->print_at( $self->offset, $string );
     }
 
     if ( $self->{key_md5} ) {

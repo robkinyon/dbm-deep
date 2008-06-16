@@ -19,7 +19,6 @@ sub _init {
     my $e = $self->engine;
 
     unless ( $self->offset ) {
-        $self->{staleness} = 0;
         $self->{offset} = $e->_request_data_sector( $self->size );
 
         my $class_offset = 0;
@@ -43,12 +42,12 @@ sub _init {
     }
     else {
         $self->{type} = $e->storage->read_at( $self->offset, 1 );
-
-        $self->{staleness} = unpack(
-            $e->StP($DBM::Deep::Engine::STALE_SIZE),
-            $e->storage->read_at( $self->offset + $e->SIG_SIZE, $DBM::Deep::Engine::STALE_SIZE ),
-        );
     }
+
+    $self->{staleness} = unpack(
+        $e->StP($DBM::Deep::Engine::STALE_SIZE),
+        $e->storage->read_at( $self->offset + $e->SIG_SIZE, $DBM::Deep::Engine::STALE_SIZE ),
+    );
 
     return;
 }

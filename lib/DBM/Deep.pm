@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings FATAL => 'all';
 
-our $VERSION = q(1.0013);
+our $VERSION = q(1.0014);
 
 use Data::Dumper ();
 use Fcntl qw( :flock );

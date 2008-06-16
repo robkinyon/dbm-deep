@@ -1,6 +1,6 @@
 package DBM::Deep::Iterator::Index;
 
-use 5.006;
+use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';

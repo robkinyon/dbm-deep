@@ -1,7 +1,7 @@
 #TODO: Convert this to a string
 package DBM::Deep::Engine::Sector::Reference;
 
-use 5.006;
+use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';
@@ -19,10 +19,11 @@ sub _init {
     my $e = $self->engine;
 
     unless ( $self->offset ) {
-        my $classname = Scalar::Util::blessed( delete $self->{data} );
-        my $leftover = $self->size - $self->base_size - 3 * $e->byte_size;
+        $self->{staleness} = 0;
+        $self->{offset} = $e->_request_data_sector( $self->size );
 
         my $class_offset = 0;
+        my $classname = Scalar::Util::blessed( delete $self->{data} );
         if ( defined $classname ) {
             my $class_sector = DBM::Deep::Engine::Sector::Scalar->new({
                 engine => $e,
@@ -31,24 +32,23 @@ sub _init {
             $class_offset = $class_sector->offset;
         }
 
-        $self->{offset} = $e->_request_data_sector( $self->size );
-        $e->storage->print_at( $self->offset, $self->type ); # Sector type
-        # Skip staleness counter
-        $e->storage->print_at( $self->offset + $self->base_size,
-            pack( $e->StP($e->byte_size), 0 ),             # Index/BList loc
-            pack( $e->StP($e->byte_size), $class_offset ), # Classname loc
-            pack( $e->StP($e->byte_size), 1 ),             # Initial refcount
-            chr(0) x $leftover,                         # Zero-fill the rest
+        my $string = chr(0) x $self->size;
+        substr( $string, 0, 1, $self->type );
+        substr( $string, $self->base_size, 3 * $e->byte_size,
+            pack( $e->StP($e->byte_size), 0 )             # Index/BList loc
+          . pack( $e->StP($e->byte_size), $class_offset ) # Classname loc
+          . pack( $e->StP($e->byte_size), 1 )             # Initial refcount
         );
+        $e->storage->print_at( $self->offset, $string );
     }
     else {
         $self->{type} = $e->storage->read_at( $self->offset, 1 );
-    }
 
-    $self->{staleness} = unpack(
-        $e->StP($DBM::Deep::Engine::STALE_SIZE),
-        $e->storage->read_at( $self->offset + $e->SIG_SIZE, $DBM::Deep::Engine::STALE_SIZE ),
-    );
+        $self->{staleness} = unpack(
+            $e->StP($DBM::Deep::Engine::STALE_SIZE),
+            $e->storage->read_at( $self->offset + $e->SIG_SIZE, $DBM::Deep::Engine::STALE_SIZE ),
+        );
+    }
 
     return;
 }

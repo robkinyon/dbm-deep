@@ -1,7 +1,7 @@
 #TODO: Convert this to a string
 package DBM::Deep::Engine::Sector::Index;
 
-use 5.006;
+use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';

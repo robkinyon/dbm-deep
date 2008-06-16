@@ -1,12 +1,10 @@
 #TODO: Convert this to a string
 package DBM::Deep::Engine::Sector::Scalar;
 
-use 5.006;
+use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';
-
-our $VERSION = '0.01';
 
 use DBM::Deep::Engine::Sector::Data;
 our @ISA = qw( DBM::Deep::Engine::Sector::Data );

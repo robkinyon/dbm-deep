@@ -1,6 +1,6 @@
 package DBM::Deep::Engine::Sector;
 
-use 5.006;
+use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';

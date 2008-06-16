@@ -2,7 +2,7 @@
 # I need an undef value, not an implementation of the Null Class pattern.
 package DBM::Deep::Null;
 
-use 5.006;
+use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';

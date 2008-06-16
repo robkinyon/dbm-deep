@@ -13,7 +13,7 @@ my $db1 = DBM::Deep->new(
     autoflush => 1,
     num_txns  => 2,
 );
-seek $db1->_get_self->_storage->{fh}, 0, 0;
+seek $db1->_get_self->_engine->storage->{fh}, 0, 0;
 
 my $db2 = DBM::Deep->new(
     file => $filename,
@@ -94,5 +94,5 @@ cmp_bag( [ keys %{$db2->{x}} ], [qw( yz )], "DB2->X keys correct" );
 cmp_bag( [ keys %{$db1->{x}{yz}} ], [qw( bar )], "DB1->X->XY keys correct" );
 cmp_bag( [ keys %{$db2->{x}{yz}} ], [qw( bar )], "DB2->X->XY keys correct" );
 
-$db1->_get_self->_storage->close( $db1->_get_self );
-$db2->_get_self->_storage->close( $db2->_get_self );
+$db1->_get_self->_engine->storage->close( $db1->_get_self );
+$db2->_get_self->_engine->storage->close( $db2->_get_self );

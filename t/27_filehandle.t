@@ -34,7 +34,7 @@ use_ok( 'DBM::Deep' );
             skip( "No inode tests on Win32", 1 )
                 if ( $^O eq 'MSWin32' || $^O eq 'cygwin' );
             my $db_obj = $db->_get_self;
-            ok( $db_obj->_storage->{inode}, "The inode has been set" );
+            ok( $db_obj->_engine->storage->{inode}, "The inode has been set" );
         }
 
         close($fh);

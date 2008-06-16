@@ -82,9 +82,6 @@ sub _init {
     my $class = shift;
     my ($args) = @_;
 
-    $args->{storage} = DBM::Deep::File->new( $args )
-        unless exists $args->{storage};
-
     # locking implicitly enables autoflush
     if ($args->{locking}) { $args->{autoflush} = 1; }
 
@@ -93,8 +90,6 @@ sub _init {
         type        => TYPE_HASH,
         base_offset => undef,
         staleness   => undef,
-
-        storage     => undef,
         engine      => undef,
     }, $class;
 
@@ -112,7 +107,6 @@ sub _init {
 
       $self->lock_exclusive;
       $self->_engine->setup_fh( $self );
-      $self->_storage->set_inode;
       $self->unlock;
     }; if ( $@ ) {
       my $e = $@;
@@ -137,17 +131,17 @@ sub TIEARRAY {
 
 sub lock_exclusive {
     my $self = shift->_get_self;
-    return $self->_storage->lock_exclusive( $self );
+    return $self->_engine->lock_exclusive( $self );
 }
 *lock = \&lock_exclusive;
 sub lock_shared {
     my $self = shift->_get_self;
-    return $self->_storage->lock_shared( $self );
+    return $self->_engine->lock_shared( $self );
 }
 
 sub unlock {
     my $self = shift->_get_self;
-    return $self->_storage->unlock( $self );
+    return $self->_engine->unlock( $self );
 }
 
 sub _copy_value {
@@ -311,14 +305,14 @@ sub optimize {
     my $self = shift->_get_self;
 
 #XXX Need to create a new test for this
-#    if ($self->_storage->{links} > 1) {
+#    if ($self->_engine->storage->{links} > 1) {
 #        $self->_throw_error("Cannot optimize: reference count is greater than 1");
 #    }
 
     #XXX Do we have to lock the tempfile?
 
     #XXX Should we use tempfile() here instead of a hard-coded name?
-    my $temp_filename = $self->_storage->{file} . '.tmp';
+    my $temp_filename = $self->_engine->storage->{file} . '.tmp';
     my $db_temp = DBM::Deep->new(
         file => $temp_filename,
         type => $self->_type,
@@ -332,13 +326,13 @@ sub optimize {
     $self->lock_exclusive;
     $self->_engine->clear_cache;
     $self->_copy_node( $db_temp );
-    $db_temp->_storage->close;
+    $db_temp->_engine->storage->close;
     undef $db_temp;
 
     ##
     # Attempt to copy user, group and permissions over to new file
     ##
-    $self->_storage->copy_stats( $temp_filename );
+    $self->_engine->storage->copy_stats( $temp_filename );
 
     # q.v. perlport for more information on this variable
     if ( $^O eq 'MSWin32' || $^O eq 'cygwin' ) {
@@ -349,19 +343,19 @@ sub optimize {
         # with a soft copy.
         ##
         $self->unlock;
-        $self->_storage->close;
+        $self->_engine->storage->close;
     }
 
-    if (!rename $temp_filename, $self->_storage->{file}) {
+    if (!rename $temp_filename, $self->_engine->storage->{file}) {
         unlink $temp_filename;
         $self->unlock;
         $self->_throw_error("Optimize failed: Cannot copy temp file over original: $!");
     }
 
     $self->unlock;
-    $self->_storage->close;
+    $self->_engine->storage->close;
 
-    $self->_storage->open;
+    $self->_engine->storage->open;
     $self->lock_exclusive;
     $self->_engine->setup_fh( $self );
     $self->unlock;
@@ -379,7 +373,6 @@ sub clone {
         type        => $self->_type,
         base_offset => $self->_base_offset,
         staleness   => $self->_staleness,
-        storage     => $self->_storage,
         engine      => $self->_engine,
     );
 }
@@ -400,7 +393,7 @@ sub clone {
         my $func = shift;
 
         if ( $is_legal_filter{$type} ) {
-            $self->_storage->{"filter_$type"} = $func;
+            $self->_engine->storage->{"filter_$type"} = $func;
             return 1;
         }
 
@@ -435,11 +428,6 @@ sub commit {
 sub _engine {
     my $self = $_[0]->_get_self;
     return $self->{engine};
-}
-
-sub _storage {
-    my $self = $_[0]->_get_self;
-    return $self->{storage};
 }
 
 sub _type {
@@ -479,7 +467,7 @@ sub STORE {
     my ($key, $value) = @_;
     warn "STORE($self, $key, $value)\n" if DEBUG;
 
-    unless ( $self->_storage->is_writable ) {
+    unless ( $self->_engine->storage->is_writable ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
@@ -487,8 +475,8 @@ sub STORE {
 
     # User may be storing a complex value, in which case we do not want it run
     # through the filtering system.
-    if ( !ref($value) && $self->_storage->{filter_store_value} ) {
-        $value = $self->_storage->{filter_store_value}->( $value );
+    if ( !ref($value) && $self->_engine->storage->{filter_store_value} ) {
+        $value = $self->_engine->storage->{filter_store_value}->( $value );
     }
 
     $self->_engine->write_value( $self, $key, $value);
@@ -514,8 +502,8 @@ sub FETCH {
 
     # Filters only apply to scalar values, so the ref check is making
     # sure the fetched bucket is a scalar, not a child hash or array.
-    return ($result && !ref($result) && $self->_storage->{filter_fetch_value})
-        ? $self->_storage->{filter_fetch_value}->($result)
+    return ($result && !ref($result) && $self->_engine->storage->{filter_fetch_value})
+        ? $self->_engine->storage->{filter_fetch_value}->($result)
         : $result;
 }
 
@@ -527,7 +515,7 @@ sub DELETE {
     my ($key) = @_;
     warn "DELETE($self,$key)\n" if DEBUG;
 
-    unless ( $self->_storage->is_writable ) {
+    unless ( $self->_engine->storage->is_writable ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
@@ -538,8 +526,8 @@ sub DELETE {
     ##
     my $value = $self->_engine->delete_key( $self, $key);
 
-    if (defined $value && !ref($value) && $self->_storage->{filter_fetch_value}) {
-        $value = $self->_storage->{filter_fetch_value}->($value);
+    if (defined $value && !ref($value) && $self->_engine->storage->{filter_fetch_value}) {
+        $value = $self->_engine->storage->{filter_fetch_value}->($value);
     }
 
     $self->unlock;
@@ -571,7 +559,7 @@ sub CLEAR {
     my $self = shift->_get_self;
     warn "CLEAR($self)\n" if DEBUG;
 
-    unless ( $self->_storage->is_writable ) {
+    unless ( $self->_engine->storage->is_writable ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 

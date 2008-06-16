@@ -17,7 +17,7 @@ my $db = DBM::Deep->new(
     num_txns  => 16,
 );
 
-seek $db->_get_self->_storage->{fh}, 0, 0;
+seek $db->_get_self->_engine->storage->{fh}, 0, 0;
 
 my $db2 = DBM::Deep->new(
     file => $filename,

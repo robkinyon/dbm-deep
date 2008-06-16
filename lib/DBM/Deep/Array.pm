@@ -177,12 +177,12 @@ sub FETCHSIZE {
 
     $self->lock_shared;
 
-    my $SAVE_FILTER = $self->_storage->{filter_fetch_value};
-    $self->_storage->{filter_fetch_value} = undef;
+    my $SAVE_FILTER = $self->_engine->storage->{filter_fetch_value};
+    $self->_engine->storage->{filter_fetch_value} = undef;
 
     my $size = $self->FETCH('length') || 0;
 
-    $self->_storage->{filter_fetch_value} = $SAVE_FILTER;
+    $self->_engine->storage->{filter_fetch_value} = $SAVE_FILTER;
 
     $self->unlock;
 
@@ -195,12 +195,12 @@ sub STORESIZE {
 
     $self->lock_exclusive;
 
-    my $SAVE_FILTER = $self->_storage->{filter_store_value};
-    $self->_storage->{filter_store_value} = undef;
+    my $SAVE_FILTER = $self->_engine->storage->{filter_store_value};
+    $self->_engine->storage->{filter_store_value} = undef;
 
     my $result = $self->STORE('length', $new_length, 'length');
 
-    $self->_storage->{filter_store_value} = $SAVE_FILTER;
+    $self->_engine->storage->{filter_store_value} = $SAVE_FILTER;
 
     $self->unlock;
 

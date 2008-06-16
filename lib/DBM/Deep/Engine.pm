@@ -53,6 +53,9 @@ sub new {
     my $class = shift;
     my ($args) = @_;
 
+    $args->{storage} = DBM::Deep::File->new( $args )
+        unless exists $args->{storage};
+
     my $self = bless {
         byte_size   => 4,
 
@@ -443,6 +446,8 @@ sub setup_fh {
 
             $obj->{staleness} = $initial_reference->staleness;
         }
+
+        $self->storage->set_inode;
     }
 
     return 1;
@@ -868,6 +873,26 @@ sub _request_sector {
     );
 
     return $loc;
+}
+
+################################################################################
+
+sub lock_exclusive {
+    my $self = shift;
+    my ($obj) = @_;
+    return $self->storage->lock_exclusive( $obj );
+}
+
+sub lock_shared {
+    my $self = shift;
+    my ($obj) = @_;
+    return $self->storage->lock_shared( $obj );
+}
+
+sub unlock {
+    my $self = shift;
+    my ($obj) = @_;
+    return $self->storage->unlock( $obj );
 }
 
 ################################################################################

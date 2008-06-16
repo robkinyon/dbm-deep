@@ -16,7 +16,7 @@ my ($fh, $filename) = new_fh();
 
     $hash{key1} = 'value';
     is( $hash{key1}, 'value', 'Set and retrieved key1' );
-    tied( %hash )->_get_self->_storage->close( tied( %hash )->_get_self );
+    tied( %hash )->_get_self->_engine->storage->close( tied( %hash )->_get_self );
 }
 
 {
@@ -27,7 +27,7 @@ my ($fh, $filename) = new_fh();
 
     is( keys %hash, 1, "There's one key so far" );
     ok( exists $hash{key1}, "... and it's key1" );
-    tied( %hash )->_get_self->_storage->close( tied( %hash )->_get_self );
+    tied( %hash )->_get_self->_engine->storage->close( tied( %hash )->_get_self );
 }
 
 {
@@ -36,7 +36,7 @@ my ($fh, $filename) = new_fh();
             file => $filename,
             type => DBM::Deep->TYPE_ARRAY,
         };
-        tied( @array )->_get_self->_storage->close( tied( @array )->_get_self );
+        tied( @array )->_get_self->_engine->storage->close( tied( @array )->_get_self );
     } qr/DBM::Deep: File type mismatch/, "\$SIG_TYPE doesn't match file's type";
 }
 
@@ -50,5 +50,5 @@ my ($fh, $filename) = new_fh();
             type => DBM::Deep->TYPE_HASH,
         };
     } qr/DBM::Deep: File type mismatch/, "\$SIG_TYPE doesn't match file's type";
-    $db->_get_self->_storage->close( $db->_get_self );
+    $db->_get_self->_engine->storage->close( $db->_get_self );
 }

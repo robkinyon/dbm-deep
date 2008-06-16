@@ -57,7 +57,7 @@ my ($fh2, $filename2) = new_fh();
     }
     ## Rewind handle otherwise the signature is not recognised below.
     ## The signature check should probably rewind the fh?
-    seek $db->_get_self->_storage->{fh}, 0, 0;
+    seek $db->_get_self->_engine->storage->{fh}, 0, 0;
 }
 
 {

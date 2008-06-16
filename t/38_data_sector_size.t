@@ -39,7 +39,7 @@ my %sizes;
     {
         my $db = DBM::Deep->new( file => $filename );
         verify( $db );
-        $db->_get_self->_storage->close( $db->_get_self );
+        $db->_get_self->_engine->storage->close( $db->_get_self );
     }
 }
 
@@ -60,7 +60,7 @@ my %sizes;
     {
         my $db = DBM::Deep->new( $filename );
         verify( $db );
-         $db->_get_self->_storage->close( $db->_get_self );
+         $db->_get_self->_engine->storage->close( $db->_get_self );
     }
 }
 
@@ -81,7 +81,7 @@ my %sizes;
     {
         my $db = DBM::Deep->new( $filename );
         verify( $db );
-         $db->_get_self->_storage->close( $db->_get_self );
+         $db->_get_self->_engine->storage->close( $db->_get_self );
     }
 }
 
@@ -102,7 +102,7 @@ my %sizes;
     {
         my $db = DBM::Deep->new( $filename );
         verify( $db );
-         $db->_get_self->_storage->close( $db->_get_self );
+         $db->_get_self->_engine->storage->close( $db->_get_self );
     }
 }
 

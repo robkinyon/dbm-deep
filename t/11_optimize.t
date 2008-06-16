@@ -59,7 +59,7 @@ ok( $after < $before, "file size has shrunk" ); # make sure file shrunk
 is( $db->{key1}, 'value1', "key1's value is still there after optimize" );
 is( $db->{a}{c}, 'value2', "key2's value is still there after optimize" );
 
-$db->_get_self->_storage->close( $db->_get_self );
+$db->_get_self->_engine->storage->close( $db->_get_self );
 
 ##
 # now for the tricky one -- try to store a new key while file is being

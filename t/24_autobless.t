@@ -53,7 +53,7 @@ my ($fh, $filename) = new_fh();
     is( $db->{unblessed}{b}[2], 3 );
 
     $db->{blessed_long} = bless {}, 'a' x 1000;
-    $db->_get_self->_storage->close( $db->_get_self );
+    $db->_get_self->_engine->storage->close( $db->_get_self );
 }
 
 {
@@ -89,7 +89,7 @@ my ($fh, $filename) = new_fh();
     is( $db->{blessed}{c}, 'new' );
 
     isa_ok( $db->{blessed_long}, 'a' x 1000 );
-    $db->_get_self->_storage->close( $db->_get_self );
+    $db->_get_self->_engine->storage->close( $db->_get_self );
 }
 
 {
@@ -124,7 +124,7 @@ my ($fh, $filename) = new_fh();
     is( $structure->{unblessed}{b}[0], 1 );
     is( $structure->{unblessed}{b}[1], 2 );
     is( $structure->{unblessed}{b}[2], 3 );
-    $db->_get_self->_storage->close( $db->_get_self );
+    $db->_get_self->_engine->storage->close( $db->_get_self );
 }
 
 {
@@ -155,7 +155,7 @@ my ($fh, $filename) = new_fh();
     is( $db->{unblessed}{b}[0], 1 );
     is( $db->{unblessed}{b}[1], 2 );
     is( $db->{unblessed}{b}[2], 3 );
-    $db->_get_self->_storage->close( $db->_get_self );
+    $db->_get_self->_engine->storage->close( $db->_get_self );
 }
 
 {
@@ -172,7 +172,7 @@ my ($fh, $filename) = new_fh();
         }, 'Foo';
 
         $db->import( { blessed => $obj } );
-        $db->_get_self->_storage->close( $db->_get_self );
+        $db->_get_self->_engine->storage->close( $db->_get_self );
     }
 
     {
@@ -184,7 +184,7 @@ my ($fh, $filename) = new_fh();
         my $blessed = $db->{blessed};
         isa_ok( $blessed, 'Foo' );
         is( $blessed->{a}, 1 );
-        $db->_get_self->_storage->close( $db->_get_self );
+        $db->_get_self->_engine->storage->close( $db->_get_self );
     }
 }
 

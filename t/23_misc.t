@@ -29,7 +29,7 @@ is( $db->{key1}, "value1", "Value set correctly" );
 
 # Testing to verify that the close() will occur if open is called on an open DB.
 #XXX WOW is this hacky ...
-$db->_get_self->_storage->open;
+$db->_get_self->_engine->storage->open;
 is( $db->{key1}, "value1", "Value still set after re-open" );
 
 throws_ok {
@@ -41,7 +41,7 @@ throws_ok {
         file => $filename,
         locking => 1,
     );
-    $db->_get_self->_storage->close( $db->_get_self );
+    $db->_get_self->_engine->storage->close( $db->_get_self );
     ok( !$db->lock, "Calling lock() on a closed database returns false" );
 }
 
@@ -51,6 +51,6 @@ throws_ok {
         locking => 1,
     );
     $db->lock;
-    $db->_get_self->_storage->close( $db->_get_self );
+    $db->_get_self->_engine->storage->close( $db->_get_self );
     ok( !$db->unlock, "Calling unlock() on a closed database returns false" );
 }

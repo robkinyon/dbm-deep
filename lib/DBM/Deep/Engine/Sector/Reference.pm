@@ -331,6 +331,8 @@ sub get_bucket_list {
                     }),
                 });
             }
+
+#XXX Why is this code here? -RobK, 2008-06-15
 #            my $blist = $blist_cache{$idx}
 #                ||= DBM::Deep::Engine::Sector::BucketList->new({
 #                    engine => $engine,

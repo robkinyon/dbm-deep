@@ -72,10 +72,7 @@ sub FIRSTKEY {
     ##
     my $self = shift->_get_self;
 
-    ##
-    # Request shared lock for reading
-    ##
-    $self->lock( $self->LOCK_SH );
+    $self->lock_shared;
     
     my $result = $self->_engine->get_next_key( $self );
     
@@ -96,10 +93,7 @@ sub NEXTKEY {
         ? $self->_storage->{filter_store_key}->($_[0])
         : $_[0];
 
-    ##
-    # Request shared lock for reading
-    ##
-    $self->lock( $self->LOCK_SH );
+    $self->lock_shared;
     
     my $result = $self->_engine->get_next_key( $self, $prev_key );
     

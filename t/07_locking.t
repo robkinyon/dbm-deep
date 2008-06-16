@@ -31,7 +31,7 @@ is( $db->{key2}[1], 2 );
 ##
 # explicit lock
 ##
-$db->lock( DBM::Deep->LOCK_EX );
+$db->lock_exclusive;
 $db->{key1} = "value2";
 $db->unlock();
 is( $db->{key1}, "value2", "key1 is overridden" );

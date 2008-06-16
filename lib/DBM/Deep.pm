@@ -8,7 +8,6 @@ use warnings FATAL => 'all';
 our $VERSION = q(1.0014);
 
 use Data::Dumper ();
-use Fcntl qw( :flock );
 use Scalar::Util ();
 
 use DBM::Deep::Engine;
@@ -111,7 +110,7 @@ sub _init {
     eval {
       local $SIG{'__DIE__'};
 
-      $self->lock;
+      $self->lock_exclusive;
       $self->_engine->setup_fh( $self );
       $self->_storage->set_inode;
       $self->unlock;
@@ -136,14 +135,19 @@ sub TIEARRAY {
     return DBM::Deep::Array->TIEARRAY( @_ );
 }
 
-sub lock {
+sub lock_exclusive {
     my $self = shift->_get_self;
-    return $self->_storage->lock( $self, @_ );
+    return $self->_storage->lock_exclusive( $self );
+}
+*lock = \&lock_exclusive;
+sub lock_shared {
+    my $self = shift->_get_self;
+    return $self->_storage->lock_shared( $self );
 }
 
 sub unlock {
     my $self = shift->_get_self;
-    return $self->_storage->unlock( $self, @_ );
+    return $self->_storage->unlock( $self );
 }
 
 sub _copy_value {
@@ -203,9 +207,9 @@ sub export {
 
     my $temp = $self->_repr;
 
-    $self->lock();
+    $self->lock_exclusive;
     $self->_copy_node( $temp );
-    $self->unlock();
+    $self->unlock;
 
     my $classname = $self->_engine->get_classname( $self );
     if ( defined $classname ) {
@@ -325,7 +329,7 @@ sub optimize {
         )),
     );
 
-    $self->lock();
+    $self->lock_exclusive;
     $self->_engine->clear_cache;
     $self->_copy_node( $db_temp );
     $db_temp->_storage->close;
@@ -344,23 +348,23 @@ sub optimize {
         # before it is overwritten with rename().  This could be redone
         # with a soft copy.
         ##
-        $self->unlock();
+        $self->unlock;
         $self->_storage->close;
     }
 
     if (!rename $temp_filename, $self->_storage->{file}) {
         unlink $temp_filename;
-        $self->unlock();
+        $self->unlock;
         $self->_throw_error("Optimize failed: Cannot copy temp file over original: $!");
     }
 
-    $self->unlock();
+    $self->unlock;
     $self->_storage->close;
 
     $self->_storage->open;
-    $self->lock();
+    $self->lock_exclusive;
     $self->_engine->setup_fh( $self );
-    $self->unlock();
+    $self->unlock;
 
     return 1;
 }
@@ -479,10 +483,7 @@ sub STORE {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
-    ##
-    # Request exclusive lock for writing
-    ##
-    $self->lock( LOCK_EX );
+    $self->lock_exclusive;
 
     # User may be storing a complex value, in which case we do not want it run
     # through the filtering system.
@@ -492,7 +493,7 @@ sub STORE {
 
     $self->_engine->write_value( $self, $key, $value);
 
-    $self->unlock();
+    $self->unlock;
 
     return 1;
 }
@@ -505,14 +506,11 @@ sub FETCH {
     my ($key) = @_;
     warn "FETCH($self,$key)\n" if DEBUG;
 
-    ##
-    # Request shared lock for reading
-    ##
-    $self->lock( LOCK_SH );
+    $self->lock_shared;
 
     my $result = $self->_engine->read_value( $self, $key);
 
-    $self->unlock();
+    $self->unlock;
 
     # Filters only apply to scalar values, so the ref check is making
     # sure the fetched bucket is a scalar, not a child hash or array.
@@ -533,10 +531,7 @@ sub DELETE {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
-    ##
-    # Request exclusive lock for writing
-    ##
-    $self->lock( LOCK_EX );
+    $self->lock_exclusive;
 
     ##
     # Delete bucket
@@ -547,7 +542,7 @@ sub DELETE {
         $value = $self->_storage->{filter_fetch_value}->($value);
     }
 
-    $self->unlock();
+    $self->unlock;
 
     return $value;
 }
@@ -560,14 +555,11 @@ sub EXISTS {
     my ($key) = @_;
     warn "EXISTS($self,$key)\n" if DEBUG;
 
-    ##
-    # Request shared lock for reading
-    ##
-    $self->lock( LOCK_SH );
+    $self->lock_shared;
 
     my $result = $self->_engine->key_exists( $self, $key );
 
-    $self->unlock();
+    $self->unlock;
 
     return $result;
 }
@@ -583,10 +575,7 @@ sub CLEAR {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
-    ##
-    # Request exclusive lock for writing
-    ##
-    $self->lock( LOCK_EX );
+    $self->lock_exclusive;
 
     #XXX Rewrite this dreck to do it in the engine as a tight loop vs.
     # iterating over keys - such a WASTE - is this required for transactional
@@ -608,7 +597,7 @@ sub CLEAR {
         $self->STORESIZE( 0 );
     }
 
-    $self->unlock();
+    $self->unlock;
 
     return 1;
 }

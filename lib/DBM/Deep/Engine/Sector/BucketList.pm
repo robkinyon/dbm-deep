@@ -39,9 +39,8 @@ sub clear {
 sub size {
     my $self = shift;
     unless ( $self->{size} ) {
-        my $e = $self->engine;
         # Base + numbuckets * bucketsize
-        $self->{size} = $self->base_size + $e->max_buckets * $self->bucket_size;
+        $self->{size} = $self->base_size + $self->engine->max_buckets * $self->bucket_size;
     }
     return $self->{size};
 }

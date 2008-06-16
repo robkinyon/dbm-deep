@@ -385,7 +385,7 @@ value.
 
   $db->clear(); # hashes or arrays
 
-=item * lock() / unlock()
+=item * lock_exclusive() / lock_shared() / lock() / unlock()
 
 q.v. L</LOCKING> for more info.
 
@@ -572,15 +572,8 @@ then incremented, then stored again.
   $db->{counter}++;
   $db->unlock();
 
-You can pass C<lock()> an optional argument, which specifies which mode to use
-(exclusive or shared). Use one of these two constants:
-C<DBM::Deep-E<gt>LOCK_EX> or C<DBM::Deep-E<gt>LOCK_SH>. These are passed
-directly to C<flock()>, and are the same as the constants defined in Perl's
-L<Fcntl> module.
-
-  $db->lock( $db->LOCK_SH );
-  # something here
-  $db->unlock();
+If you want a shared lock, you will need to call C<lock_shared()>. C<lock()> is
+an alias to C<lock_exclusive()>.
 
 =head2 Win32/Cygwin
 

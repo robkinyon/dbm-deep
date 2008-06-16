@@ -3,6 +3,10 @@ Revision history for DBM::Deep.
 1.0014 Jun 13 23:15:00 2008 EST
     - (This version is compatible with 1.0013)
     - Fix for RT#36781 (t/44 has an unrequired dependency)
+    - lock() has been aliased to lock_exclusive(). There is now
+      a lock_shared() method. The :flock constants are no longer
+      imported into the DBM::Deep namespace.
+      **** THIS IS AN API CHANGE ****
     - Start the process of optimization.
 
 1.0013 Jun 13 23:15:00 2008 EST

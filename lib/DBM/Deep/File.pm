@@ -168,6 +168,18 @@ sub request_space {
 # times before unlock(), then the same number of unlocks() must
 # be called before the lock is released.
 ##
+sub lock_exclusive {
+    my $self = shift;
+    my ($obj) = @_;
+    return $self->lock( $obj, LOCK_EX );
+}
+
+sub lock_shared {
+    my $self = shift;
+    my ($obj) = @_;
+    return $self->lock( $obj, LOCK_SH );
+}
+
 sub lock {
     my $self = shift;
     my ($obj, $type) = @_;

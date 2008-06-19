@@ -1,4 +1,3 @@
-#TODO: Convert this to a string
 package DBM::Deep::Engine::Sector::Index;
 
 use 5.006_000;
@@ -17,15 +16,14 @@ sub _init {
     unless ( $self->offset ) {
         $self->{offset} = $engine->_request_index_sector( $self->size );
 
-        my $string = chr(0) x $self->size;
-        substr( $string, 0, 1, $engine->SIG_INDEX );
-        $engine->storage->print_at( $self->offset, $string );
+        $self->write( 0, $engine->SIG_INDEX );
     }
 
     return $self;
 }
 
 #XXX Change here
+#XXX Why? -RobK, 2008-06-18
 sub size {
     my $self = shift;
     unless ( $self->{size} ) {
@@ -52,7 +50,7 @@ sub free {
 sub _loc_for {
     my $self = shift;
     my ($idx) = @_;
-    return $self->offset + $self->base_size + $idx * $self->engine->byte_size;
+    return $self->base_size + $idx * $self->engine->byte_size;
 }
 
 sub get_entry {
@@ -66,7 +64,7 @@ sub get_entry {
 
     return unpack(
         $e->StP($e->byte_size),
-        $e->storage->read_at( $self->_loc_for( $idx ), $e->byte_size ),
+        $self->read( $self->_loc_for( $idx ), $e->byte_size ),
     );
 }
 
@@ -79,10 +77,7 @@ sub set_entry {
     DBM::Deep->_throw_error( "set_entry: Out of range ($idx)" )
         if $idx < 0 || $idx >= $e->hash_chars;
 
-    $self->engine->storage->print_at(
-        $self->_loc_for( $idx ),
-        pack( $e->StP($e->byte_size), $loc ),
-    );
+    $self->write( $self->_loc_for( $idx ), pack( $e->StP($e->byte_size), $loc ) );
 }
 
 1;

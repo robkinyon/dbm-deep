@@ -20,15 +20,11 @@ sub _init {
     unless ( $self->offset ) {
         $self->{offset} = $engine->_request_data_sector( $self->size );
 
-        my $string = chr(0) x $self->size;
-
-        substr( $string, 0, 1, $self->type );
-        substr( $string, $self->base_size, $engine->byte_size + 1,
+        $self->write( 0, $self->type );
+        $self->write( $self->base_size,
             pack( $engine->StP($engine->byte_size), 0 )   # Chain loc
           . pack( $engine->StP(1), $self->data_length ),  # Data length
         );
-
-        $engine->storage->print_at( $self->offset, $string );
 
         return;
     }

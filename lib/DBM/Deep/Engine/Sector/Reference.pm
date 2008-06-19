@@ -1,4 +1,3 @@
-#TODO: Convert this to a string
 package DBM::Deep::Engine::Sector::Reference;
 
 use 5.006_000;
@@ -31,22 +30,20 @@ sub _init {
             $class_offset = $class_sector->offset;
         }
 
-        my $string = chr(0) x $self->size;
-        substr( $string, 0, 1, $self->type );
-        substr( $string, $self->base_size, 3 * $e->byte_size,
+        $self->write( 0, $self->type );
+        $self->write( $self->base_size, 
             pack( $e->StP($e->byte_size), 0 )             # Index/BList loc
           . pack( $e->StP($e->byte_size), $class_offset ) # Classname loc
           . pack( $e->StP($e->byte_size), 1 )             # Initial refcount
         );
-        $e->storage->print_at( $self->offset, $string );
     }
     else {
-        $self->{type} = $e->storage->read_at( $self->offset, 1 );
+        $self->{type} = $self->read( 0, $e->SIG_SIZE );
     }
 
     $self->{staleness} = unpack(
         $e->StP($DBM::Deep::Engine::STALE_SIZE),
-        $e->storage->read_at( $self->offset + $e->SIG_SIZE, $DBM::Deep::Engine::STALE_SIZE ),
+        $self->read( $e->SIG_SIZE, $DBM::Deep::Engine::STALE_SIZE ),
     );
 
     return;
@@ -207,8 +204,10 @@ sub get_blist_loc {
     my $self = shift;
 
     my $e = $self->engine;
-    my $blist_loc = $e->storage->read_at( $self->offset + $self->base_size, $e->byte_size );
-    return unpack( $e->StP($e->byte_size), $blist_loc );
+    return unpack(
+        $e->StP($e->byte_size),
+        $self->read( $self->base_size, $e->byte_size ),
+    );
 }
 
 sub get_bucket_list {
@@ -231,9 +230,7 @@ sub get_bucket_list {
             key_md5 => $args->{key_md5},
         });
 
-        $engine->storage->print_at( $self->offset + $self->base_size,
-            pack( $engine->StP($engine->byte_size), $blist->offset ),
-        );
+        $self->write( $self->base_size, pack( $engine->StP($engine->byte_size), $blist->offset ) );
 
         return $blist;
     }
@@ -358,9 +355,7 @@ sub get_bucket_list {
                 $new_index->offset,
             );
         } else {
-            $engine->storage->print_at( $self->offset + $self->base_size,
-                pack( $engine->StP($engine->byte_size), $new_index->offset ),
-            );
+            $self->write( $self->base_size, pack( $engine->StP($engine->byte_size), $new_index->offset ) );
         }
 
         $sector->clear;
@@ -385,8 +380,9 @@ sub get_class_offset {
     my $e = $self->engine;
     return unpack(
         $e->StP($e->byte_size),
-        $e->storage->read_at(
-            $self->offset + $self->base_size + 1 * $e->byte_size, $e->byte_size,
+        $self->read(
+            $self->base_size + 1 * $e->byte_size,
+            $e->byte_size,
         ),
     );
 }
@@ -492,8 +488,9 @@ sub get_refcount {
     my $e = $self->engine;
     return unpack(
         $e->StP($e->byte_size),
-        $e->storage->read_at(
-            $self->offset + $self->base_size + 2 * $e->byte_size, $e->byte_size,
+        $self->read(
+            $self->base_size + 2 * $e->byte_size,
+            $e->byte_size,
         ),
     );
 }
@@ -503,8 +500,8 @@ sub write_refcount {
     my ($num) = @_;
 
     my $e = $self->engine;
-    $e->storage->print_at(
-        $self->offset + $self->base_size + 2 * $e->byte_size,
+    $self->write(
+        $self->base_size + 2 * $e->byte_size,
         pack( $e->StP($e->byte_size), $num ),
     );
 }

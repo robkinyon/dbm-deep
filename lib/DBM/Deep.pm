@@ -465,7 +465,7 @@ sub STORE {
     ##
     my $self = shift->_get_self;
     my ($key, $value) = @_;
-    warn "STORE($self, $key, $value)\n" if DEBUG;
+    warn "STORE($self, $key, @{[defined$value?$value:'undef']})\n" if DEBUG;
 
     unless ( $self->_engine->storage->is_writable ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );

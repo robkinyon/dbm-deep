@@ -36,8 +36,6 @@ sub _init {
 
         my $data_section = $self->size - $self->base_size - $engine->byte_size - 1;
 
-
-
         my $curr_offset = $self->offset;
         my $continue = 1;
         while ( $continue ) {
@@ -62,7 +60,7 @@ sub _init {
             }
 
             my $string = chr(0) x $self->size;
-            substr( $string, 0, 1, $self->type );
+            substr( $string, 0, $engine->SIG_SIZE, $self->type );
             substr( $string, $self->base_size, $engine->byte_size + 1,
                 pack( $engine->StP($engine->byte_size), $next_offset ) # Chain loc
               . pack( $engine->StP(1), $this_len ),                    # Data length

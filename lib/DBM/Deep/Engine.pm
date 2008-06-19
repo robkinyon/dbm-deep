@@ -877,6 +877,39 @@ sub _request_sector {
 
 ################################################################################
 
+sub dirty_sectors {
+    my $self = shift;
+    return $self->{dirty_sectors} ||= {};
+}
+
+sub add_dirty_sector {
+    my $self = shift;
+    my ($sector) = @_;
+
+#    if ( exists $self->dirty_sectors->{ $sector->offset } ) {
+#        DBM::Deep->_throw_error( "We have a duplicate sector!! " . $sector->offset );
+#    }
+
+    $self->dirty_sectors->{ $sector->offset } = $sector;
+}
+
+sub clear_dirty_sectors {
+    my $self = shift;
+    $self->{dirty_sectors} = {};
+}
+
+sub flush {
+    my $self = shift;
+
+    for (values %{ $self->dirty_sectors }) {
+        $_->flush;
+    }
+
+    $self->clear_dirty_sectors;
+}
+
+################################################################################
+
 sub lock_exclusive {
     my $self = shift;
     my ($obj) = @_;
@@ -892,7 +925,12 @@ sub lock_shared {
 sub unlock {
     my $self = shift;
     my ($obj) = @_;
-    return $self->storage->unlock( $obj );
+
+    my $rv = $self->storage->unlock( $obj );
+
+    $self->flush if $rv;
+
+    return $rv;
 }
 
 ################################################################################
@@ -950,6 +988,9 @@ sub _dump_file {
     );
 
     my $return = "";
+
+    # Filesize
+    $return .= "Size: " . (-s $self->storage->{fh}) . $/;
 
     # Header values
     $return .= "NumTxns: " . $self->num_txns . $/;

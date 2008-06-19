@@ -1,4 +1,3 @@
-#TODO: Convert this to a string
 package DBM::Deep::Engine::Sector::BucketList;
 
 use 5.006_000;
@@ -17,9 +16,7 @@ sub _init {
     unless ( $self->offset ) {
         $self->{offset} = $engine->_request_blist_sector( $self->size );
 
-        my $string = chr(0) x $self->size;
-        substr( $string, 0, 1, $engine->SIG_BLIST );
-        $engine->storage->print_at( $self->offset, $string );
+        $self->write( 0, $engine->SIG_BLIST );
     }
 
     if ( $self->{key_md5} ) {
@@ -31,9 +28,9 @@ sub _init {
 
 sub clear {
     my $self = shift;
-    $self->engine->storage->print_at( $self->offset + $self->base_size,
-        chr(0) x ($self->size - $self->base_size), # Zero-fill the data
-    );
+
+    # Zero-fill the data
+    $self->write( $self->base_size, chr(0) x ($self->size - $self->base_size) );
 }
 
 sub size {
@@ -100,14 +97,14 @@ sub chopped_up {
 
     my @buckets;
     foreach my $idx ( 0 .. $e->max_buckets - 1 ) {
-        my $spot = $self->offset + $self->base_size + $idx * $self->bucket_size;
-        my $md5 = $e->storage->read_at( $spot, $e->hash_size );
+        my $spot = $self->base_size + $idx * $self->bucket_size;
+        my $data = $self->read( $spot, $self->bucket_size );
 
-        #XXX If we're chopping, why would we ever have the blank_md5?
-        last if $md5 eq $e->blank_md5;
+        # _dump_file() will run into the blank_md5. Otherwise, we should never run into it.
+        # -RobK, 2008-06-18
+        last if substr( $data, 0, $e->hash_size ) eq $e->blank_md5;
 
-        my $rest = $e->storage->read_at( undef, $self->bucket_size - $e->hash_size );
-        push @buckets, [ $spot, $md5 . $rest ];
+        push @buckets, [ $spot, $data ];
     }
 
     return @buckets;
@@ -120,8 +117,8 @@ sub write_at_next_open {
     #XXX This is such a hack!
     $self->{_next_open} = 0 unless exists $self->{_next_open};
 
-    my $spot = $self->offset + $self->base_size + $self->{_next_open}++ * $self->bucket_size;
-    $self->engine->storage->print_at( $spot, $entry );
+    my $spot = $self->base_size + $self->{_next_open}++ * $self->bucket_size;
+    $self->write( $spot, $entry );
 
     return $spot;
 }
@@ -151,8 +148,8 @@ sub find_md5 {
 
     my $e = $self->engine;
     foreach my $idx ( 0 .. $e->max_buckets - 1 ) {
-        my $potential = $e->storage->read_at(
-            $self->offset + $self->base_size + $idx * $self->bucket_size, $e->hash_size,
+        my $potential = $self->read(
+            $self->base_size + $idx * $self->bucket_size, $e->hash_size,
         );
 
         if ( $potential eq $e->blank_md5 ) {
@@ -178,41 +175,34 @@ sub write_md5 {
     DBM::Deep->_throw_error( "write_md5: no key_md5" ) unless exists $args->{key_md5};
     DBM::Deep->_throw_error( "write_md5: no value" ) unless exists $args->{value};
 
-    my $engine = $self->engine;
+    my $e = $self->engine;
 
-    $args->{trans_id} = $engine->trans_id unless exists $args->{trans_id};
+    $args->{trans_id} = $e->trans_id unless exists $args->{trans_id};
 
-    my $spot = $self->offset + $self->base_size + $self->{idx} * $self->bucket_size;
-    $engine->add_entry( $args->{trans_id}, $spot );
+    my $spot = $self->base_size + $self->{idx} * $self->bucket_size;
+    $e->add_entry( $args->{trans_id}, $self->offset + $spot );
 
     unless ($self->{found}) {
         my $key_sector = DBM::Deep::Engine::Sector::Scalar->new({
-            engine => $engine,
+            engine => $e,
             data   => $args->{key},
         });
 
-        $engine->storage->print_at( $spot,
-            $args->{key_md5},
-            pack( $engine->StP($engine->byte_size), $key_sector->offset ),
-        );
+        $self->write( $spot, $args->{key_md5} . pack( $e->StP($e->byte_size), $key_sector->offset ) );
     }
 
-    my $loc = $spot
-      + $engine->hash_size
-      + $engine->byte_size;
+    my $loc = $spot + $e->hash_size + $e->byte_size;
 
     if ( $args->{trans_id} ) {
-        $loc += $engine->byte_size + ($args->{trans_id} - 1) * ( $engine->byte_size + $DBM::Deep::Engine::STALE_SIZE );
+        $loc += $e->byte_size + ($args->{trans_id} - 1) * ( $e->byte_size + $DBM::Deep::Engine::STALE_SIZE );
 
-        $engine->storage->print_at( $loc,
-            pack( $engine->StP($engine->byte_size), $args->{value}->offset ),
-            pack( $engine->StP($DBM::Deep::Engine::STALE_SIZE), $engine->get_txn_staleness_counter( $args->{trans_id} ) ),
+        $self->write( $loc,
+            pack( $e->StP($e->byte_size), $args->{value}->offset )
+          . pack( $e->StP($DBM::Deep::Engine::STALE_SIZE), $e->get_txn_staleness_counter( $args->{trans_id} ) ),
         );
     }
     else {
-        $engine->storage->print_at( $loc,
-            pack( $engine->StP($engine->byte_size), $args->{value}->offset ),
-        );
+        $self->write( $loc, pack( $e->StP($e->byte_size), $args->{value}->offset ) );
     }
 }
 
@@ -221,31 +211,29 @@ sub mark_deleted {
     my ($args) = @_;
     $args ||= {};
 
-    my $engine = $self->engine;
+    my $e = $self->engine;
 
-    $args->{trans_id} = $engine->trans_id unless exists $args->{trans_id};
+    $args->{trans_id} = $e->trans_id unless exists $args->{trans_id};
 
-    my $spot = $self->offset + $self->base_size + $self->{idx} * $self->bucket_size;
-    $engine->add_entry( $args->{trans_id}, $spot );
+    my $spot = $self->base_size + $self->{idx} * $self->bucket_size;
+    $e->add_entry( $args->{trans_id}, $self->offset + $spot );
 
     my $loc = $spot
-      + $engine->hash_size
-      + $engine->byte_size;
+      + $e->hash_size
+      + $e->byte_size;
 
     if ( $args->{trans_id} ) {
-        $loc += $engine->byte_size + ($args->{trans_id} - 1) * ( $engine->byte_size + $DBM::Deep::Engine::STALE_SIZE );
+        $loc += $e->byte_size + ($args->{trans_id} - 1) * ( $e->byte_size + $DBM::Deep::Engine::STALE_SIZE );
 
-        $engine->storage->print_at( $loc,
-            pack( $engine->StP($engine->byte_size), 1 ), # 1 is the marker for deleted
-            pack( $engine->StP($DBM::Deep::Engine::STALE_SIZE), $engine->get_txn_staleness_counter( $args->{trans_id} ) ),
+        $self->write( $loc,
+            pack( $e->StP($e->byte_size), 1 ) # 1 is the marker for deleted
+          . pack( $e->StP($DBM::Deep::Engine::STALE_SIZE), $e->get_txn_staleness_counter( $args->{trans_id} ) ),
         );
     }
     else {
-        $engine->storage->print_at( $loc,
-            pack( $engine->StP($engine->byte_size), 1 ), # 1 is the marker for deleted
-        );
+        # 1 is the marker for deleted
+        $self->write( $loc, pack( $e->StP($e->byte_size), 1 ) );
     }
-
 }
 
 sub delete_md5 {
@@ -261,13 +249,15 @@ sub delete_md5 {
     });
     my $key_sector = $self->get_key_for;
 
-    my $spot = $self->offset + $self->base_size + $self->{idx} * $self->bucket_size;
-    $engine->storage->print_at( $spot,
-        $engine->storage->read_at(
+    my $spot = $self->base_size + $self->{idx} * $self->bucket_size;
+
+    # Shuffle everything down to cover the deleted bucket's spot.
+    $self->write( $spot,
+        $self->read(
             $spot + $self->bucket_size,
             $self->bucket_size * ( $engine->max_buckets - $self->{idx} - 1 ),
-        ),
-        chr(0) x $self->bucket_size,
+        )
+      . chr(0) x $self->bucket_size,
     );
 
     $key_sector->free;
@@ -290,7 +280,7 @@ sub get_data_location_for {
 
     my $e = $self->engine;
 
-    my $spot = $self->offset + $self->base_size
+    my $spot = $self->base_size
       + $args->{idx} * $self->bucket_size
       + $e->hash_size
       + $e->byte_size;
@@ -299,11 +289,11 @@ sub get_data_location_for {
         $spot += $e->byte_size + ($args->{trans_id} - 1) * ( $e->byte_size + $DBM::Deep::Engine::STALE_SIZE );
     }
 
-    my $buffer = $e->storage->read_at(
-        $spot,
-        $e->byte_size + $DBM::Deep::Engine::STALE_SIZE,
+    my $buffer = $self->read( $spot, $e->byte_size + $DBM::Deep::Engine::STALE_SIZE );
+    my ($loc, $staleness) = unpack(
+        $e->StP($e->byte_size) . ' ' . $e->StP($DBM::Deep::Engine::STALE_SIZE),
+        $buffer,
     );
-    my ($loc, $staleness) = unpack( $e->StP($e->byte_size) . ' ' . $e->StP($DBM::Deep::Engine::STALE_SIZE), $buffer );
 
     # XXX Merge the two if-clauses below
     if ( $args->{trans_id} ) {
@@ -351,8 +341,8 @@ sub get_key_for {
         DBM::Deep->_throw_error( "get_key_for(): Attempting to retrieve $idx" );
     }
 
-    my $location = $self->engine->storage->read_at(
-        $self->offset + $self->base_size + $idx * $self->bucket_size + $self->engine->hash_size,
+    my $location = $self->read(
+        $self->base_size + $idx * $self->bucket_size + $self->engine->hash_size,
         $self->engine->byte_size,
     );
     $location = unpack( $self->engine->StP($self->engine->byte_size), $location );

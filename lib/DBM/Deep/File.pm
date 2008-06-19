@@ -239,9 +239,13 @@ sub unlock {
 
     if ($self->{locking} && $self->{locked} > 0) {
         $self->{locked}--;
-        if (!$self->{locked}) { flock($self->{fh}, LOCK_UN); }
 
-        return 1;
+        if (!$self->{locked}) {
+            flock($self->{fh}, LOCK_UN);
+            return 1;
+        }
+
+        return;
     }
 
     return;

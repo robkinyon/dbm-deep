@@ -5,8 +5,6 @@ use 5.006_000;
 use strict;
 use warnings FATAL => 'all';
 
-our $VERSION = '0.01';
-
 use DBM::Deep::Engine::Sector;
 our @ISA = qw( DBM::Deep::Engine::Sector );
 

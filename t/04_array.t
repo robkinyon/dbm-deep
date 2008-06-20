@@ -19,10 +19,13 @@ my $db = DBM::Deep->new(
 # basic put/get/push
 ##
 $db->[0] = "elem1";
-$db->push( "elem2" );
-$db->put(2, "elem3");
-$db->store(3, "elem4");
+#$db->push( "elem2" );
+#$db->put(2, "elem3");
+#$db->store(3, "elem4");
+warn $db->_engine->_dump_file;
 $db->unshift("elem0");
+warn $db->_engine->_dump_file;
+__END__
 
 is( $db->[0], 'elem0', "Array get for shift works" );
 is( $db->[1], 'elem1', "Array get for array set works" );

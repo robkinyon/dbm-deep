@@ -22,6 +22,9 @@ sub new {
 
     $self->_init;
 
+    # Add new sectors to the sector cache.
+    $self->engine->sector_cache->{$self->offset} = $self;
+
     return $self;
 }
 

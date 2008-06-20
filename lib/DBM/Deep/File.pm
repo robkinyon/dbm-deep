@@ -87,6 +87,13 @@ sub close {
     return 1;
 }
 
+sub size {
+    my $self = shift;
+
+    return 0 unless $self->{fh};
+    return -s $self->{fh};
+}
+
 sub set_inode {
     my $self = shift;
 

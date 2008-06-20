@@ -5,13 +5,6 @@ use 5.006_000;
 use strict;
 use warnings FATAL => 'all';
 
-use DBM::Deep::Engine::Sector::BucketList;
-use DBM::Deep::Engine::Sector::Index;
-use DBM::Deep::Engine::Sector::Null;
-use DBM::Deep::Engine::Sector::Reference;
-use DBM::Deep::Engine::Sector::Scalar;
-use DBM::Deep::Iterator;
-
 # Never import symbols into our namespace. We are a class, not a library.
 # -RobK, 2008-05-27
 use Scalar::Util ();
@@ -46,6 +39,16 @@ my %StP = (
     8 => 'Q', # Usigned quad (no order specified, presumably machine-dependent)
 );
 sub StP { $StP{$_[1]} }
+
+# Import these after the SIG_* definitions because those definitions are used
+# in the headers of these classes. -RobK, 2008-06-20
+use DBM::Deep::Engine::Sector::BucketList;
+use DBM::Deep::Engine::Sector::FileHeader;
+use DBM::Deep::Engine::Sector::Index;
+use DBM::Deep::Engine::Sector::Null;
+use DBM::Deep::Engine::Sector::Reference;
+use DBM::Deep::Engine::Sector::Scalar;
+use DBM::Deep::Iterator;
 
 ################################################################################
 
@@ -183,7 +186,7 @@ sub make_reference {
 
     # This will be a Reference sector
     my $sector = $self->_load_sector( $obj->_base_offset )
-        or DBM::Deep->_throw_error( "How did get_classname fail (no sector for '$obj')?!" );
+        or DBM::Deep->_throw_error( "How did make_reference fail (no sector for '$obj')?!" );
 
     if ( $sector->staleness != $obj->_staleness ) {
         return;
@@ -281,10 +284,10 @@ sub write_value {
 
     # This will be a Reference sector
     my $sector = $self->_load_sector( $obj->_base_offset )
-        or DBM::Deep->_throw_error( "Cannot write to a deleted spot in DBM::Deep." );
+        or DBM::Deep->_throw_error( "1: Cannot write to a deleted spot in DBM::Deep." );
 
     if ( $sector->staleness != $obj->_staleness ) {
-        DBM::Deep->_throw_error( "Cannot write to a deleted spot in DBM::Deep." );
+        DBM::Deep->_throw_error( "2: Cannot write to a deleted spot in DBM::Deep." );
     }
 
     my ($class, $type);
@@ -411,44 +414,43 @@ sub setup_fh {
     my $self = shift;
     my ($obj) = @_;
 
-    # We're opening the file.
-    unless ( $obj->_base_offset ) {
-        my $bytes_read = $self->_read_file_header;
+    return 1 if $obj->_base_offset;
 
-        # Creating a new file
-        unless ( $bytes_read ) {
-            $self->_write_file_header;
+    my $header = DBM::Deep::Engine::Sector::FileHeader->new({
+        engine => $self,
+    });
 
-            # 1) Create Array/Hash entry
-            my $initial_reference = DBM::Deep::Engine::Sector::Reference->new({
-                engine => $self,
-                type   => $obj->_type,
-            });
-            $obj->{base_offset} = $initial_reference->offset;
-            $obj->{staleness} = $initial_reference->staleness;
+    # Creating a new file
+    if ( $header->is_new ) {
+        # 1) Create Array/Hash entry
+        my $sector = DBM::Deep::Engine::Sector::Reference->new({
+            engine => $self,
+            type   => $obj->_type,
+        });
+        $obj->{base_offset} = $sector->offset;
+        $obj->{staleness} = $sector->staleness;
 
-            $self->storage->flush;
-        }
-        # Reading from an existing file
-        else {
-            $obj->{base_offset} = $bytes_read;
-            my $initial_reference = DBM::Deep::Engine::Sector::Reference->new({
-                engine => $self,
-                offset => $obj->_base_offset,
-            });
-            unless ( $initial_reference ) {
-                DBM::Deep->_throw_error("Corrupted file, no master index record");
-            }
-
-            unless ($obj->_type eq $initial_reference->type) {
-                DBM::Deep->_throw_error("File type mismatch");
-            }
-
-            $obj->{staleness} = $initial_reference->staleness;
-        }
-
-        $self->storage->set_inode;
+        $self->flush;
     }
+    # Reading from an existing file
+    else {
+        $obj->{base_offset} = $header->size;
+        my $sector = DBM::Deep::Engine::Sector::Reference->new({
+            engine => $self,
+            offset => $obj->_base_offset,
+        });
+        unless ( $sector ) {
+            DBM::Deep->_throw_error("Corrupted file, no master index record");
+        }
+
+        unless ($obj->_type eq $sector->type) {
+            DBM::Deep->_throw_error("File type mismatch");
+        }
+
+        $obj->{staleness} = $sector->staleness;
+    }
+
+    $self->storage->set_inode;
 
     return 1;
 }
@@ -654,105 +656,6 @@ sub clear_entries {
 
 ################################################################################
 
-{
-    my $header_fixed = length( SIG_FILE ) + 1 + 4 + 4;
-    my $this_file_version = 3;
-
-    sub _write_file_header {
-        my $self = shift;
-
-        my $nt = $self->num_txns;
-        my $bl = $self->txn_bitfield_len;
-
-        my $header_var = 1 + 1 + 1 + 1 + $bl + $STALE_SIZE * ($nt - 1) + 3 * $self->byte_size;
-
-        my $loc = $self->storage->request_space( $header_fixed + $header_var );
-
-        $self->storage->print_at( $loc,
-            SIG_FILE,
-            SIG_HEADER,
-            pack('N', $this_file_version), # At this point, we're at 9 bytes
-            pack('N', $header_var),        # header size
-            # --- Above is $header_fixed. Below is $header_var
-            pack('C', $self->byte_size),
-
-            # These shenanigans are to allow a 256 within a C
-            pack('C', $self->max_buckets - 1),
-            pack('C', $self->data_sector_size - 1),
-
-            pack('C', $nt),
-            pack('C' . $bl, 0 ),                           # Transaction activeness bitfield
-            pack($StP{$STALE_SIZE}.($nt-1), 0 x ($nt-1) ), # Transaction staleness counters
-            pack($StP{$self->byte_size}, 0), # Start of free chain (blist size)
-            pack($StP{$self->byte_size}, 0), # Start of free chain (data size)
-            pack($StP{$self->byte_size}, 0), # Start of free chain (index size)
-        );
-
-        #XXX Set these less fragilely
-        $self->set_trans_loc( $header_fixed + 4 );
-        $self->set_chains_loc( $header_fixed + 4 + $bl + $STALE_SIZE * ($nt-1) );
-
-        return;
-    }
-
-    sub _read_file_header {
-        my $self = shift;
-
-        my $buffer = $self->storage->read_at( 0, $header_fixed );
-        return unless length($buffer);
-
-        my ($file_signature, $sig_header, $file_version, $size) = unpack(
-            'A4 A N N', $buffer
-        );
-
-        unless ( $file_signature eq SIG_FILE ) {
-            $self->storage->close;
-            DBM::Deep->_throw_error( "Signature not found -- file is not a Deep DB" );
-        }
-
-        unless ( $sig_header eq SIG_HEADER ) {
-            $self->storage->close;
-            DBM::Deep->_throw_error( "Pre-1.00 file version found" );
-        }
-
-        unless ( $file_version == $this_file_version ) {
-            $self->storage->close;
-            DBM::Deep->_throw_error(
-                "Wrong file version found - " .  $file_version .
-                " - expected " . $this_file_version
-            );
-        }
-
-        my $buffer2 = $self->storage->read_at( undef, $size );
-        my @values = unpack( 'C C C C', $buffer2 );
-
-        if ( @values != 4 || grep { !defined } @values ) {
-            $self->storage->close;
-            DBM::Deep->_throw_error("Corrupted file - bad header");
-        }
-
-        #XXX Add warnings if values weren't set right
-        @{$self}{qw(byte_size max_buckets data_sector_size num_txns)} = @values;
-
-        # These shenangians are to allow a 256 within a C
-        $self->{max_buckets} += 1;
-        $self->{data_sector_size} += 1;
-
-        my $bl = $self->txn_bitfield_len;
-
-        my $header_var = scalar(@values) + $bl + $STALE_SIZE * ($self->num_txns - 1) + 3 * $self->byte_size;
-        unless ( $size == $header_var ) {
-            $self->storage->close;
-            DBM::Deep->_throw_error( "Unexpected size found ($size <-> $header_var)." );
-        }
-
-        $self->set_trans_loc( $header_fixed + scalar(@values) );
-        $self->set_chains_loc( $header_fixed + scalar(@values) + $bl + $STALE_SIZE * ($self->num_txns - 1) );
-
-        return length($buffer) + length($buffer2);
-    }
-}
-
 sub _load_sector {
     my $self = shift;
     my ($offset) = @_;
@@ -760,51 +663,58 @@ sub _load_sector {
     # Add a catch for offset of 0 or 1
     return if !$offset || $offset <= 1;
 
-    my $type = $self->storage->read_at( $offset, 1 );
-    return if $type eq chr(0);
+    unless ( exists $self->sector_cache->{ $offset } ) {
+        my $type = $self->storage->read_at( $offset, $self->SIG_SIZE );
 
-    if ( $type eq $self->SIG_ARRAY || $type eq $self->SIG_HASH ) {
-        return DBM::Deep::Engine::Sector::Reference->new({
-            engine => $self,
-            type   => $type,
-            offset => $offset,
-        });
-    }
-    # XXX Don't we need key_md5 here?
-    elsif ( $type eq $self->SIG_BLIST ) {
-        return DBM::Deep::Engine::Sector::BucketList->new({
-            engine => $self,
-            type   => $type,
-            offset => $offset,
-        });
-    }
-    elsif ( $type eq $self->SIG_INDEX ) {
-        return DBM::Deep::Engine::Sector::Index->new({
-            engine => $self,
-            type   => $type,
-            offset => $offset,
-        });
-    }
-    elsif ( $type eq $self->SIG_NULL ) {
-        return DBM::Deep::Engine::Sector::Null->new({
-            engine => $self,
-            type   => $type,
-            offset => $offset,
-        });
-    }
-    elsif ( $type eq $self->SIG_DATA ) {
-        return DBM::Deep::Engine::Sector::Scalar->new({
-            engine => $self,
-            type   => $type,
-            offset => $offset,
-        });
-    }
-    # This was deleted from under us, so just return and let the caller figure it out.
-    elsif ( $type eq $self->SIG_FREE ) {
-        return;
+        # XXX Don't we want to do something more proactive here? -RobK, 2008-06-19
+        return if $type eq chr(0);
+
+        if ( $type eq $self->SIG_ARRAY || $type eq $self->SIG_HASH ) {
+            $self->sector_cache->{$offset} = DBM::Deep::Engine::Sector::Reference->new({
+                engine => $self,
+                type   => $type,
+                offset => $offset,
+            });
+        }
+        # XXX Don't we need key_md5 here?
+        elsif ( $type eq $self->SIG_BLIST ) {
+            $self->sector_cache->{$offset} = DBM::Deep::Engine::Sector::BucketList->new({
+                engine => $self,
+                type   => $type,
+                offset => $offset,
+            });
+        }
+        elsif ( $type eq $self->SIG_INDEX ) {
+            $self->sector_cache->{$offset} = DBM::Deep::Engine::Sector::Index->new({
+                engine => $self,
+                type   => $type,
+                offset => $offset,
+            });
+        }
+        elsif ( $type eq $self->SIG_NULL ) {
+            $self->sector_cache->{$offset} = DBM::Deep::Engine::Sector::Null->new({
+                engine => $self,
+                type   => $type,
+                offset => $offset,
+            });
+        }
+        elsif ( $type eq $self->SIG_DATA ) {
+            $self->sector_cache->{$offset} = DBM::Deep::Engine::Sector::Scalar->new({
+                engine => $self,
+                type   => $type,
+                offset => $offset,
+            });
+        }
+        # This was deleted from under us, so just return and let the caller figure it out.
+        elsif ( $type eq $self->SIG_FREE ) {
+            return;
+        }
+        else {
+            DBM::Deep->_throw_error( "'$offset': Don't know what to do with type '$type'" );
+        }
     }
 
-    DBM::Deep->_throw_error( "'$offset': Don't know what to do with type '$type'" );
+    return $self->sector_cache->{$offset};
 }
 
 sub _apply_digest {
@@ -877,9 +787,24 @@ sub _request_sector {
 
 ################################################################################
 
+sub sector_cache {
+    my $self = shift;
+    return $self->{sector_cache} ||= {};
+}
+
+sub clear_sector_cache {
+    my $self = shift;
+    $self->{sector_cache} = {};
+}
+
 sub dirty_sectors {
     my $self = shift;
     return $self->{dirty_sectors} ||= {};
+}
+
+sub clear_dirty_sectors {
+    my $self = shift;
+    $self->{dirty_sectors} = {};
 }
 
 sub add_dirty_sector {
@@ -893,19 +818,17 @@ sub add_dirty_sector {
     $self->dirty_sectors->{ $sector->offset } = $sector;
 }
 
-sub clear_dirty_sectors {
-    my $self = shift;
-    $self->{dirty_sectors} = {};
-}
-
 sub flush {
     my $self = shift;
 
-    for (values %{ $self->dirty_sectors }) {
-        $_->flush;
+    my $sectors = $self->dirty_sectors;
+    for my $offset (sort { $a <=> $b } keys %{ $sectors }) {
+        $sectors->{$offset}->flush;
     }
 
     $self->clear_dirty_sectors;
+
+    $self->clear_sector_cache;
 }
 
 ################################################################################
@@ -971,9 +894,12 @@ sub clear_cache { %{$_[0]->cache} = () }
 
 sub _dump_file {
     my $self = shift;
+    $self->flush;
 
     # Read the header
-    my $spot = $self->_read_file_header();
+    my $header_sector = DBM::Deep::Engine::Sector::FileHeader->new({
+        engine => $self,
+    });
 
     my %types = (
         0 => 'B',
@@ -1018,6 +944,7 @@ sub _dump_file {
         $return .= $/;
     }
 
+    my $spot = $header_sector->size;
     SECTOR:
     while ( $spot < $self->storage->{end} ) {
         # Read each sector in order.

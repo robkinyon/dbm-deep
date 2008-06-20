@@ -236,7 +236,7 @@ sub get_bucket_list {
     }
 
     my $sector = $engine->_load_sector( $blist_loc )
-        or DBM::Deep->_throw_error( "Cannot read sector at $blist_loc in get_bucket_list()" );
+        or DBM::Deep->_throw_error( "1: Cannot read sector at $blist_loc in get_bucket_list()" );
     my $i = 0;
     my $last_sector = undef;
     while ( $sector->isa( 'DBM::Deep::Engine::Sector::Index' ) ) {
@@ -244,7 +244,7 @@ sub get_bucket_list {
         $last_sector = $sector;
         if ( $blist_loc ) {
             $sector = $engine->_load_sector( $blist_loc )
-                or DBM::Deep->_throw_error( "Cannot read sector at $blist_loc in get_bucket_list()" );
+                or DBM::Deep->_throw_error( "2: Cannot read sector at $blist_loc in get_bucket_list()" );
         }
         else {
             $sector = undef;

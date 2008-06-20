@@ -1,4 +1,4 @@
-#TODO: Convert this to a string
+#TODO: Add chaining back in.
 package DBM::Deep::Engine::Sector::Scalar;
 
 use 5.006_000;
@@ -35,44 +35,18 @@ sub _init {
         my $dlen = length $data;
 
         my $data_section = $self->size - $self->base_size - $engine->byte_size - 1;
+        my $next_offset = 0;
 
-        my $curr_offset = $self->offset;
-        my $continue = 1;
-        while ( $continue ) {
-            my $next_offset = 0;
-
-            my ($leftover, $this_len, $chunk);
-            if ( $dlen > $data_section ) {
-                $leftover = 0;
-                $this_len = $data_section;
-                $chunk = substr( $data, 0, $this_len );
-
-                $dlen -= $data_section;
-                $next_offset = $engine->_request_data_sector( $self->size );
-                $data = substr( $data, $this_len );
-            }
-            else {
-                $leftover = $data_section - $dlen;
-                $this_len = $dlen;
-                $chunk = $data;
-
-                $continue = 0;
-            }
-
-            my $string = chr(0) x $self->size;
-            substr( $string, 0, $engine->SIG_SIZE, $self->type );
-            substr( $string, $self->base_size, $engine->byte_size + 1,
-                pack( $engine->StP($engine->byte_size), $next_offset ) # Chain loc
-              . pack( $engine->StP(1), $this_len ),                    # Data length
-            );
-            substr( $string, $self->base_size + $engine->byte_size + 1, $this_len,
-                $chunk,
-            );
-
-            $engine->storage->print_at( $curr_offset, $string );
-
-            $curr_offset = $next_offset;
+        if ( $dlen > $data_section ) {
+            DBM::Deep->_throw_error( "Storage of values longer than $data_section not supported." );
         }
+
+        $self->write( 0, $self->type );
+        $self->write( $self->base_size,
+            pack( $engine->StP($engine->byte_size), $next_offset ) # Chain loc
+          . pack( $engine->StP(1), $dlen )                         # Data length
+          . $data
+        );
 
         return;
     }
@@ -81,19 +55,18 @@ sub _init {
 sub data_length {
     my $self = shift;
 
-    my $buffer = $self->engine->storage->read_at(
-        $self->offset + $self->base_size + $self->engine->byte_size, 1
+    return unpack(
+        $self->engine->StP(1),
+        $self->read( $self->base_size + $self->engine->byte_size, 1 ),
     );
-
-    return unpack( $self->engine->StP(1), $buffer );
 }
 
 sub chain_loc {
     my $self = shift;
     return unpack(
         $self->engine->StP($self->engine->byte_size),
-        $self->engine->storage->read_at(
-            $self->offset + $self->base_size,
+        $self->read(
+            $self->base_size,
             $self->engine->byte_size,
         ),
     );
@@ -101,16 +74,12 @@ sub chain_loc {
 
 sub data {
     my $self = shift;
-#    my ($args) = @_;
-#    $args ||= {};
 
     my $data;
     while ( 1 ) {
         my $chain_loc = $self->chain_loc;
 
-        $data .= $self->engine->storage->read_at(
-            $self->offset + $self->base_size + $self->engine->byte_size + 1, $self->data_length,
-        );
+        $data .= $self->read( $self->base_size + $self->engine->byte_size + 1, $self->data_length );
 
         last unless $chain_loc;
 

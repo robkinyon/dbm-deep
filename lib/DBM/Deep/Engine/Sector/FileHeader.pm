@@ -108,7 +108,10 @@ sub _init {
         my $bl = $e->txn_bitfield_len;
         $e->set_chains_loc( $header_fixed + scalar(@values) + $bl + $DBM::Deep::Engine::STALE_SIZE * ($e->num_txns - 1) );
 
-        $self->{is_new} = 1;
+        # Make sure we set up the string so that the caching works. -RobK, 2008-06-20
+        $self->{string} = $buffer . $buffer2;
+
+        $self->{is_new} = 0;
     }
 }
 

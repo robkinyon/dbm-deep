@@ -26,11 +26,17 @@ sub _init {
 #XXX Why? -RobK, 2008-06-18
 sub size {
     my $self = shift;
-    unless ( $self->{size} ) {
-        my $e = $self->engine;
-        $self->{size} = $self->base_size + $e->byte_size * $e->hash_chars;
+    if ( ref($self) ) {
+        unless ( $self->{size} ) {
+            my $e = $self->engine;
+            $self->{size} = $self->base_size + $e->byte_size * $e->hash_chars;
+        }
+        return $self->{size};
     }
-    return $self->{size};
+    else {
+        my $e = shift;
+        return $self->base_size($e) + $e->byte_size * $e->hash_chars;
+    }
 }
 
 sub free_meth { return '_add_free_index_sector' }

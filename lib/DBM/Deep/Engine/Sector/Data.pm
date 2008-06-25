@@ -9,7 +9,10 @@ use DBM::Deep::Engine::Sector;
 our @ISA = qw( DBM::Deep::Engine::Sector );
 
 # This is in bytes
-sub size { $_[0]{engine}->data_sector_size }
+sub size {
+    my $e = ref($_[0]) ? $_[0]{engine} : $_[1];
+    return $e->data_sector_size;
+}
 sub free_meth { return '_add_free_data_sector' }
 
 sub clone {

@@ -35,11 +35,17 @@ sub clear {
 
 sub size {
     my $self = shift;
-    unless ( $self->{size} ) {
-        # Base + numbuckets * bucketsize
-        $self->{size} = $self->base_size + $self->engine->max_buckets * $self->bucket_size;
+    if ( ref($self) ) {
+        unless ( $self->{size} ) {
+            # Base + numbuckets * bucketsize
+            $self->{size} = $self->base_size + $self->engine->max_buckets * $self->bucket_size;
+        }
+        return $self->{size};
     }
-    return $self->{size};
+    else {
+        my $e = shift;
+        return $self->base_size($e) + $e->max_buckets * $self->bucket_size($e);
+    }
 }
 
 sub free_meth { return '_add_free_blist_sector' }
@@ -80,13 +86,20 @@ sub free {
 
 sub bucket_size {
     my $self = shift;
-    unless ( $self->{bucket_size} ) {
-        my $e = $self->engine;
-        # Key + head (location) + transactions (location + staleness-counter)
-        my $location_size = $e->byte_size + $e->byte_size + ($e->num_txns - 1) * ($e->byte_size + $DBM::Deep::Engine::STALE_SIZE);
-        $self->{bucket_size} = $e->hash_size + $location_size;
+    if ( ref($self) ) {
+        unless ( $self->{bucket_size} ) {
+            my $e = $self->engine;
+            # Key + head (location) + transactions (location + staleness-counter)
+            my $location_size = $e->byte_size + $e->byte_size + ($e->num_txns - 1) * ($e->byte_size + $DBM::Deep::Engine::STALE_SIZE);
+            $self->{bucket_size} = $e->hash_size + $location_size;
+        }
+        return $self->{bucket_size};
     }
-    return $self->{bucket_size};
+    else {
+        my $e = shift;
+        my $location_size = $e->byte_size + $e->byte_size + ($e->num_txns - 1) * ($e->byte_size + $DBM::Deep::Engine::STALE_SIZE);
+        return $e->hash_size + $location_size;
+    }
 }
 
 # XXX This is such a poor hack. I need to rethink this code.

@@ -416,9 +416,7 @@ sub setup_fh {
 
     return 1 if $obj->_base_offset;
 
-    my $header = DBM::Deep::Engine::Sector::FileHeader->new({
-        engine => $self,
-    });
+    my $header = $self->_load_header;
 
     # Creating a new file
     if ( $header->is_new ) {
@@ -656,136 +654,98 @@ sub clear_entries {
 
 ################################################################################
 
-sub _load_sector {
-    my $self = shift;
-    my ($offset) = @_;
-
-    # Add a catch for offset of 0 or 1
-    return if !$offset || $offset <= 1;
-
-    unless ( exists $self->sector_cache->{ $offset } ) {
-        my $type = $self->storage->read_at( $offset, $self->SIG_SIZE );
-
-        # XXX Don't we want to do something more proactive here? -RobK, 2008-06-19
-        return if $type eq chr(0);
-
-        if ( $type eq $self->SIG_ARRAY || $type eq $self->SIG_HASH ) {
-            $self->sector_cache->{$offset} = DBM::Deep::Engine::Sector::Reference->new({
-                engine => $self,
-                type   => $type,
-                offset => $offset,
-            });
-        }
-        # XXX Don't we need key_md5 here?
-        elsif ( $type eq $self->SIG_BLIST ) {
-            $self->sector_cache->{$offset} = DBM::Deep::Engine::Sector::BucketList->new({
-                engine => $self,
-                type   => $type,
-                offset => $offset,
-            });
-        }
-        elsif ( $type eq $self->SIG_INDEX ) {
-            $self->sector_cache->{$offset} = DBM::Deep::Engine::Sector::Index->new({
-                engine => $self,
-                type   => $type,
-                offset => $offset,
-            });
-        }
-        elsif ( $type eq $self->SIG_NULL ) {
-            $self->sector_cache->{$offset} = DBM::Deep::Engine::Sector::Null->new({
-                engine => $self,
-                type   => $type,
-                offset => $offset,
-            });
-        }
-        elsif ( $type eq $self->SIG_DATA ) {
-            $self->sector_cache->{$offset} = DBM::Deep::Engine::Sector::Scalar->new({
-                engine => $self,
-                type   => $type,
-                offset => $offset,
-            });
-        }
-        # This was deleted from under us, so just return and let the caller figure it out.
-        elsif ( $type eq $self->SIG_FREE ) {
-            return;
-        }
-        else {
-            DBM::Deep->_throw_error( "'$offset': Don't know what to do with type '$type'" );
-        }
-    }
-
-    return $self->sector_cache->{$offset};
-}
-
 sub _apply_digest {
     my $self = shift;
     return $self->{digest}->(@_);
 }
 
 sub _add_free_blist_sector { shift->_add_free_sector( 0, @_ ) }
-sub _add_free_data_sector { shift->_add_free_sector( 1, @_ ) }
+sub _add_free_data_sector  { shift->_add_free_sector( 1, @_ ) }
 sub _add_free_index_sector { shift->_add_free_sector( 2, @_ ) }
-
-sub _add_free_sector {
-    my $self = shift;
-    my ($multiple, $offset, $size) = @_;
-
-    my $chains_offset = $multiple * $self->byte_size;
-
-    my $storage = $self->storage;
-
-    # Increment staleness.
-    # XXX Can this increment+modulo be done by "&= 0x1" ?
-    my $staleness = unpack( $StP{$STALE_SIZE}, $storage->read_at( $offset + SIG_SIZE, $STALE_SIZE ) );
-    $staleness = ($staleness + 1 ) % ( 2 ** ( 8 * $STALE_SIZE ) );
-    $storage->print_at( $offset + SIG_SIZE, pack( $StP{$STALE_SIZE}, $staleness ) );
-
-    my $old_head = $storage->read_at( $self->chains_loc + $chains_offset, $self->byte_size );
-
-    $storage->print_at( $self->chains_loc + $chains_offset,
-        pack( $StP{$self->byte_size}, $offset ),
-    );
-
-    # Record the old head in the new sector after the signature and staleness counter
-    $storage->print_at( $offset + SIG_SIZE + $STALE_SIZE, $old_head );
-}
+sub _add_free_sector       { shift->_load_header->add_free_sector( @_ ) }
 
 sub _request_blist_sector { shift->_request_sector( 0, @_ ) }
-sub _request_data_sector { shift->_request_sector( 1, @_ ) }
+sub _request_data_sector  { shift->_request_sector( 1, @_ ) }
 sub _request_index_sector { shift->_request_sector( 2, @_ ) }
-
-sub _request_sector {
-    my $self = shift;
-    my ($multiple, $size) = @_;
-
-    my $chains_offset = $multiple * $self->byte_size;
-
-    my $old_head = $self->storage->read_at( $self->chains_loc + $chains_offset, $self->byte_size );
-    my $loc = unpack( $StP{$self->byte_size}, $old_head );
-
-    # We don't have any free sectors of the right size, so allocate a new one.
-    unless ( $loc ) {
-        my $offset = $self->storage->request_space( $size );
-
-        # Zero out the new sector. This also guarantees correct increases
-        # in the filesize.
-        $self->storage->print_at( $offset, chr(0) x $size );
-
-        return $offset;
-    }
-
-    # Read the new head after the signature and the staleness counter
-    my $new_head = $self->storage->read_at( $loc + SIG_SIZE + $STALE_SIZE, $self->byte_size );
-    $self->storage->print_at( $self->chains_loc + $chains_offset, $new_head );
-    $self->storage->print_at(
-        $loc + SIG_SIZE + $STALE_SIZE,
-        pack( $StP{$self->byte_size}, 0 ),
-    );
-
-    return $loc;
-}
+sub _request_sector       { shift->_load_header->request_sector( @_ ) }
 
 ################################################################################
+
+{
+    my %t = (
+        SIG_ARRAY => 'Reference',
+        SIG_HASH  => 'Reference',
+        SIG_BLIST => 'BucketList',
+        SIG_INDEX => 'Index',
+        SIG_NULL  => 'Null',
+        SIG_DATA  => 'Scalar',
+    );
+
+    my %class_for;
+    while ( my ($k,$v) = each %t ) {
+        $class_for{ DBM::Deep::Engine->$k } = "DBM::Deep::Engine::Sector::$v";
+    }
+
+    sub load_sector {
+        my $self = shift;
+        my ($offset) = @_;
+
+        #warn join(':',(caller)[0,2]) . " -> $offset\n";
+        my $data = $self->get_data( $offset )
+            or return;#die "Cannot read from '$offset'\n";
+        my $type = substr( $$data, 0, 1 );
+        my $class = $class_for{ $type };
+        return $class->new({
+            engine => $self,
+            type   => $type,
+            offset => $offset,
+        });
+    }
+    *_load_sector = \&load_sector;
+
+    sub load_header {
+        my $self = shift;
+
+        #XXX Does this mean we make too many objects? -RobK, 2008-06-23
+        return DBM::Deep::Engine::Sector::FileHeader->new({
+            engine => $self,
+            offset => 0,
+        });
+    }
+    *_load_header = \&load_header;
+
+    sub get_data {
+        my $self = shift;
+        my ($offset, $size) = @_;
+        return unless defined $offset;
+
+        unless ( exists $self->sector_cache->{$offset} ) {
+            # Don't worry about the header sector. It will manage itself.
+            return unless $offset;
+
+            if ( !defined $size ) {
+                my $type = $self->storage->read_at( $offset, 1 )
+                    or die "($offset): Cannot read from '$offset' to find the type\n";
+
+                if ( $type eq $self->SIG_FREE ) {
+                    return;
+                }
+
+                my $class = $class_for{$type}
+                    or die "($offset): Cannot find class for '$type'\n";
+                $size = $class->size( $self )
+                    or die "($offset): '$class' doesn't return a size\n";
+                $self->sector_cache->{$offset} = $type . $self->storage->read_at( undef, $size - 1 );
+            }
+            else {
+                $self->sector_cache->{$offset} = $self->storage->read_at( $offset, $size )
+                    or return;
+            }
+        }
+
+        return \$self->sector_cache->{$offset};
+    }
+}
 
 sub sector_cache {
     my $self = shift;
@@ -809,13 +769,9 @@ sub clear_dirty_sectors {
 
 sub add_dirty_sector {
     my $self = shift;
-    my ($sector) = @_;
+    my ($offset) = @_;
 
-#    if ( exists $self->dirty_sectors->{ $sector->offset } ) {
-#        DBM::Deep->_throw_error( "We have a duplicate sector!! " . $sector->offset );
-#    }
-
-    $self->dirty_sectors->{ $sector->offset } = $sector;
+    $self->dirty_sectors->{ $offset } = undef;
 }
 
 sub flush {
@@ -823,7 +779,7 @@ sub flush {
 
     my $sectors = $self->dirty_sectors;
     for my $offset (sort { $a <=> $b } keys %{ $sectors }) {
-        $sectors->{$offset}->flush;
+        $self->storage->print_at( $offset, $self->sector_cache->{$offset} );
     }
 
     $self->clear_dirty_sectors;

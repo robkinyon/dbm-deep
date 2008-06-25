@@ -11,19 +11,7 @@ sub new {
     my $self = bless $_[1], $_[0];
     Scalar::Util::weaken( $self->{engine} );
 
-    if ( $self->offset ) {
-        $self->{string} = $self->engine->storage->read_at(
-            $self->offset, $self->size,
-        );
-    }
-    else {
-        $self->{string} = chr(0) x $self->size;
-    }
-
     $self->_init;
-
-    # Add new sectors to the sector cache.
-    $self->engine->sector_cache->{$self->offset} = $self;
 
     return $self;
 }
@@ -36,9 +24,13 @@ sub offset { $_[0]{offset} }
 sub type   { $_[0]{type}   }
 
 sub base_size {
-   my $self = shift;
-   no warnings 'once';
-   return $self->engine->SIG_SIZE + $DBM::Deep::Engine::STALE_SIZE;
+    my $self = shift;
+    if ( ref($self) ) {
+        return $self->engine->SIG_SIZE + $DBM::Deep::Engine::STALE_SIZE;
+    }
+    else {
+        return $_[0]->SIG_SIZE + $DBM::Deep::Engine::STALE_SIZE;
+    }
 }
 
 sub free {
@@ -49,33 +41,26 @@ sub free {
     $self->write( 0, $e->SIG_FREE );
     $self->write( $self->base_size, chr(0) x ($self->size - $self->base_size) );
 
-    $e->flush;
-
-#    $e->storage->print_at( $self->offset, $e->SIG_FREE );
-#    # Skip staleness counter
-#    $e->storage->print_at( $self->offset + $self->base_size,
-#        chr(0) x ($self->size - $self->base_size),
-#    );
-
-    #TODO When freeing two sectors, we cannot flush them right away! This means the following:
-    # 1) The header has to understand about unflushed items.
-    # 2) Loading a sector has to go through a cache to make sure we see what's already been loaded.
-    # 3) The header should be cached.
-
     my $free_meth = $self->free_meth;
-    $e->$free_meth( $self->offset, $self->size );
+    $e->$free_meth( $self );
 
     return;
 }
 
 sub read {
     my $self = shift;
-    my ($start, $length) = @_;
-    if ( $length ) {
-        return substr( $self->{string}, $start, $length );
+
+    if ( @_ == 1 ) {
+        return substr( ${$self->engine->get_data( $self->offset, $self->size )}, $_[0] );
+    }
+    elsif ( @_ == 2 ) {
+        return substr( ${$self->engine->get_data( $self->offset, $self->size )}, $_[0], $_[1] );
+    }
+    elsif ( @_ < 1 ) {
+        die "read( start [, length ]): No parameters found.";
     }
     else {
-        return substr( $self->{string}, $start );
+        die "read( start [, length ]): Too many parameters found (@_).";
     }
 }
 
@@ -83,19 +68,14 @@ sub write {
     my $self = shift;
     my ($start, $text) = @_;
 
-    substr( $self->{string}, $start, length($text) ) = $text;
+    substr( ${$self->engine->get_data( $self->offset, $self->size )}, $start, length($text) ) = $text;
 
     $self->mark_dirty;
 }
 
 sub mark_dirty {
     my $self = shift;
-    $self->engine->add_dirty_sector( $self );
-}
-
-sub flush {
-    my $self = shift;
-    $self->engine->storage->print_at( $self->offset, $self->{string} );
+    $self->engine->add_dirty_sector( $self->offset );
 }
 
 1;

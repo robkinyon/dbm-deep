@@ -181,4 +181,3 @@ throws_ok {
 throws_ok {
     $db->exists(undef);
 } qr/Cannot use an undefined hash key/, "EXISTS fails on an undefined key";
-

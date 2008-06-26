@@ -12,6 +12,8 @@ use t::common qw( new_fh );
 
 plan tests => 9;
 
+my $locked = 0;
+
 use_ok( 'DBM::Deep' );
 
 diag "This test can take up to a minute to run. Please be patient.";
@@ -22,7 +24,7 @@ my $db = DBM::Deep->new(
 	type => DBM::Deep->TYPE_HASH,
 );
 
-#$db->lock_exclusive;
+$db->lock_exclusive if $locked;
 
 $db->{foo} = {};
 my $foo = $db->{foo};
@@ -54,6 +56,7 @@ cmp_ok( scalar(@keys), '==', $max_keys + 1, "Number of keys is correct" );
 my @control =  sort map { "hello $_" } 0 .. $max_keys;
 cmp_deeply( \@keys, \@control, "Correct keys are there" );
 
+warn localtime(time) . ": before exists\n";
 ok( !exists $foo->{does_not_exist}, "EXISTS works on large hashes for non-existent keys" );
 is( $foo->{does_not_exist}, undef, "autovivification works on large hashes" );
 ok( exists $foo->{does_not_exist}, "EXISTS works on large hashes for newly-existent keys" );
@@ -64,4 +67,4 @@ $db->clear;
 warn localtime(time) . ": after clear\n";
 cmp_ok( scalar(keys %$db), '==', 0, "Number of keys after clear() is correct" );
 
-#$db->unlock;
+$db->unlock if $locked;

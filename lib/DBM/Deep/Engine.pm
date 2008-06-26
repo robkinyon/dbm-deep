@@ -567,13 +567,7 @@ sub commit {
 
 sub read_txn_slots {
     my $self = shift;
-    my $bl = $self->txn_bitfield_len;
-    my $num_bits = $bl * 8;
-    return split '', unpack( 'b'.$num_bits,
-        $self->storage->read_at(
-            $self->trans_loc, $bl,
-        )
-    );
+    return $self->_load_header->read_txn_slots;
 }
 
 sub write_txn_slots {

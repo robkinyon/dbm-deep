@@ -193,5 +193,13 @@ sub request_sector {
     return $loc;
 }
 
+sub read_txn_slots {
+    my $self = shift;
+    my $e = $self->engine;
+    my $bl = $e->txn_bitfield_len;
+    my $num_bits = $bl * 8;
+    return split '', unpack( 'b'.$num_bits, $self->read( $e->trans_loc, $bl ) );
+}
+
 1;
 __END__

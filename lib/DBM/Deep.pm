@@ -610,7 +610,6 @@ sub delete { (shift)->DELETE( @_ ) }
 sub exists { (shift)->EXISTS( @_ ) }
 sub clear { (shift)->CLEAR( @_ ) }
 
-sub flush      {shift->_get_self->_engine->flush;}
 sub _dump_file {shift->_get_self->_engine->_dump_file;}
 
 1;

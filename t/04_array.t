@@ -22,10 +22,7 @@ $db->[0] = "elem1";
 $db->push( "elem2" );
 $db->put(2, "elem3");
 $db->store(3, "elem4");
-#warn $db->_engine->_dump_file;
 $db->unshift("elem0");
-#warn $db->_engine->_dump_file;
-#__END__
 
 is( $db->[0], 'elem0', "Array get for shift works" );
 is( $db->[1], 'elem1', "Array get for array set works" );
@@ -66,24 +63,16 @@ is( $db->fetch(4), 'elem4.1' );
 
 throws_ok {
     $db->[-6] = 'whoops!';
-} qr/Modification of non-creatable array value attempted, subscript -6/, "Correct error thrown";
+} qr/Modification of non-creatable array value attempted, subscript -6/,
+  "Correct error thrown when attempting to modify a non-creatable array value";
 
-warn "1: \n" . $db->_engine->_dump_file;
 my $popped = $db->pop;
-warn "2: \n" . $db->_engine->_dump_file;
 is( $db->length, 4, "... and we have four after popping" );
-warn "3: \n" . $db->_engine->_dump_file;
 is( $db->[0], 'elem0', "0th element still there after popping" );
-warn "4: \n" . $db->_engine->_dump_file;
 is( $db->[1], 'elem1', "1st element still there after popping" );
-warn "5: \n" . $db->_engine->_dump_file;
 is( $db->[2], 'elem2', "2nd element still there after popping" );
-warn "6: \n" . $db->_engine->_dump_file;
 is( $db->[3], 'elem3', "3rd element still there after popping" );
-warn "7: \n" . $db->_engine->_dump_file;
 is( $popped, 'elem4.1', "Popped value is correct" );
-
-die $db->_engine->_dump_file;
 
 my $shifted = $db->shift;
 is( $db->length, 3, "... and we have three after shifting" );
@@ -145,8 +134,6 @@ is( $db->length(), 0, "After pop() on empty array, length is still 0" );
 is( $db->shift, undef, "shift on an empty array returns undef" );
 is( $db->length(), 0, "After shift() on empty array, length is still 0" );
 
-warn "BEFORE: " . $db->_engine->_dump_file;
-__END__
 is( $db->unshift( 1, 2, 3 ), 3, "unshift returns the number of elements in the array" );
 is( $db->unshift( 1, 2, 3 ), 6, "unshift returns the number of elements in the array" );
 is( $db->push( 1, 2, 3 ), 9, "push returns the number of elements in the array" );

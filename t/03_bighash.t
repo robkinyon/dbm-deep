@@ -22,6 +22,8 @@ my $db = DBM::Deep->new(
 	type => DBM::Deep->TYPE_HASH,
 );
 
+#$db->lock_exclusive;
+
 $db->{foo} = {};
 my $foo = $db->{foo};
 
@@ -61,3 +63,5 @@ warn localtime(time) . ": before clear\n";
 $db->clear;
 warn localtime(time) . ": after clear\n";
 cmp_ok( scalar(keys %$db), '==', 0, "Number of keys after clear() is correct" );
+
+#$db->unlock;

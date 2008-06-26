@@ -189,15 +189,11 @@ sub FETCHSIZE {
     $self->_engine->storage->{filter_fetch_value} = undef;
 
     # If there is no flushing, then things get out of sync.
-#    warn "FETCHSIZE BEG: " . $self->_engine->_dump_file;
     my $size = $self->FETCH('length') || 0;
-#    warn "FETCHSIZE AFT: " . $self->_engine->_dump_file;
 
     $self->_engine->storage->{filter_fetch_value} = $SAVE_FILTER;
 
     $self->unlock;
-
-#    warn "FETCHSIZE END: " . $self->_engine->_dump_file;
 
     return $size;
 }
@@ -314,15 +310,12 @@ sub UNSHIFT {
             $self->_move_value( $i, $i+$new_size );
         }
 
-#        warn "BEFORE: " . $self->_dump_file;
         $self->STORESIZE( $length + $new_size );
     }
 
-#    $self->_engine->flush;
     for (my $i = 0; $i < $new_size; $i++) {
         $self->STORE( $i, $new_elements[$i] );
     }
-        warn "AFTER : " . $self->_dump_file;
 
     $self->unlock;
 

@@ -690,7 +690,6 @@ sub _request_sector       { shift->_load_header->request_sector( @_ ) }
         my $self = shift;
         my ($offset) = @_;
 
-        #warn join(':',(caller)[0,2]) . " -> $offset\n";
         my $data = $self->get_data( $offset )
             or return;#die "Cannot read from '$offset'\n";
         my $type = substr( $$data, 0, 1 );

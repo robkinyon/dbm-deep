@@ -7,7 +7,7 @@ use warnings FATAL => 'all';
 
 use Fcntl qw( :DEFAULT :flock :seek );
 
-use constant DEBUG => 0;
+use constant DEBUG => 1;
 
 sub new {
     my $class = shift;
@@ -110,6 +110,7 @@ sub print_at {
     my $self = shift;
     my $loc  = shift;
 
+    warn "print_at called\n";
     local ($/,$\);
 
     my $fh = $self->{fh};

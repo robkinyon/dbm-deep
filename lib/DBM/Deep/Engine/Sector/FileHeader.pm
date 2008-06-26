@@ -183,10 +183,10 @@ sub request_sector {
     }
 
     # Need to load the new sector so we can read from it.
-    my $new_sector = $self->engine->storage->read_at( $loc, $size );
+    my $new_sector = $self->engine->get_data( $loc, $size );
 
     # Read the new head after the signature and the staleness counter
-    my $new_head = substr( $new_sector, $e->SIG_SIZE + $DBM::Deep::Engine::STALE_SIZE, $e->byte_size );
+    my $new_head = substr( $$new_sector, $e->SIG_SIZE + $DBM::Deep::Engine::STALE_SIZE, $e->byte_size );
 
     $self->write( $e->chains_loc + $chains_offset, $new_head );
 

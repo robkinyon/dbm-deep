@@ -201,5 +201,44 @@ sub read_txn_slots {
     return split '', unpack( 'b'.$num_bits, $self->read( $e->trans_loc, $bl ) );
 }
 
+sub write_txn_slots {
+    my $self = shift;
+    my $e = $self->engine;
+    my $num_bits = $e->txn_bitfield_len * 8;
+    $self->write( $e->trans_loc,
+        pack( 'b'.$num_bits, join('', @_) ),
+    );
+}
+
+sub get_txn_staleness_counter {
+    my $self = shift;
+    my ($trans_id) = @_;
+
+    # Hardcode staleness of 0 for the HEAD
+    return 0 unless $trans_id;
+
+    my $e = $self->engine;
+    return unpack( $e->StP($DBM::Deep::Engine::STALE_SIZE),
+        $self->read(
+            $e->trans_loc + $e->txn_bitfield_len + $DBM::Deep::Engine::STALE_SIZE * ($trans_id - 1),
+            $DBM::Deep::Engine::STALE_SIZE,
+        )
+    );
+}
+
+sub inc_txn_staleness_counter {
+    my $self = shift;
+    my ($trans_id) = @_;
+
+    # Hardcode staleness of 0 for the HEAD
+    return 0 unless $trans_id;
+
+    my $e = $self->engine;
+    $self->write(
+        $e->trans_loc + $e->txn_bitfield_len + $DBM::Deep::Engine::STALE_SIZE * ($trans_id - 1),
+        pack( $e->StP($DBM::Deep::Engine::STALE_SIZE), $self->get_txn_staleness_counter( $trans_id ) + 1 ),
+    );
+}
+
 1;
 __END__

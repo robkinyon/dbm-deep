@@ -32,9 +32,7 @@ my $x = 25;
     } qr/Storage of references of type 'GLOB' is not supported/,
     'Storage of glob refs not supported';
 
-    warn "\n1: " . $db->_engine->_dump_file;
     $db->{scalar} = $x;
-    warn "\n2: " . $db->_engine->_dump_file;
     TODO: {
         todo_skip "Refs to DBM::Deep objects aren't implemented yet", 2;
         lives_ok {
@@ -43,8 +41,6 @@ my $x = 25;
 
         is( ${$db->{selfref}}, $x, "A ref to a DBM::Deep object is ok" );
     }
-
-    warn $db->_engine->_dump_file;
 }
 
 {

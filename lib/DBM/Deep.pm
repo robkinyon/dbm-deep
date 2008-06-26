@@ -76,6 +76,15 @@ sub new {
     return bless $self, $class;
 }
 
+sub DESTROY {
+    my $self = shift;
+
+    # If we have an error, don't flush - we might be flushing bad stuff. -RobK, 2008-06-26
+    die $@ if $@;
+
+    $self->_get_self->_engine->flush;
+}
+
 # This initializer is called from the various TIE* methods. new() calls tie(),
 # which allows for a single point of entry.
 sub _init {

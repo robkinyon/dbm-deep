@@ -567,15 +567,12 @@ sub commit {
 
 sub read_txn_slots {
     my $self = shift;
-    return $self->_load_header->read_txn_slots;
+    return $self->_load_header->read_txn_slots(@_);
 }
 
 sub write_txn_slots {
     my $self = shift;
-    my $num_bits = $self->txn_bitfield_len * 8;
-    $self->storage->print_at( $self->trans_loc,
-        pack( 'b'.$num_bits, join('', @_) ),
-    );
+    return $self->_load_header->write_txn_slots(@_);
 }
 
 sub get_running_txn_ids {
@@ -586,30 +583,12 @@ sub get_running_txn_ids {
 
 sub get_txn_staleness_counter {
     my $self = shift;
-    my ($trans_id) = @_;
-
-    # Hardcode staleness of 0 for the HEAD
-    return 0 unless $trans_id;
-
-    return unpack( $StP{$STALE_SIZE},
-        $self->storage->read_at(
-            $self->trans_loc + $self->txn_bitfield_len + $STALE_SIZE * ($trans_id - 1),
-            $STALE_SIZE,
-        )
-    );
+    return $self->_load_header->get_txn_staleness_counter(@_);
 }
 
 sub inc_txn_staleness_counter {
     my $self = shift;
-    my ($trans_id) = @_;
-
-    # Hardcode staleness of 0 for the HEAD
-    return 0 unless $trans_id;
-
-    $self->storage->print_at(
-        $self->trans_loc + $self->txn_bitfield_len + $STALE_SIZE * ($trans_id - 1),
-        pack( $StP{$STALE_SIZE}, $self->get_txn_staleness_counter( $trans_id ) + 1 ),
-    );
+    return $self->_load_header->inc_txn_staleness_counter(@_);
 }
 
 sub get_entries {

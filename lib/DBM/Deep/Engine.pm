@@ -754,6 +754,10 @@ sub flush {
         $self->storage->print_at( $offset, $self->sector_cache->{$offset} );
     }
 
+    # Why do we need to have the storage flush? Shouldn't autoflush take care of things?
+    # -RobK, 2008-06-26
+    $self->storage->flush;
+
     $self->clear_dirty_sectors;
 
     $self->clear_sector_cache;

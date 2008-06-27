@@ -91,7 +91,7 @@ sub size {
     my $self = shift;
 
     return 0 unless $self->{fh};
-    return -s $self->{fh};
+    return( (-s $self->{fh}) - $self->{file_offset} );
 }
 
 sub set_inode {

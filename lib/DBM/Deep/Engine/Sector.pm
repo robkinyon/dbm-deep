@@ -51,9 +51,12 @@ sub read {
     my $self = shift;
 
     if ( @_ == 1 ) {
+        die "read(): Start ($_[0]) is too large" if $_[0] > $self->size;
         return substr( ${$self->engine->get_data( $self->offset, $self->size )}, $_[0] );
     }
     elsif ( @_ == 2 ) {
+        die "read(): Start ($_[0]) is too large" if $_[0] > $self->size;
+        die "read(): Length ($_[1]) is too large" if $_[1] > $self->size;
         return substr( ${$self->engine->get_data( $self->offset, $self->size )}, $_[0], $_[1] );
     }
     elsif ( @_ < 1 ) {
@@ -68,6 +71,8 @@ sub write {
     my $self = shift;
     my ($start, $text) = @_;
 
+    die "write(): Start ($start) is too large" if $start > $self->size;
+    die "write(): length(\$text) (@{[length($text)]}) is too large" if length($text) > $self->size;
     substr( ${$self->engine->get_data( $self->offset, $self->size )}, $start, length($text) ) = $text;
 
     $self->mark_dirty;

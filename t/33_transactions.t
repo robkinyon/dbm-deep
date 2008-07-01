@@ -47,10 +47,7 @@ lives_ok {
 } "Rolling back an empty transaction is ok.";
 
 cmp_bag( [ keys %$db1 ], [qw( x )], "DB1 keys correct" );
-__END__
-warn "4\n";
 cmp_bag( [ keys %$db2 ], [qw( x )], "DB2 keys correct" );
-warn "5\n";
 
 $db1->begin_work;
 

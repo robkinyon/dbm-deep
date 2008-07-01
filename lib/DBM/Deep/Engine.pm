@@ -496,27 +496,6 @@ sub rollback {
         $self->_load_sector( $sector )->rollback( $idx );
     }
 
-=pod
-    # Each entry is the file location for a bucket that has a modification for
-    # this transaction. The entries need to be expunged.
-    foreach my $entry (@{ $self->get_entries } ) {
-        # Remove the entry here
-        my $read_loc = $entry
-          + $self->hash_size
-          + $self->byte_size
-          + $self->byte_size
-          + ($self->trans_id - 1) * ( $self->byte_size + $STALE_SIZE );
-
-        my $data_loc = $self->storage->read_at( $read_loc, $self->byte_size );
-        $data_loc = unpack( $StP{$self->byte_size}, $data_loc );
-        $self->storage->print_at( $read_loc, pack( $StP{$self->byte_size}, 0 ) );
-
-        if ( $data_loc > 1 ) {
-            $self->_load_sector( $data_loc )->free;
-        }
-    }
-=cut
-
     $self->clear_entries;
 
     my @slots = $self->read_txn_slots;
@@ -540,33 +519,6 @@ sub commit {
         my ($sector, $idx) = split ':', $entry;
         $self->_load_sector( $sector )->commit( $idx );
     }
-
-=pod
-    foreach my $entry (@{ $self->get_entries } ) {
-        # Overwrite the entry in head with the entry in trans_id
-        my $base = $entry
-          + $self->hash_size
-          + $self->byte_size;
-
-        my $head_loc = $self->storage->read_at( $base, $self->byte_size );
-        $head_loc = unpack( $StP{$self->byte_size}, $head_loc );
-
-        my $spot = $base + $self->byte_size + ($self->trans_id - 1) * ( $self->byte_size + $STALE_SIZE );
-        my $trans_loc = $self->storage->read_at(
-            $spot, $self->byte_size,
-        );
-
-        $self->storage->print_at( $base, $trans_loc );
-        $self->storage->print_at(
-            $spot,
-            pack( $StP{$self->byte_size} . ' ' . $StP{$STALE_SIZE}, (0) x 2 ),
-        );
-
-        if ( $head_loc > 1 ) {
-            $self->_load_sector( $head_loc )->free;
-        }
-    }
-=cut
 
     $self->clear_entries;
 

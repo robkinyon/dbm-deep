@@ -420,24 +420,30 @@ sub clone {
 sub begin_work {
     my $self = shift->_get_self;
     $self->lock_exclusive;
-    my $rv = $self->_engine->begin_work( $self, @_ );
+    my $rv = eval { $self->_engine->begin_work( $self, @_ ) };
+    my $e = $@;
     $self->unlock;
+    die $e if $e;
     return $rv;
 }
 
 sub rollback {
     my $self = shift->_get_self;
     $self->lock_exclusive;
-    my $rv = $self->_engine->rollback( $self, @_ );
+    my $rv = eval { $self->_engine->rollback( $self, @_ ) };
+    my $e = $@;
     $self->unlock;
+    die $e if $e;
     return $rv;
 }
 
 sub commit {
     my $self = shift->_get_self;
     $self->lock_exclusive;
-    my $rv = $self->_engine->commit( $self, @_ );
+    my $rv = eval { $self->_engine->commit( $self, @_ ) };
+    my $e = $@;
     $self->unlock;
+    die $e if $e;
     return $rv;
 }
 

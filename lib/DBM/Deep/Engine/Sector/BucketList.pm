@@ -123,6 +123,7 @@ sub chopped_up {
     return @buckets;
 }
 
+#XXX Call this append() instead? -RobK, 2008-06-30
 sub write_at_next_open {
     my $self = shift;
     my ($entry) = @_;
@@ -133,7 +134,7 @@ sub write_at_next_open {
     my $spot = $self->base_size + $self->{_next_open}++ * $self->bucket_size;
     $self->write( $spot, $entry );
 
-    return $spot;
+    return ($self->{_next_open} - 1);
 }
 
 sub has_md5 {
@@ -193,7 +194,7 @@ sub write_md5 {
     $args->{trans_id} = $e->trans_id unless exists $args->{trans_id};
 
     my $spot = $self->base_size + $self->{idx} * $self->bucket_size;
-    $e->add_entry( $args->{trans_id}, $self->offset + $spot );
+    $e->add_entry( $args->{trans_id}, $self->offset, $self->{idx} );
 
     unless ($self->{found}) {
         my $key_sector = DBM::Deep::Engine::Sector::Scalar->new({
@@ -229,7 +230,7 @@ sub mark_deleted {
     $args->{trans_id} = $e->trans_id unless exists $args->{trans_id};
 
     my $spot = $self->base_size + $self->{idx} * $self->bucket_size;
-    $e->add_entry( $args->{trans_id}, $self->offset + $spot );
+    $e->add_entry( $args->{trans_id}, $self->offset, $self->{idx} );
 
     my $loc = $spot
       + $e->hash_size
@@ -362,6 +363,51 @@ sub get_key_for {
     DBM::Deep->_throw_error( "get_key_for: No location?" ) unless $location;
 
     return $self->engine->_load_sector( $location );
+}
+
+sub rollback {
+    my $self = shift;
+    my ($idx) = @_;
+    my $e = $self->engine;
+    my $trans_id = $e->trans_id;
+
+    my $base = $self->base_size + ($idx * $self->bucket_size) + $e->hash_size + $e->byte_size;
+    my $spot = $base + $e->byte_size + ($trans_id - 1) * ( $e->byte_size + $DBM::Deep::Engine::STALE_SIZE );
+
+    my $trans_loc = $self->read( $spot, $e->byte_size );
+    $trans_loc = unpack( $e->StP($e->byte_size), $trans_loc );
+
+    $self->write( $spot, pack( $e->StP($e->byte_size), 0 ) );
+
+    if ( $trans_loc > 1 ) {
+        $e->_load_sector( $trans_loc )->free;
+    }
+
+    return;
+}
+
+sub commit {
+    my $self = shift;
+    my ($idx) = @_;
+    my $e = $self->engine;
+    my $trans_id = $e->trans_id;
+
+    my $base = $self->base_size + ($idx * $self->bucket_size) + $e->hash_size + $e->byte_size;
+
+    my $head_loc = $self->read( $base, $e->byte_size );
+    $head_loc = unpack( $e->StP($e->byte_size), $head_loc );
+
+    my $spot = $base + $e->byte_size + ($trans_id - 1) * ( $e->byte_size + $DBM::Deep::Engine::STALE_SIZE );
+    my $trans_loc = $self->read( $spot, $e->byte_size );
+
+    $self->write( $base, $trans_loc );
+    $self->write( $spot, pack( $e->StP($e->byte_size) . ' ' . $e->StP($DBM::Deep::Engine::STALE_SIZE), (0) x 2 ) );
+
+    if ( $head_loc > 1 ) {
+        $e->_load_sector( $head_loc )->free;
+    }
+
+    return;
 }
 
 1;

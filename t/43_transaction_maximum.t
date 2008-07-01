@@ -6,17 +6,20 @@ use t::common qw( new_fh );
 
 use DBM::Deep;
 
-my $max_txns = 255;
+my $max_txns = 250;
 
 my ($fh, $filename) = new_fh();
 
 my @dbs = grep { $_ } map {
+    my $x = 
     eval {
         DBM::Deep->new(
-            file => $filename,
-            num_txns  => $max_txns,
+            file     => $filename,
+            num_txns => $max_txns,
         );
     };
+    die $@ if $@;
+    $x;
 } 1 .. $max_txns;
 
 my $num = $#dbs;

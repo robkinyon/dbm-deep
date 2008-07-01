@@ -491,6 +491,12 @@ sub rollback {
         DBM::Deep->_throw_error( "Cannot rollback without an active transaction" );
     }
 
+    foreach my $entry ( @{ $self->get_entries } ) {
+        my ($sector, $idx) = split ':', $entry;
+        $self->_load_sector( $sector )->rollback( $idx );
+    }
+
+=pod
     # Each entry is the file location for a bucket that has a modification for
     # this transaction. The entries need to be expunged.
     foreach my $entry (@{ $self->get_entries } ) {
@@ -509,6 +515,7 @@ sub rollback {
             $self->_load_sector( $data_loc )->free;
         }
     }
+=cut
 
     $self->clear_entries;
 
@@ -529,6 +536,12 @@ sub commit {
         DBM::Deep->_throw_error( "Cannot commit without an active transaction" );
     }
 
+    foreach my $entry ( @{ $self->get_entries } ) {
+        my ($sector, $idx) = split ':', $entry;
+        $self->_load_sector( $sector )->commit( $idx );
+    }
+
+=pod
     foreach my $entry (@{ $self->get_entries } ) {
         # Overwrite the entry in head with the entry in trans_id
         my $base = $entry
@@ -553,6 +566,7 @@ sub commit {
             $self->_load_sector( $head_loc )->free;
         }
     }
+=cut
 
     $self->clear_entries;
 
@@ -598,23 +612,23 @@ sub get_entries {
 
 sub add_entry {
     my $self = shift;
-    my ($trans_id, $loc) = @_;
+    my ($trans_id, $loc, $idx) = @_;
 
     $self->{entries}{$trans_id} ||= {};
-    $self->{entries}{$trans_id}{$loc} = undef;
+    $self->{entries}{$trans_id}{"$loc:$idx"} = undef;
 }
 
 # If the buckets are being relocated because of a reindexing, the entries
 # mechanism needs to be made aware of it.
 sub reindex_entry {
     my $self = shift;
-    my ($old_loc, $new_loc) = @_;
+    my ($old_loc, $old_idx, $new_loc, $new_idx) = @_;
 
     TRANS:
     while ( my ($trans_id, $locs) = each %{ $self->{entries} } ) {
-        if ( exists $locs->{$old_loc} ) {
-            delete $locs->{$old_loc};
-            $locs->{$new_loc} = undef;
+        if ( exists $locs->{"$old_loc:$old_idx"} ) {
+            delete $locs->{"$old_loc:$old_idx"};
+            $locs->{"$new_loc:$new_idx"} = undef;
             next TRANS;
         }
     }

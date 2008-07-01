@@ -284,6 +284,7 @@ sub get_bucket_list {
 
         my %blist_cache;
         #XXX q.v. the comments for this function.
+        my $old_idx = 0;
         foreach my $entry ( $sector->chopped_up ) {
             my ($spot, $md5) = @{$entry};
             my $idx = ord( substr( $md5, $i, 1 ) );
@@ -296,8 +297,12 @@ sub get_bucket_list {
 
             $new_index->set_entry( $idx => $blist->offset );
 
-            my $new_spot = $blist->write_at_next_open( $md5 );
-            $engine->reindex_entry( $spot => $new_spot );
+            #XXX q.v. the comments for this function.
+            my $new_idx = $blist->write_at_next_open( $md5 );
+
+            $engine->reindex_entry( ( $sector->offset, $old_idx ) => ( $blist->offset, $new_idx ) );
+
+            $old_idx++;
         }
 
         # Handle the new item separately.

@@ -419,17 +419,26 @@ sub clone {
 
 sub begin_work {
     my $self = shift->_get_self;
-    return $self->_engine->begin_work( $self, @_ );
+    $self->lock_exclusive;
+    my $rv = $self->_engine->begin_work( $self, @_ );
+    $self->unlock;
+    return $rv;
 }
 
 sub rollback {
     my $self = shift->_get_self;
-    return $self->_engine->rollback( $self, @_ );
+    $self->lock_exclusive;
+    my $rv = $self->_engine->rollback( $self, @_ );
+    $self->unlock;
+    return $rv;
 }
 
 sub commit {
     my $self = shift->_get_self;
-    return $self->_engine->commit( $self, @_ );
+    $self->lock_exclusive;
+    my $rv = $self->_engine->commit( $self, @_ );
+    $self->unlock;
+    return $rv;
 }
 
 ##

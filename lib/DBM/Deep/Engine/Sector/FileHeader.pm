@@ -198,7 +198,8 @@ sub read_txn_slots {
     my $e = $self->engine;
     my $bl = $e->txn_bitfield_len;
     my $num_bits = $bl * 8;
-    return split '', unpack( 'b'.$num_bits, $self->read( $e->trans_loc, $bl ) );
+    my @x = split '', unpack( 'b'.$num_bits, $self->read( $e->trans_loc, $bl ) );
+    return @x;
 }
 
 sub write_txn_slots {

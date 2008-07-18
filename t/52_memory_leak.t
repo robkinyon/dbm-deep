@@ -1,4 +1,8 @@
 
+# This was discussed here:
+# http://groups.google.com/group/DBM-Deep/browse_thread/thread/a6b8224ffec21bab
+# brought up by Alex Gallichotte
+
 use strict;
 use Test;
 use DBM::Deep;

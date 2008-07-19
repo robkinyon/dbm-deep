@@ -566,6 +566,8 @@ sub add_entry {
     my $self = shift;
     my ($trans_id, $loc, $idx) = @_;
 
+    return unless $trans_id;
+
     $self->{entries}{$trans_id} ||= {};
     $self->{entries}{$trans_id}{"$loc:$idx"} = undef;
 }

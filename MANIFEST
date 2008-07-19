@@ -69,3 +69,4 @@ t/etc/db-0-983
 t/etc/db-0-99_04
 t/etc/db-1-0000
 t/etc/db-1-0003
+t/53_misc_transactions.t

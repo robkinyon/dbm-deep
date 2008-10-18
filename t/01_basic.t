@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 4;
+use Test::More tests => 3;
 
 use t::common qw( new_fh );
 
@@ -27,4 +27,3 @@ isa_ok( $db, 'DBM::Deep' );
 ok(1, "We can successfully open a file!" );
 
 $db->{foo} = 'bar';
-is( $db->{foo}, 'bar' );

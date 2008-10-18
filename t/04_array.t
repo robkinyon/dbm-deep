@@ -63,8 +63,7 @@ is( $db->fetch(4), 'elem4.1' );
 
 throws_ok {
     $db->[-6] = 'whoops!';
-} qr/Modification of non-creatable array value attempted, subscript -6/,
-  "Correct error thrown when attempting to modify a non-creatable array value";
+} qr/Modification of non-creatable array value attempted, subscript -6/, "Correct error thrown";
 
 my $popped = $db->pop;
 is( $db->length, 4, "... and we have four after popping" );

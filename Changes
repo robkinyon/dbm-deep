@@ -7,7 +7,6 @@ Revision history for DBM::Deep.
       a lock_shared() method. The :flock constants are no longer
       imported into the DBM::Deep namespace.
       **** THIS IS AN API CHANGE ****
-    - Start the process of optimization.
 
 1.0013 Jun 13 23:15:00 2008 EST
     - (This version is compatible with 1.0012)

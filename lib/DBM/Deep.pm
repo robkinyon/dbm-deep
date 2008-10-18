@@ -142,17 +142,17 @@ sub TIEARRAY {
 
 sub lock_exclusive {
     my $self = shift->_get_self;
-    return $self->_engine->lock_exclusive( $self );
+    return $self->_engine->lock_exclusive( $self, @_ );
 }
 *lock = \&lock_exclusive;
 sub lock_shared {
     my $self = shift->_get_self;
-    return $self->_engine->lock_shared( $self );
+    return $self->_engine->lock_shared( $self, @_ );
 }
 
 sub unlock {
     my $self = shift->_get_self;
-    return $self->_engine->unlock( $self );
+    return $self->_engine->unlock( $self, @_ );
 }
 
 sub _copy_value {

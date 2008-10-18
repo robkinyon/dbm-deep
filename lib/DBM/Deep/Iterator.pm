@@ -57,6 +57,7 @@ sub get_next_key {
     my $crumbs = $self->{breadcrumbs};
     my $e = $self->{engine};
 
+    warn "1\n";
     unless ( @$crumbs ) {
         # This will be a Reference sector
         my $sector = $e->_load_sector( $self->{base_offset} )
@@ -73,6 +74,7 @@ sub get_next_key {
         push @$crumbs, $self->get_sector_iterator( $loc );
     }
 
+    warn "2: " . $obj->_dump_file;
     FIND_NEXT_KEY: {
         # We're at the end.
         unless ( @$crumbs ) {

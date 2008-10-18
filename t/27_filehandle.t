@@ -98,7 +98,7 @@ locking => 0,
         } qr/Cannot write to a readonly filehandle/, "Can't write to a read-only filehandle";
         ok( !$db->exists( 'foo' ), "foo still doesn't exist" );
 
-        is( $db->{x}, 'b', "x is still 'b'" );
+        is( $db->{x}, 'b' );
     }
 
     exec( "$^X -Iblib/lib $filename" );

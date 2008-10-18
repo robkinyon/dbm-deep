@@ -3,7 +3,9 @@ package DBM::Deep::Array;
 use 5.006_000;
 
 use strict;
-use warnings FATAL => 'all';
+use warnings;
+
+our $VERSION = q(1.0013);
 
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative
@@ -26,17 +28,12 @@ sub TIEARRAY {
 
     $args->{type} = $class->TYPE_ARRAY;
 
-    my $self = $class->_init($args);
-
-#    $self->STORESIZE;
-
-    return $self;
+    return $class->_init($args);
 }
 
 sub FETCH {
     my $self = shift->_get_self;
     my ($key) = @_;
-    warn "ARRAY:FETCH( $key )\n" if DBM::Deep::DEBUG;
 
     $self->lock_shared;
 
@@ -68,7 +65,6 @@ sub FETCH {
 sub STORE {
     my $self = shift->_get_self;
     my ($key, $value) = @_;
-    warn "ARRAY::STORE($self, $key)\n" if DBM::Deep::DEBUG;
 
     $self->lock_exclusive;
 
@@ -110,7 +106,6 @@ sub STORE {
 sub EXISTS {
     my $self = shift->_get_self;
     my ($key) = @_;
-    warn "ARRAY::EXISTS($self, $key)\n" if DBM::Deep::DEBUG;
 
     $self->lock_shared;
 
@@ -181,14 +176,12 @@ sub DELETE {
 # going to work.
 sub FETCHSIZE {
     my $self = shift->_get_self;
-    warn "ARRAY::FETCHSIZE($self)\n" if DBM::Deep::DEBUG;
 
     $self->lock_shared;
 
     my $SAVE_FILTER = $self->_engine->storage->{filter_fetch_value};
     $self->_engine->storage->{filter_fetch_value} = undef;
 
-    # If there is no flushing, then things get out of sync.
     my $size = $self->FETCH('length') || 0;
 
     $self->_engine->storage->{filter_fetch_value} = $SAVE_FILTER;
@@ -201,7 +194,6 @@ sub FETCHSIZE {
 sub STORESIZE {
     my $self = shift->_get_self;
     my ($new_length) = @_;
-    warn "ARRAY::STORESIZE($self, $new_length)\n" if DBM::Deep::DEBUG;
 
     $self->lock_exclusive;
 
@@ -219,7 +211,6 @@ sub STORESIZE {
 
 sub POP {
     my $self = shift->_get_self;
-    warn "ARRAY::POP($self)\n" if DBM::Deep::DEBUG;
 
     $self->lock_exclusive;
 
@@ -241,7 +232,6 @@ sub POP {
 
 sub PUSH {
     my $self = shift->_get_self;
-    warn "ARRAY::PUSH($self)\n" if DBM::Deep::DEBUG;
 
     $self->lock_exclusive;
 
@@ -268,7 +258,7 @@ sub _move_value {
 
 sub SHIFT {
     my $self = shift->_get_self;
-    warn "ARRAY::SHIFT($self)\n" if DBM::Deep::DEBUG;
+    warn "SHIFT($self)\n" if DBM::Deep::DEBUG;
 
     $self->lock_exclusive;
 
@@ -297,7 +287,6 @@ sub SHIFT {
 
 sub UNSHIFT {
     my $self = shift->_get_self;
-    warn "ARRAY::UNSHIFT($self)\n" if DBM::Deep::DEBUG;
     my @new_elements = @_;
 
     $self->lock_exclusive;
@@ -324,7 +313,6 @@ sub UNSHIFT {
 
 sub SPLICE {
     my $self = shift->_get_self;
-    warn "ARRAY::SPLICE($self)\n" if DBM::Deep::DEBUG;
 
     $self->lock_exclusive;
 
@@ -391,7 +379,6 @@ sub SPLICE {
 # We don't need to populate it, yet.
 # It will be useful, though, when we split out HASH and ARRAY
 sub EXTEND {
-    warn "ARRAY::EXTEND()\n" if DBM::Deep::DEBUG;
     ##
     # Perl will call EXTEND() when the array is likely to grow.
     # We don't care, but include it because it gets called at times.

@@ -72,13 +72,11 @@ sub FIRSTKEY {
     ##
     my $self = shift->_get_self;
 
-    warn "HASH:FIRSTKEY($self)\n" if DBM::Deep::DEBUG;
-
     $self->lock_shared;
     
     my $result = $self->_engine->get_next_key( $self );
     
-    $self->unlock();
+    $self->unlock;
     
     return ($result && $self->_engine->storage->{filter_fetch_key})
         ? $self->_engine->storage->{filter_fetch_key}->($result)
@@ -95,14 +93,12 @@ sub NEXTKEY {
         ? $self->_engine->storage->{filter_store_key}->($_[0])
         : $_[0];
 
-    warn "HASH:NEXTKEY($self,$prev_key)\n" if DBM::Deep::DEBUG;
-
     $self->lock_shared;
     
     my $result = $self->_engine->get_next_key( $self, $prev_key );
     
-    $self->unlock();
-
+    $self->unlock;
+    
     return ($result && $self->_engine->storage->{filter_fetch_key})
         ? $self->_engine->storage->{filter_fetch_key}->($result)
         : $result;

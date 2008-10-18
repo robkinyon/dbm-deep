@@ -45,7 +45,6 @@ is( $db->{key4}, undef, "Autovivified key4" );
 ok( exists $db->{key4}, "Autovivified key4 now exists" );
 
 delete $db->{key4};
-
 ok( !exists $db->{key4}, "And key4 doesn't exists anymore" );
 
 # Keys will be done via an iterator that keeps a breadcrumb trail of the last
@@ -181,3 +180,4 @@ throws_ok {
 throws_ok {
     $db->exists(undef);
 } qr/Cannot use an undefined hash key/, "EXISTS fails on an undefined key";
+

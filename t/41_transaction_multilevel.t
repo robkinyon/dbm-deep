@@ -27,7 +27,6 @@ $db1->{x} = { xy => { foo => 'y' } };
 is( $db1->{x}{xy}{foo}, 'y', "Before transaction, DB1's X is Y" );
 is( $db2->{x}{xy}{foo}, 'y', "Before transaction, DB2's X is Y" );
 
-#warn $db1->_dump_file;
 $db1->begin_work;
 
     cmp_bag( [ keys %$db1 ], [qw( x )], "DB1 keys correct" );
@@ -49,9 +48,8 @@ $db1->begin_work;
     cmp_bag( [ keys %{$db1->{x}} ], [qw( yz )], "DB1->X keys correct" );
     cmp_bag( [ keys %{$db2->{x}} ], [qw( xy )], "DB2->X keys correct" );
 
-#warn $db1->_dump_file;
 $db1->rollback;
-__END__
+
 cmp_bag( [ keys %$db1 ], [qw( x )], "DB1 keys correct" );
 cmp_bag( [ keys %$db2 ], [qw( x )], "DB2 keys correct" );
 

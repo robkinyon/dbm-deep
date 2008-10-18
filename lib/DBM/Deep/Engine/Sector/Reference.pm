@@ -454,11 +454,11 @@ sub free {
     bless $self->engine->cache->{ $self->offset }, 'DBM::Deep::Null';
     delete $self->engine->cache->{ $self->offset };
 
-    my $blist_loc = $self->get_blist_loc;
-    $self->engine->_load_sector( $blist_loc )->free if $blist_loc;
-
-    my $class_loc = $self->get_class_offset;
-    $self->engine->_load_sector( $class_loc )->free if $class_loc;
+    foreach my $meth ( qw( get_blist_loc get_class_offset ) ) {
+        my $l = $self->$meth;
+        my $s = $self->engine->_load_sector( $l );
+        $s->free if $s;
+    }
 
     $self->SUPER::free();
 }

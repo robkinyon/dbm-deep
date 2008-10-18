@@ -68,7 +68,7 @@ sub free {
                 $e->byte_size,
             ),
         );
-        $s = $e->_load_sector( $l ); $s->free if $s;
+        $s = $e->_load_sector( $l ); $s->free if $s; 
 
         foreach my $txn ( 0 .. $e->num_txns - 2 ) {
             my $l = unpack( $e->StP($e->byte_size),
@@ -352,7 +352,7 @@ sub get_key_for {
     $idx = $self->{idx} unless defined $idx;
 
     if ( $idx >= $self->engine->max_buckets ) {
-        DBM::Deep->_throw_error( "get_key_for(): Attempting to retrieve $idx" );
+        DBM::Deep->_throw_error( "get_key_for(): Attempting to retrieve $idx beyond max_buckets" );
     }
 
     my $location = $self->read(
@@ -371,11 +371,14 @@ sub rollback {
     my $e = $self->engine;
     my $trans_id = $e->trans_id;
 
+#    warn "Rolling back $idx ($trans_id)\n";
+
     my $base = $self->base_size + ($idx * $self->bucket_size) + $e->hash_size + $e->byte_size;
     my $spot = $base + $e->byte_size + ($trans_id - 1) * ( $e->byte_size + $DBM::Deep::Engine::STALE_SIZE );
 
     my $trans_loc = $self->read( $spot, $e->byte_size );
     $trans_loc = unpack( $e->StP($e->byte_size), $trans_loc );
+#    warn "$trans_loc\n";
 
     $self->write( $spot, pack( $e->StP($e->byte_size), 0 ) );
 

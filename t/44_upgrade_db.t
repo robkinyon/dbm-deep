@@ -95,7 +95,7 @@ foreach my $input_filename (
             "-version $v",
         );
 
-        warn "Testing $input_filename against $v\n";
+        #warn "Testing $input_filename against $v\n";
 
         # Clone was removed as a requirement in 1.0006
         if ( $output =~ /Can\'t locate Clone\.pm in \@INC/ ) {

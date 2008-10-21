@@ -440,6 +440,8 @@ sub setup_fh {
         }
     }
 
+    $self->storage->set_inode;
+
     return 1;
 }
 

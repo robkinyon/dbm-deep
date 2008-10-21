@@ -26,7 +26,7 @@ $db->{key1} = "value1";
 is( $db->{key1}, "value1", "key1 is set" );
 
 $db->{key2} = [ 1 .. 3 ];
-is( $db->{key2}[1], 2 );
+is( $db->{key2}[1], 2, "The value is set properly" );
 
 ##
 # explicit lock

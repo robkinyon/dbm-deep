@@ -87,6 +87,7 @@ foreach my $input_filename (
 
     foreach my $v ( @output_versions ) {
         my (undef, $output_filename) = new_fh();
+
         my $output = run_prog(
             $PROG,
             "-input $input_filename",
@@ -94,7 +95,7 @@ foreach my $input_filename (
             "-version $v",
         );
 
-        #warn "Testing $input_filename against $v\n";
+        warn "Testing $input_filename against $v\n";
 
         # Clone was removed as a requirement in 1.0006
         if ( $output =~ /Can\'t locate Clone\.pm in \@INC/ ) {
@@ -125,12 +126,12 @@ foreach my $input_filename (
 
         # Now, read the output file with the right version.
         ok( !$output, "A successful run produces no output" );
-        die "$output\n" if $output;
+        die "'$input_filename' -> '$v' : $output\n" if $output;
 
         my $db;
         if ( $v =~ /^1\.001[0-4]/ || $v =~ /^1\.000[3-9]/ ) {
             push @INC, 'lib';
-            eval "use DBM::Deep";
+            eval "use DBM::Deep $v"; die $@ if $@;
             $db = DBM::Deep->new( $output_filename );
         }
         elsif ( $v =~ /^1\.000?[0-2]?/ ) {

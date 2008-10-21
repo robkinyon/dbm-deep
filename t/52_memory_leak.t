@@ -4,8 +4,13 @@
 # brought up by Alex Gallichotte
 
 use strict;
-use Test;
+use warnings FATAL => 'all';
+
+use Test::More;
 use DBM::Deep;
+
+plan skip_all => "Need to figure out what platforms this runs on";
+
 use t::common qw( new_fh );
 
 my ($fh, $filename) = new_fh();

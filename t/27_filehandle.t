@@ -1,7 +1,8 @@
-##
-# DBM::Deep Test
-##
+use 5.006_000;
+
 use strict;
+use warnings FATAL => 'all';
+
 use Test::More tests => 14;
 use Test::Exception;
 use t::common qw( new_fh );

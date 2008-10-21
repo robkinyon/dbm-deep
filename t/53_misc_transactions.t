@@ -4,25 +4,26 @@
 # brought up by Alex Gallichotte
 
 use strict;
-use Test;
-use DBM::Deep;
+#use warnings FATAL => 'all';
+
+use Test::More tests => 4;
 use t::common qw( new_fh );
+
+use_ok( 'DBM::Deep' );
 
 my ($fh, $filename) = new_fh();
 my $db = DBM::Deep->new( file => $filename, fh => $fh, );
 
-plan tests => 3;
-
-eval { $db->{randkey()} = randkey() for 1 .. 10; }; ok($@, "");
+eval { $db->{randkey()} = randkey() for 1 .. 10; }; ok(!$@, "No eval failures");
 
 eval {
     $db->begin_work;
     $db->{randkey()} = randkey() for 1 .. 10;
     $db->commit;
 };
-ok($@, '');
+ok(!$@, 'No eval failures');
 
-eval { $db->{randkey()} = randkey() for 1 .. 10; }; ok($@, "");
+eval { $db->{randkey()} = randkey() for 1 .. 10; }; ok(!$@, "No eval failures");
 
 sub randkey {
     our $i ++;

@@ -3,7 +3,7 @@ use 5.006;
 use strict;
 use warnings FATAL => 'all';
 
-use Test::More no_plan => 1;
+use Test::More tests => 2;
 use Test::Deep;
 
 use t::common qw( new_fh );

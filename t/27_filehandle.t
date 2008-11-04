@@ -50,7 +50,7 @@ use_ok( 'DBM::Deep' );
     print $fh "#!$^X\n";
     print $fh <<'__END_FH__';
 use strict;
-use Test::More no_plan => 1;
+use Test::More 'no_plan';
 Test::More->builder->no_ending(1);
 Test::More->builder->{Curr_Test} = 12;
 

@@ -76,8 +76,9 @@ my ($default, $small, $medium, $large);
 }
 
 SKIP: {
+    eval "pack('Q', 0);";
     skip "Largefile support is not compiled into $^X", 3
-        unless $Config{ use64bitall };
+        if $@;
 
     my ($fh, $filename) = new_fh();
     {

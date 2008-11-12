@@ -39,7 +39,109 @@ my %StP = (
     8 => 'Q', # Usigned quad (no order specified, presumably machine-dependent)
 );
 
+=head1 NAME
+
+DBM::Deep::Engine
+
+=head1 PURPOSE
+
+This is an internal-use-only object for L<DBM::Deep/>. It mediates the low-level
+mapping between the L<DBM::Deep/> objects and the storage medium.
+
+The purpose of this documentation is to provide low-level documentation for
+developers. It is B<not> intended to be used by the general public. This
+documentation and what it documents can and will change without notice.
+
+=head1 OVERVIEW
+
+The engine exposes an API to the DBM::Deep objects (DBM::Deep, DBM::Deep::Array,
+and DBM::Deep::Hash) for their use to access the actual stored values. This API
+is the following:
+
+=over 4
+
+=item * new
+
+=item * read_value
+
+=item * get_classname
+
+=item * make_reference
+
+=item * key_exists
+
+=item * delete_key
+
+=item * write_value
+
+=item * get_next_key
+
+=item * setup_fh
+
+=item * begin_work
+
+=item * commit
+
+=item * rollback
+
+=item * lock_exclusive
+
+=item * lock_shared
+
+=item * unlock
+
+=back
+
+They are explained in their own sections below. These methods, in turn, may
+provide some bounds-checking, but primarily act to instantiate objects in the
+Engine::Sector::* hierarchy and dispatch to them.
+
+=head1 TRANSACTIONS
+
+Transactions in DBM::Deep are implemented using a variant of MVCC. This attempts
+to keep the amount of actual work done against the file low while stil providing
+Atomicity, Consistency, and Isolation. Durability, unfortunately, cannot be done
+with only one file.
+
+=head2 STALENESS
+
+If another process uses a transaction slot and writes stuff to it, then terminates,
+the data that process wrote it still within the file. In order to address this,
+there is also a transaction staleness counter associated within every write.
+Each time a transaction is started, that process increments that transaction's
+staleness counter. If, when it reads a value, the staleness counters aren't
+identical, DBM::Deep will consider the value on disk to be stale and discard it.
+
+=head2 DURABILITY
+
+The fourth leg of ACID is Durability, the guarantee that when a commit returns,
+the data will be there the next time you read from it. This should be regardless
+of any crashes or powerdowns in between the commit and subsequent read. DBM::Deep
+does provide that guarantee; once the commit returns, all of the data has been
+transferred from the transaction shadow to the HEAD. The issue arises with partial
+commits - a commit that is interrupted in some fashion. In keeping with DBM::Deep's
+"tradition" of very light error-checking and non-existent error-handling, there is
+no way to recover from a partial commit. (This is probably a failure in Consistency
+as well as Durability.)
+
+Other DBMSes use transaction logs (a separate file, generally) to achieve Durability.
+As DBM::Deep is a single-file, we would have to do something similar to what SQLite
+and BDB do in terms of committing using synchonized writes. To do this, we would have
+to use a much higher RAM footprint and some serious programming that make my head
+hurts just to think about it.
+
+=head1 EXTERNAL METHODS
+
+=cut
+
 ################################################################################
+
+=head2 new()
+
+This takes a set of args. These args are described in the documentation for
+L<DBM::Deep/new>.
+
+=cut
 
 sub new {
     my $class = shift;
@@ -119,6 +221,13 @@ sub new {
 
 ################################################################################
 
+=head2 read_value( $obj, $key )
+
+This takes an object that provides _base_offset() and a string. It returns the
+value stored in the corresponding Sector::Value's data section.
+
+=cut
+
 sub read_value {
     my $self = shift;
     my ($obj, $key) = @_;
@@ -154,6 +263,17 @@ sub read_value {
     return $value_sector->data;
 }
 
+=head2 get_classname( $obj )
+
+This takes an object that provides _base_offset() and returns the classname (if any)
+associated with it.
+
+It delegates to Sector::Reference::get_classname() for the heavy lifting.
+
+It performs a staleness check.
+
+=cut
+
 sub get_classname {
     my $self = shift;
     my ($obj) = @_;
@@ -169,13 +289,23 @@ sub get_classname {
     return $sector->get_classname;
 }
 
+=head2 make_reference( $obj, $old_key, $new_key )
+
+This takes an object that provides _base_offset() and two strings. The
+strings correspond to the old key and new key, respectively. This operation
+is equivalent to (given C<< $db->{foo} = []; >>) C<< $db->{bar} = $db->{foo}; >>.
+
+This returns nothing.
+
+=cut
+
 sub make_reference {
     my $self = shift;
     my ($obj, $old_key, $new_key) = @_;
 
     # This will be a Reference sector
     my $sector = $self->_load_sector( $obj->_base_offset )
-        or DBM::Deep->_throw_error( "How did get_classname fail (no sector for '$obj')?!" );
+        or DBM::Deep->_throw_error( "How did make_reference fail (no sector for '$obj')?!" );
 
     if ( $sector->staleness != $obj->_staleness ) {
         return;
@@ -216,7 +346,16 @@ sub make_reference {
             value   => $value_sector->clone,
         });
     }
+
+    return;
 }
+
+=head2 key_exists( $obj, $key )
+
+This takes an object that provides _base_offset() and a string for
+the key to be checked. This returns 1 for true and "" for false.
+
+=cut
 
 sub key_exists {
     my $self = shift;
@@ -239,6 +378,14 @@ sub key_exists {
     return $data ? 1 : '';
 }
 
+=head2 delete_key( $obj, $key )
+
+This takes an object that provides _base_offset() and a string for
+the key to be deleted. This returns the result of the Sector::Reference
+delete_key() method.
+
+=cut
+
 sub delete_key {
     my $self = shift;
     my ($obj, $key) = @_;
@@ -255,6 +402,15 @@ sub delete_key {
         allow_head => 0,
     });
 }
+
+=head2 write_value( $obj, $key, $value )
+
+This takes an object that provides _base_offset(), a string for the
+key, and a value. This value can be anything storable within L<DBM::Deep/>.
+
+This returns 1 upon success.
+
+=cut
 
 sub write_value {
     my $self = shift;
@@ -381,6 +537,15 @@ sub write_value {
     return 1;
 }
 
+=head2 get_next_key( $obj, $prev_key )
+
+This takes an object that provides _base_offset() and an optional string
+representing the prior key returned via a prior invocation of this method.
+
+This method delegates to C<< DBM::Deep::Iterator->get_next_key() >>.
+
+=cut
+
 # XXX Add staleness here
 sub get_next_key {
     my $self = shift;
@@ -398,6 +563,16 @@ sub get_next_key {
 }
 
 ################################################################################
+
+=head2 setup_fh( $obj )
+
+This takes an object that provides _base_offset(). It will do everything needed
+in order to properly initialize all values for necessary functioning. If this is
+called upon an already initialized object, this will also reset the inode.
+
+This returns 1.
+
+=cut
 
 sub setup_fh {
     my $self = shift;
@@ -445,6 +620,18 @@ sub setup_fh {
     return 1;
 }
 
+=head2 begin_work( $obj )
+
+This takes an object that provides _base_offset(). It will set up all necessary
+bookkeeping in order to run all work within a transaction.
+
+If $obj is already within a transaction, an error wiill be thrown. If there are
+no more available transactions, an error will be thrown.
+
+This returns undef.
+
+=cut
+
 sub begin_work {
     my $self = shift;
     my ($obj) = @_;
@@ -474,6 +661,17 @@ sub begin_work {
 
     return;
 }
+
+=head2 rollback( $obj )
+
+This takes an object that provides _base_offset(). It will revert all
+actions taken within the running transaction.
+
+If $obj is not within a transaction, an error will be thrown.
+
+This returns 1.
+
+=cut
 
 sub rollback {
     my $self = shift;
@@ -512,6 +710,17 @@ sub rollback {
 
     return 1;
 }
+
+=head2 commit( $obj )
+
+This takes an object that provides _base_offset(). It will apply all
+actions taken within the transaction to the HEAD.
+
+If $obj is not within a transaction, an error will be thrown.
+
+This returns 1.
+
+=cut
 
 sub commit {
     my $self = shift;
@@ -557,6 +766,74 @@ sub commit {
     return 1;
 }
 
+=head2 lock_exclusive()
+
+This takes an object that provides _base_offset(). It will guarantee that
+the storage has taken precautions to be safe for a write.
+
+This returns nothing.
+
+=cut
+
+sub lock_exclusive {
+    my $self = shift;
+    my ($obj) = @_;
+    return $self->storage->lock_exclusive( $obj );
+}
+
+=head2 lock_shared()
+
+This takes an object that provides _base_offset(). It will guarantee that
+the storage has taken precautions to be safe for a read.
+
+This returns nothing.
+
+=cut
+
+sub lock_shared {
+    my $self = shift;
+    my ($obj) = @_;
+    return $self->storage->lock_shared( $obj );
+}
+
+=head2 unlock()
+
+This takes an object that provides _base_offset(). It will guarantee that
+the storage has released all locks taken.
+
+This returns nothing.
+
+=cut
+
+sub unlock {
+    my $self = shift;
+    my ($obj) = @_;
+
+    my $rv = $self->storage->unlock( $obj );
+
+    $self->flush if $rv;
+
+    return $rv;
+}
+
+################################################################################
+
+=head1 INTERNAL METHODS
+
+The following methods are internal-use-only to DBM::Deep::Engine.
+
+=cut
+
+=head2 read_txn_slots()
+
+This takes no arguments.
+
+This will return an array with a 1 or 0 in each slot. Each spot represents one
+available transaction. If the slot is 1, that transaction is taken. If it is 0,
+the transaction is available.
+
+=cut
+
 sub read_txn_slots {
     my $self = shift;
     my $bl = $self->txn_bitfield_len;
@@ -568,6 +845,17 @@ sub read_txn_slots {
     );
 }
 
+=head2 write_txn_slots( @slots )
+
+This takes an array of 1's and 0's. This array represents the transaction slots
+returned by L</read_txn_slots()>. In other words, the following is true:
+
+  @x = read_txn_slots( write_txn_slots( @x ) );
+
+(With the obviously missing object referents added back in.)
+
+=cut
+
 sub write_txn_slots {
     my $self = shift;
     my $num_bits = $self->txn_bitfield_len * 8;
@@ -576,11 +864,26 @@ sub write_txn_slots {
     );
 }
 
+=head2 get_running_txn_ids()
+
+This takes no arguments.
+
+This will return an array of taken transaction IDs. This wraps L</read_txn_slots()>.
+
+=cut
+
 sub get_running_txn_ids {
     my $self = shift;
     my @transactions = $self->read_txn_slots;
-    my @trans_ids = map { $_+1} grep { $transactions[$_] } 0 .. $#transactions;
+    my @trans_ids = map { $_+1 } grep { $transactions[$_] } 0 .. $#transactions;
 }
+
+=head2 get_txn_staleness_counter( $trans_id )
+
+This will return the staleness counter for the given transaction ID. Please see
+L</TRANSACTION STALENESS> for more information.
+
+=cut
 
 sub get_txn_staleness_counter {
     my $self = shift;
@@ -597,6 +900,13 @@ sub get_txn_staleness_counter {
     );
 }
 
+=head2 inc_txn_staleness_counter( $trans_id )
+
+This will increment the staleness counter for the given transaction ID. Please see
+L</TRANSACTION STALENESS> for more information.
+
+=cut
+
 sub inc_txn_staleness_counter {
     my $self = shift;
     my ($trans_id) = @_;
@@ -610,10 +920,30 @@ sub inc_txn_staleness_counter {
     );
 }
 
+=head2 get_entries()
+
+This takes no arguments.
+
+This returns a list of all the sectors that have been modified by this transaction.
+
+=cut
+
 sub get_entries {
     my $self = shift;
     return [ keys %{ $self->{entries}{$self->trans_id} ||= {} } ];
 }
+
+=head2 add_entry( $trans_id, $location )
+
+This takes a transaction ID and a file location and marks the sector at that location
+as having been modified by the transaction identified by $trans_id.
+
+This returns nothing.
+
+B<NOTE>: Unlike all the other _entries() methods, there are several cases where
+C<< $trans_id != $self->trans_id >> for this method.
+
+=cut
 
 sub add_entry {
     my $self = shift;
@@ -623,8 +953,16 @@ sub add_entry {
     $self->{entries}{$trans_id}{$loc} = undef;
 }
 
-# If the buckets are being relocated because of a reindexing, the entries
-# mechanism needs to be made aware of it.
+=head2 reindex_entry( $old_loc, $new_loc )
+
+This takes two locations (old and new, respectively). If a location that has been
+modified by this transaction is subsequently reindexed due to a bucketlist
+overflowing, then the entries hash needs to be made aware of this change.
+
+This returns nothing.
+
+=cut
+
 sub reindex_entry {
     my $self = shift;
     my ($old_loc, $new_loc) = @_;
@@ -639,12 +977,32 @@ sub reindex_entry {
     }
 }
 
+=head2 clear_entries()
+
+This takes no arguments. It will clear the entries list for the running transaction.
+
+This returns nothing.
+
+=cut
+
 sub clear_entries {
     my $self = shift;
     delete $self->{entries}{$self->trans_id};
 }
 
 ################################################################################
+
+=head2 _write_file_header()
+
+This writes the file header for a new file. This will write the various settings
+that set how the file is interpreted.
+
+=head2 _read_file_header()
+
+This reads the file header from an existing file. This will read the various
+settings that set how the file is interpreted.
+
+=cut
 
 {
     my $header_fixed = length( SIG_FILE ) + 1 + 4 + 4;
@@ -745,6 +1103,13 @@ sub clear_entries {
     }
 }
 
+=head2 _load_sector( $offset )
+
+This will instantiate and return the sector object that represents the data found
+at $offset.
+
+=cut
+
 sub _load_sector {
     my $self = shift;
     my ($offset) = @_;
@@ -799,14 +1164,44 @@ sub _load_sector {
     DBM::Deep->_throw_error( "'$offset': Don't know what to do with type '$type'" );
 }
 
+=head2 _apply_digest( @stuff )
+
+This will apply the digest methd (default to Digest::MD5::md5) to the arguments
+passed in and return the result.
+
+=cut
+
 sub _apply_digest {
     my $self = shift;
     return $self->{digest}->(@_);
 }
 
+=head2 _add_free_blist_sector( $offset, $size )
+
+=head2 _add_free_data_sector( $offset, $size )
+
+=head2 _add_free_index_sector( $offset, $size )
+
+These methods are all wrappers around _add_free_sector(), providing the proper
+chain offset ($multiple) for the sector type.
+
+=cut
+
 sub _add_free_blist_sector { shift->_add_free_sector( 0, @_ ) }
 sub _add_free_data_sector { shift->_add_free_sector( 1, @_ ) }
 sub _add_free_index_sector { shift->_add_free_sector( 2, @_ ) }
+
+=head2 _add_free_sector( $multiple, $offset, $size )
+
+_add_free_sector() takes the offset into the chains location, the offset of the
+sector, and the size of that sector. It will mark the sector as a free sector
+and put it into the list of sectors that are free of this type for use later.
+
+This returns nothing.
+
+B<NOTE>: $size is unused?
+
+=cut
 
 sub _add_free_sector {
     my $self = shift;
@@ -832,9 +1227,30 @@ sub _add_free_sector {
     $storage->print_at( $offset + SIG_SIZE + $STALE_SIZE, $old_head );
 }
 
+=head2 _request_blist_sector( $size )
+
+=head2 _request_data_sector( $size )
+
+=head2 _request_index_sector( $size )
+
+These methods are all wrappers around _request_sector(), providing the proper
+chain offset ($multiple) for the sector type.
+
+=cut
+
 sub _request_blist_sector { shift->_request_sector( 0, @_ ) }
 sub _request_data_sector { shift->_request_sector( 1, @_ ) }
 sub _request_index_sector { shift->_request_sector( 2, @_ ) }
+
+=head2 _request_sector( $multiple $size )
+
+This takes the offset into the chains location and the size of that sector.
+
+This returns the object with the sector. If there is an available free sector of
+that type, then it will be reused. If there isn't one, then a new one will be
+allocated.
+
+=cut
 
 sub _request_sector {
     my $self = shift;
@@ -869,44 +1285,21 @@ sub _request_sector {
 
 ################################################################################
 
+=head2 flush()
+
+This takes no arguments. It will do everything necessary to flush all things to
+disk. This is usually called during unlock() and setup_fh().
+
+This returns nothing.
+
+=cut
+
 sub flush {
     my $self = shift;
-
-#    my $sectors = $self->dirty_sectors;
-#    for my $offset (sort { $a <=> $b } keys %{ $sectors }) {
-#        $self->storage->print_at( $offset, $self->sector_cache->{$offset} );
-#    }
 
     # Why do we need to have the storage flush? Shouldn't autoflush take care of things?
     # -RobK, 2008-06-26
     $self->storage->flush;
-
-#    $self->clear_dirty_sectors;
-
-#    $self->clear_sector_cache;
-}
-
-sub lock_exclusive {
-    my $self = shift;
-    my ($obj) = @_;
-    return $self->storage->lock_exclusive( $obj );
-}
-
-sub lock_shared {
-    my $self = shift;
-    my ($obj) = @_;
-    return $self->storage->lock_shared( $obj );
-}
-
-sub unlock {
-    my $self = shift;
-    my ($obj) = @_;
-
-    my $rv = $self->storage->unlock( $obj );
-
-    $self->flush if $rv;
-
-    return $rv;
 }
 
 ################################################################################

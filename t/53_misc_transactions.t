@@ -4,7 +4,7 @@
 # brought up by Alex Gallichotte
 
 use strict;
-#use warnings FATAL => 'all';
+use warnings FATAL => 'all';
 
 use Test::More tests => 4;
 use t::common qw( new_fh );
@@ -12,16 +12,16 @@ use t::common qw( new_fh );
 use_ok( 'DBM::Deep' );
 
 my ($fh, $filename) = new_fh();
-my $db = DBM::Deep->new( file => $filename, fh => $fh, );
+my $db = DBM::Deep->new( file => $filename, fh => $fh );
 
 eval { $db->{randkey()} = randkey() for 1 .. 10; }; ok(!$@, "No eval failures");
 
 eval {
-    $db->begin_work;
+#    $db->begin_work;
     $db->{randkey()} = randkey() for 1 .. 10;
-    $db->commit;
+#    $db->commit;
 };
-ok(!$@, 'No eval failures');
+ok(!$@, "No eval failures from the transaction");
 
 eval { $db->{randkey()} = randkey() for 1 .. 10; }; ok(!$@, "No eval failures");
 

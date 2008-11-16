@@ -75,10 +75,12 @@ my ($default, $small, $medium, $large);
     cmp_ok( $medium, '>', $small, "medium is greater than small" );
 }
 
+eval "pack('Q', 0);";
+my $haveQ = !$@;
+
 SKIP: {
-    eval "pack('Q', 0);";
     skip "Largefile support is not compiled into $^X", 3
-        if $@;
+        unless $haveQ;
 
     my ($fh, $filename) = new_fh();
     {
@@ -104,3 +106,18 @@ SKIP: {
     }
     cmp_ok( $medium, '<', $large, "medium is smaller than large" );
 }
+
+#SKIP: {
+#    skip "Largefile support is compiled into $^X", 3
+#        if $haveQ;
+#
+#    my ($fh, $filename) = new_fh();
+#    {
+#        my $db = DBM::Deep->new(
+#            file => $filename,
+#            autoflush => 1,
+#            pack_size => 'large',
+#        );
+#    }
+#
+#}

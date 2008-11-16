@@ -7,6 +7,16 @@ use warnings FATAL => 'all';
 
 use base qw( DBM::Deep::Engine::Sector::Data );
 
+my $STALE_SIZE = 2;
+
+# Please refer to the pack() documentation for further information
+my %StP = (
+    1 => 'C', # Unsigned char value (no order needed as it's just one byte)
+    2 => 'n', # Unsigned short in "network" (big-endian) order
+    4 => 'N', # Unsigned long in "network" (big-endian) order
+    8 => 'Q', # Usigned quad (no order specified, presumably machine-dependent)
+);
+
 sub _init {
     my $self = shift;
 

@@ -5,6 +5,16 @@ use 5.006_000;
 use strict;
 use warnings FATAL => 'all';
 
+my $STALE_SIZE = 2;
+
+# Please refer to the pack() documentation for further information
+my %StP = (
+    1 => 'C', # Unsigned char value (no order needed as it's just one byte)
+    2 => 'n', # Unsigned short in "network" (big-endian) order
+    4 => 'N', # Unsigned long in "network" (big-endian) order
+    8 => 'Q', # Usigned quad (no order specified, presumably machine-dependent)
+);
+
 sub new {
     my $self = bless $_[1], $_[0];
     Scalar::Util::weaken( $self->{engine} );

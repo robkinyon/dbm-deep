@@ -29,8 +29,7 @@ sub SIG_BLIST    () { 'B'    }
 sub SIG_FREE     () { 'F'    }
 sub SIG_SIZE     () {  1     }
 
-use DBM::Deep::Iterator::BucketList ();
-use DBM::Deep::Iterator::Index ();
+use DBM::Deep::Iterator ();
 use DBM::Deep::Engine::Sector::Data ();
 use DBM::Deep::Engine::Sector::BucketList ();
 use DBM::Deep::Engine::Sector::Index ();

@@ -5,6 +5,9 @@ use 5.006_000;
 use strict;
 use warnings FATAL => 'all';
 
+use DBM::Deep::Iterator::BucketList ();
+use DBM::Deep::Iterator::Index ();
+
 =head1 NAME
 
 DBM::Deep::Iterator

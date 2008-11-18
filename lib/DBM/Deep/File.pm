@@ -9,6 +9,28 @@ use Fcntl qw( :DEFAULT :flock :seek );
 
 use constant DEBUG => 0;
 
+=head1 NAME
+
+DBM::Deep::File
+
+=head1 PURPOSE
+
+This is an internal-use-only object for L<DBM::Deep/>. It mediates the low-level
+interaction with the storage mechanism.
+
+Currently, the only storage mechanism supported is the file system.
+
+=head1 OVERVIEW
+
+This class provides an abstraction to the storage mechanism so that the Engine (the
+only class that uses this class) doesn't have to worry about that.
+
+=head1 METHODS
+
+=head2 new( \%args )
+
+=cut
+
 sub new {
     my $class = shift;
     my ($args) = @_;
@@ -44,6 +66,14 @@ sub new {
     return $self;
 }
 
+=head2 open()
+
+This method opens the filehandle for the filename in C< file >. 
+
+There is no return value.
+
+=cut
+
 sub open {
     my $self = shift;
 
@@ -76,6 +106,14 @@ sub open {
     return 1;
 }
 
+=head2 close()
+
+If the filehandle is opened, this will close it.
+
+There is no return value.
+
+=cut
+
 sub close {
     my $self = shift;
 
@@ -87,12 +125,29 @@ sub close {
     return 1;
 }
 
+=head2 size()
+
+This will return the size of the DB. If file_offset is set, this will take that into account.
+
+=cut
+
 sub size {
     my $self = shift;
 
     return 0 unless $self->{fh};
     return( (-s $self->{fh}) - $self->{file_offset} );
 }
+
+=head2 set_inode()
+
+This will set the inode value of the underlying file object.
+
+This is only needed to handle some obscure Win32 bugs. It reqlly shouldn't be needed outside
+this object.
+
+There is no return value.
+
+=cut
 
 sub set_inode {
     my $self = shift;
@@ -105,6 +160,18 @@ sub set_inode {
 
     return 1;
 }
+
+=head2 print_at( $offset, @data )
+
+This takes an optional offset and some data to print.
+
+C< $offset >, if defined, will be used to seek into the file. If file_offset is set, it will be used
+as the zero location. If it is undefined, no seeking will occur. Then, C< @data > will be printed to
+the current location.
+
+There is no return value.
+
+=cut
 
 sub print_at {
     my $self = shift;
@@ -128,6 +195,18 @@ sub print_at {
     return 1;
 }
 
+=head2 read_at( $offset, $length )
+
+This takes an optional offset and a length.
+
+C< $offset >, if defined, will be used to seek into the file. If file_offset is set, it will be used
+as the zero location. If it is undefined, no seeking will occur. Then, C< $length > bytes will be
+read from the current location.
+
+The data read will be returned.
+
+=cut
+
 sub read_at {
     my $self = shift;
     my ($loc, $size) = @_;
@@ -150,6 +229,12 @@ sub read_at {
     return $buffer;
 }
 
+=head2 DESTROY
+
+When the ::File object goes out of scope, it will be closed.
+
+=cut
+
 sub DESTROY {
     my $self = shift;
     return unless $self;
@@ -158,6 +243,14 @@ sub DESTROY {
 
     return;
 }
+
+=head2 request_space( $size )
+
+This takes a size and adds that much space to the DBM.
+
+This returns the offset for the new location.
+
+=cut
 
 sub request_space {
     my $self = shift;
@@ -170,24 +263,118 @@ sub request_space {
     return $loc;
 }
 
-##
-# If db locking is set, flock() the db file.  If called multiple
-# times before unlock(), then the same number of unlocks() must
-# be called before the lock is released.
-##
+=head2 flush()
+
+This flushes the filehandle. This takes no parameters and returns nothing.
+
+=cut
+
+sub flush {
+    my $self = shift;
+
+    # Flush the filehandle
+    my $old_fh = select $self->{fh};
+    my $old_af = $|; $| = 1; $| = $old_af;
+    select $old_fh;
+
+    return 1;
+}
+
+=head2 is_writable()
+
+This takes no parameters. It returns a boolean saying if this filehandle is
+writable.
+
+Taken from L<http://www.perlmonks.org/?node_id=691054/>.
+
+=cut
+
+sub is_writable {
+    my $self = shift;
+
+    my $fh = $self->{fh};
+    return unless defined $fh;
+    return unless defined fileno $fh;
+    local $\ = '';  # just in case
+    no warnings;    # temporarily disable warnings
+    local $^W;      # temporarily disable warnings
+    return print $fh '';
+}
+
+=head2 copy_stats( $target_filename )
+
+This will take the stats for the current filehandle and apply them to
+C< $target_filename >. The stats copied are:
+
+=over 4
+
+=item * Onwer UID and GID
+
+=item * Permissions
+
+=back
+
+=cut
+
+sub copy_stats {
+    my $self = shift;
+    my ($temp_filename) = @_;
+
+    my @stats = stat( $self->{fh} );
+    my $perms = $stats[2] & 07777;
+    my $uid = $stats[4];
+    my $gid = $stats[5];
+    chown( $uid, $gid, $temp_filename );
+    chmod( $perms, $temp_filename );
+}
+
+=head1 LOCKING
+
+This is where the actual locking of the storage medium is performed.
+Nested locking is supported.
+
+B<NOTE>: It is unclear what will happen if a read lock is taken, then
+a write lock is taken as a nested lock, then the write lock is released.
+
+Currently, the only locking method supported is flock(1). This is a
+whole-file lock. In the future, more granular locking may be supported.
+The API for that is unclear right now.
+
+The following methods manage the locking status. In all cases, they take
+a L<DBM::Deep/> object and returns nothing.
+
+=over 4
+
+=item * lock_exclusive( $obj )
+
+Take a lock usable for writing.
+
+=item * lock_shared( $obj )
+
+Take a lock usable for reading.
+
+=item * unlock( $obj )
+
+Releases the last lock taken. If this is the outermost lock, then the
+object is actually unlocked.
+
+=back
+
+=cut
+
 sub lock_exclusive {
     my $self = shift;
     my ($obj) = @_;
-    return $self->lock( $obj, LOCK_EX );
+    return $self->_lock( $obj, LOCK_EX );
 }
 
 sub lock_shared {
     my $self = shift;
     my ($obj) = @_;
-    return $self->lock( $obj, LOCK_SH );
+    return $self->_lock( $obj, LOCK_SH );
 }
 
-sub lock {
+sub _lock {
     my $self = shift;
     my ($obj, $type) = @_;
 
@@ -235,10 +422,6 @@ sub lock {
     return;
 }
 
-##
-# If db locking is set, unlock the db file.  See note in lock()
-# regarding calling lock() multiple times.
-##
 sub unlock {
     my $self = shift;
 
@@ -256,42 +439,6 @@ sub unlock {
     }
 
     return;
-}
-
-sub flush {
-    my $self = shift;
-
-    # Flush the filehandle
-    my $old_fh = select $self->{fh};
-    my $old_af = $|; $| = 1; $| = $old_af;
-    select $old_fh;
-
-    return 1;
-}
-
-# Taken from http://www.perlmonks.org/?node_id=691054
-sub is_writable {
-    my $self = shift;
-
-    my $fh = $self->{fh};
-    return unless defined $fh;
-    return unless defined fileno $fh;
-    local $\ = '';  # just in case
-    no warnings;    # temporarily disable warnings
-    local $^W;      # temporarily disable warnings
-    return print $fh '';
-}
-
-sub copy_stats {
-    my $self = shift;
-    my ($temp_filename) = @_;
-
-    my @stats = stat( $self->{fh} );
-    my $perms = $stats[2] & 07777;
-    my $uid = $stats[4];
-    my $gid = $stats[5];
-    chown( $uid, $gid, $temp_filename );
-    chmod( $perms, $temp_filename );
 }
 
 1;

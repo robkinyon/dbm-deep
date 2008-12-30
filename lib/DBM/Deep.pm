@@ -480,7 +480,7 @@ sub STORE {
     ##
     my $self = shift->_get_self;
     my ($key, $value) = @_;
-    warn "STORE($self, $key, @{[defined$value?$value:'undef']})\n" if DEBUG;
+    warn "STORE($self, '$key', '@{[defined$value?$value:'undef']}')\n" if DEBUG;
 
     unless ( $self->_engine->storage->is_writable ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
@@ -494,7 +494,7 @@ sub STORE {
         $value = $self->_engine->storage->{filter_store_value}->( $value );
     }
 
-    $self->_engine->write_value( $self, $key, $value);
+    my $x = $self->_engine->write_value( $self, $key, $value);
 
     $self->unlock;
 
@@ -507,7 +507,7 @@ sub FETCH {
     ##
     my $self = shift->_get_self;
     my ($key) = @_;
-    warn "FETCH($self,$key)\n" if DEBUG;
+    warn "FETCH($self, '$key')\n" if DEBUG;
 
     $self->lock_shared;
 
@@ -528,7 +528,7 @@ sub DELETE {
     ##
     my $self = shift->_get_self;
     my ($key) = @_;
-    warn "DELETE($self,$key)\n" if DEBUG;
+    warn "DELETE($self, '$key')\n" if DEBUG;
 
     unless ( $self->_engine->storage->is_writable ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
@@ -556,7 +556,7 @@ sub EXISTS {
     ##
     my $self = shift->_get_self;
     my ($key) = @_;
-    warn "EXISTS($self,$key)\n" if DEBUG;
+    warn "EXISTS($self, '$key')\n" if DEBUG;
 
     $self->lock_shared;
 

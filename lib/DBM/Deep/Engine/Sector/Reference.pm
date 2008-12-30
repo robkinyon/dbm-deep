@@ -163,10 +163,13 @@ sub delete_key {
     my $self = shift;
     my ($args) = @_;
 
-    # XXX What should happen if this fails?
+    # This can return nothing if we are deleting an entry in a hashref that was
+    # auto-vivified as part of the delete process. For example:
+    #     my $x = {};
+    #     delete $x->{foo}{bar};
     my $blist = $self->get_bucket_list({
         key_md5 => $args->{key_md5},
-    }) or DBM::Deep->_throw_error( "How did delete_key fail (no blist)?!" );
+    }) or return;
 
     # Save the location so that we can free the data
     my $location = $blist->get_data_location_for({

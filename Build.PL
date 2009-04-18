@@ -17,7 +17,7 @@ my $build = Module::Build->new(
         'Pod::Usage'      => '1.3',
         'Test::Deep'      => '0.095',
         'Test::Warn'      => '0.08',
-        'Test::More'      => '0.47',
+        'Test::More'      => '0.61',
         'Test::Exception' => '0.21',
         'IO::Scalar'      => '0.01',
     },

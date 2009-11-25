@@ -19,3 +19,4 @@ cover_db
 ^__MACOSX
 ^articles
 ^t_attic
+^.gitignore

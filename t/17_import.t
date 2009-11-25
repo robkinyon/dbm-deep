@@ -14,7 +14,6 @@ foreach my $type ( DBM::Deep->TYPE_HASH, DBM::Deep->TYPE_ARRAY ) {
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new({
         file => $filename,
-        fh => $fh,
         type => $type,
     });
 
@@ -50,7 +49,6 @@ foreach my $type ( DBM::Deep->TYPE_HASH, DBM::Deep->TYPE_ARRAY ) {
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new({
         file      => $filename,
-        fh => $fh,
         autobless => 1,
     });
 
@@ -98,7 +96,6 @@ foreach my $type ( DBM::Deep->TYPE_HASH, DBM::Deep->TYPE_ARRAY ) {
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new({
         file => $filename,
-        fh => $fh,
         type => DBM::Deep->TYPE_ARRAY,
     });
 
@@ -132,7 +129,6 @@ foreach my $type ( DBM::Deep->TYPE_HASH, DBM::Deep->TYPE_ARRAY ) {
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new({
         file      => $filename,
-        fh => $fh,
         autobless => 1,
     });
 

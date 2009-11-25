@@ -11,7 +11,6 @@ use_ok( 'DBM::Deep' );
 my ($fh, $filename) = new_fh();
 my $db = DBM::Deep->new(
     file => $filename,
-    fh => $fh,
     locking => 1,
     autoflush => 1,
     num_txns  => 16,
@@ -21,7 +20,6 @@ seek $db->_get_self->_engine->storage->{fh}, 0, 0;
 
 my $db2 = DBM::Deep->new(
     file => $filename,
-    fh => $fh,
     locking => 1,
     autoflush => 1,
     num_txns  => 16,

@@ -8,7 +8,7 @@ use t::common qw( new_fh );
 use_ok( 'DBM::Deep' );
 
 my ($fh, $filename) = new_fh();
-my $db = DBM::Deep->new( file => $filename, fh => $fh, );
+my $db = DBM::Deep->new( $filename );
 
 my %hash = (
     foo => 1,

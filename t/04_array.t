@@ -11,7 +11,6 @@ use_ok( 'DBM::Deep' );
 my ($fh, $filename) = new_fh();
 my $db = DBM::Deep->new(
     file => $filename,
-    fh => $fh,
     type => DBM::Deep->TYPE_ARRAY
 );
 

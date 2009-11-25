@@ -6,9 +6,7 @@ use t::common qw( new_fh );
 use_ok( 'DBM::Deep' );
 
 my ($fh, $filename) = new_fh();
-my $db = DBM::Deep->new(
-	file => $filename,
-);
+my $db = DBM::Deep->new( $filename );
 
 is( $db->_dump_file, <<"__END_DUMP__", "Dump of initial file correct" );
 NumTxns: 1

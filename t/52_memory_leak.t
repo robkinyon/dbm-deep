@@ -14,7 +14,7 @@ plan skip_all => "Need to figure out what platforms this runs on";
 use t::common qw( new_fh );
 
 my ($fh, $filename) = new_fh();
-my $db = DBM::Deep->new( file => $filename, fh => $fh, );
+my $db = DBM::Deep->new( $filename );
 
 my $todo  = 1000;
 my $allow = $todo*0.02; # NOTE: a 2% fail rate is hardly a failure

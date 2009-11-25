@@ -21,7 +21,6 @@ my $max_levels = 1000;
 {
     my $db = DBM::Deep->new(
         file => $filename,
-        fh => $fh,
         type => DBM::Deep->TYPE_ARRAY,
     );
 
@@ -38,7 +37,6 @@ my $max_levels = 1000;
     open $fh, '+<', $filename;
     my $db = DBM::Deep->new(
         file => $filename,
-        fh => $fh,
         type => DBM::Deep->TYPE_ARRAY,
     );
 

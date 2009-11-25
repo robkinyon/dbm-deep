@@ -9,7 +9,7 @@ use t::common qw( new_fh );
 use_ok( 'DBM::Deep' );
 
 my ($fh2, $filename2) = new_fh();
-my $db2 = DBM::Deep->new( file => $filename2, fh => $fh2, );
+my $db2 = DBM::Deep->new( $filename2 );
 
 SKIP: {
     skip "Apparently, we cannot detect a tied scalar?", 1;
@@ -35,7 +35,7 @@ SKIP: {
 
 {
     my ($fh, $filename) = new_fh();
-    my $db = DBM::Deep->new( file => $filename, fh => $fh, );
+    my $db = DBM::Deep->new( $filename );
 
     ##
     # Create structure in $db

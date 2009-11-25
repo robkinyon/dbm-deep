@@ -27,7 +27,6 @@ my %sizes;
     {
         my $db = DBM::Deep->new(
             file => $filename,
-            fh => $fh,
             data_sector_size => 32,
         );
 
@@ -48,7 +47,6 @@ my %sizes;
     {
         my $db = DBM::Deep->new(
             file => $filename,
-            fh => $fh,
             data_sector_size => 64,
         );
 
@@ -69,7 +67,6 @@ my %sizes;
     {
         my $db = DBM::Deep->new(
             file => $filename,
-            fh => $fh,
             data_sector_size => 128,
         );
 
@@ -90,7 +87,6 @@ my %sizes;
     {
         my $db = DBM::Deep->new(
             file => $filename,
-            fh => $fh,
             data_sector_size => 256,
         );
 

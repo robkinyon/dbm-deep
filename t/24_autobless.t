@@ -16,7 +16,6 @@ my ($fh, $filename) = new_fh();
 {
     my $db = DBM::Deep->new(
         file     => $filename,
-        fh => $fh,
         autobless => 1,
     );
 
@@ -163,7 +162,6 @@ my ($fh, $filename) = new_fh();
     {
         my $db = DBM::Deep->new(
             file     => $filename2,
-            fh => $fh2,
             autobless => 1,
         );
         my $obj = bless {
@@ -197,7 +195,6 @@ my ($fh, $filename) = new_fh();
     my ($fh3, $filename3) = new_fh();
     my $db = DBM::Deep->new(
         file     => $filename3,
-        fh => $fh3,
         autobless => 1,
     );
 

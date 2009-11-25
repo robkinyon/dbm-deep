@@ -16,7 +16,6 @@ use_ok( 'DBM::Deep' );
     my ($fh, $filename) = new_fh();
     my $db = DBM::Deep->new(
         file => $filename,
-        fh => $fh,
     );
 
     my $bar = bless { foo => 'ope' }, 'Foo';
@@ -33,10 +32,7 @@ use_ok( 'DBM::Deep' );
 # This is bug #29957, reported by HANENKAMP
 {
     my ($fh, $filename) = new_fh();
-    my $db = DBM::Deep->new(
-        file => $filename,
-        fh => $fh,
-    );
+    my $db = DBM::Deep->new( $filename );
 
     $db->{foo} = [];
 
@@ -54,10 +50,7 @@ use_ok( 'DBM::Deep' );
 # This is bug #33863, reported by PJS
 {
     my ($fh, $filename) = new_fh();
-    my $db = DBM::Deep->new(
-        file => $filename,
-        fh => $fh,
-    );
+    my $db = DBM::Deep->new( $filename );
 
     $db->{foo} = [ 42 ];
     my $foo = shift @{ $db->{foo} };

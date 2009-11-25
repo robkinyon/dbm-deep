@@ -12,10 +12,7 @@ use_ok( 'DBM::Deep' );
 
 {
     my ($fh, $filename) = t::common::new_fh();
-    my $db = DBM::Deep->new(
-        file => $filename,
-        fh => $fh,
-    );
+    my $db = DBM::Deep->new( $filename );
 
     # Add a self-referencing connection to test export
     my %struct = (

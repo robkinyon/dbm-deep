@@ -12,7 +12,7 @@ use t::common qw( new_fh );
 use_ok( 'DBM::Deep' );
 
 my ($fh, $filename) = new_fh();
-my $db = DBM::Deep->new( file => $filename, fh => $fh );
+my $db = DBM::Deep->new( $filename );
 
 eval { $db->{randkey()} = randkey() for 1 .. 10; }; ok(!$@, "No eval failures");
 

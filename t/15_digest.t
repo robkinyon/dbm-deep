@@ -11,7 +11,7 @@ my ($fh, $filename) = new_fh();
 
 my $salt = 38473827;
 
-my $db = new DBM::Deep(
+my $db = DBM::Deep->new(
 	file => $filename,
     digest => \&my_digest,
     hash_size => 8,

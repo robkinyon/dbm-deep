@@ -13,6 +13,10 @@ use Scalar::Util ();
 use DBM::Deep::Engine;
 use DBM::Deep::File;
 
+use DBM::Deep::SQL::Util;
+use DBM::Deep::SQL::Array;
+use DBM::Deep::SQL::Hash;
+
 use overload
     '""' => sub { overload::StrVal( $_[0] ) },
     fallback => 1;
@@ -57,11 +61,76 @@ sub new {
     ##
     my $class = shift;
     my $args = $class->_get_args( @_ );
+    my $self;
+    
+    ##
+    # Check for SQL storage
+    ##
+    if (exists $args->{dbi}) {
+        eval {
+            require DBIx::Abstract;
+        }; if ( $@ ) {
+            DBM::Deep->_throw_error('DBIx::Abstract not installed. You cannot use the SQL mode.');
+        }
+        unless (UNIVERSAL::isa($args->{dbi}, 'DBIx::Abstract')) {
+            $args->{dbi} = DBIx::Abstract->connect($args->{dbi});
+        }
+
+        if (defined $args->{id}) {
+            unless ($args->{id} =~ /^\d+$/ && $args->{id} > 0) {
+                DBM::Deep->_throw_error('Invalid SQL record id');
+            }
+            my $util = {dbi => $args->{dbi}};
+            bless $util, 'DBM::Deep::SQL::Util';
+            my $q = $util->_select(
+                table  => 'rec_item',
+                fields => 'item_type',
+                where  => {id => $args->{id}},
+            );
+            if ($q->[0]->[0] eq 'array') {
+                $args->{type} = TYPE_ARRAY;
+            }
+            elsif ($q->[0]->[0] eq 'hash') {
+                $args->{type} = TYPE_HASH;
+            }
+            else {
+                DBM::Deep->_throw_error('Unknown SQL record id');
+            }
+        }
+        else {
+            my $util = {dbi => $args->{dbi}};
+            bless $util, 'DBM::Deep::SQL::Util';
+            if (defined($args->{type}) && $args->{type} eq TYPE_ARRAY) {
+                $args->{id} = $util->_create('array');
+            }
+            else {
+                $args->{id} = $util->_create('hash');
+            }
+        }
+
+        if (defined($args->{type}) && $args->{type} eq TYPE_ARRAY) {
+            $class = 'DBM::Deep::SQL::Array';
+            require DBM::Deep::SQL::Array;
+            tie @$self, $class, %$args;
+            if ($args->{prefetch}) {
+                (tied(@$self))->_prefetch();
+            }
+            return bless $self, $class;
+        }
+        else {
+            $class = 'DBM::Deep::SQL::Hash';
+            require DBM::Deep::SQL::Hash;
+            tie %$self, $class, %$args;
+            if ($args->{prefetch}) {
+                (tied(%$self))->_prefetch();
+            }
+            return bless $self, $class;
+        }
+    }
 
     ##
     # Check if we want a tied hash or array.
     ##
-    my $self;
     if (defined($args->{type}) && $args->{type} eq TYPE_ARRAY) {
         $class = 'DBM::Deep::Array';
         require DBM::Deep::Array;
@@ -494,7 +563,7 @@ sub STORE {
         $value = $self->_engine->storage->{filter_store_value}->( $value );
     }
 
-    my $x = $self->_engine->write_value( $self, $key, $value);
+    $self->_engine->write_value( $self, $key, $value);
 
     $self->unlock;
 

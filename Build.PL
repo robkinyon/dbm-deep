@@ -11,6 +11,10 @@ my $build = Module::Build->new(
         'Scalar::Util'      => '1.14',
         'Digest::MD5'       => '1.00',
     },
+    recommends => {
+        'DBIx::Abstract' => '1.006',
+        'Storable'       => '2.21',
+    },
     build_requires => {
         'File::Path'      => '0.01',
         'File::Temp'      => '0.01',

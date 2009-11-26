@@ -1,5 +1,8 @@
 Revision history for DBM::Deep.
 
+1.0015 Nov 22 20:00:00 2009 EST
+	- DBM::Deep::SQL added
+
 1.0014 Jun 13 23:15:00 2008 EST
     - (This version is compatible with 1.0013)
     - Fix for RT#36781 (t/44 has an unrequired dependency)

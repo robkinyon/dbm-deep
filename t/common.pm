@@ -10,6 +10,7 @@ our $VERSION = '0.01';
 
 use base 'Exporter';
 our @EXPORT_OK = qw(
+    new_dbm
     new_fh
 );
 
@@ -28,6 +29,23 @@ sub new_fh {
     flock $fh, LOCK_UN;
 
     return ($fh, $filename);
+}
+
+sub new_dbm {
+    my @args = @_;
+    my ($fh, $filename) = new_fh();
+    my @extra_args = (
+        [ file => $filename ],
+    );
+    return sub {
+        return unless @extra_args;
+        my @these_args = @{ shift @extra_args };
+        return sub {
+            DBM::Deep->new(
+                @these_args, @args,
+            );
+        };
+    };
 }
 
 1;

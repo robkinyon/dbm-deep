@@ -4,12 +4,13 @@
 use strict;
 use Test::More tests => 49;
 use Test::Exception;
-use t::common qw( new_fh );
+use t::common qw( new_dbm );
 
 use_ok( 'DBM::Deep' );
 
-my ($fh, $filename) = new_fh();
-my $db = DBM::Deep->new( $filename );
+my $dbm_factory = new_dbm();
+while ( my $dbm_maker = $dbm_factory->() ) {
+my $db = $dbm_maker->();
 
 ##
 # put/get key
@@ -112,8 +113,7 @@ is( $db->get("key1"), "value222222222222222222222222", "We set a value before cl
 # Make sure DB still works after closing / opening
 ##
 undef $db;
-open $fh, '+<', $filename;
-$db = DBM::Deep->new( $filename );
+$db = $dbm_maker->();
 is( $db->get("key1"), "value222222222222222222222222", "The value we set is still there after closure" );
 
 ##
@@ -175,3 +175,4 @@ throws_ok {
     $db->exists(undef);
 } qr/Cannot use an undefined hash key/, "EXISTS fails on an undefined key";
 
+}

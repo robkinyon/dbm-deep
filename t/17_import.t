@@ -1,60 +1,55 @@
-##
-# DBM::Deep Test
-##
 use strict;
-use Test::More tests => 17;
+use warnings FATAL => 'all';
+
+use Test::More;
 use Test::Deep;
 use Test::Exception;
-use t::common qw( new_fh );
+use t::common qw( new_dbm );
 
 use_ok( 'DBM::Deep' );
 
 # Failure cases to make sure that things are caught right.
 foreach my $type ( DBM::Deep->TYPE_HASH, DBM::Deep->TYPE_ARRAY ) {
-    my ($fh, $filename) = new_fh();
-    my $db = DBM::Deep->new({
-        file => $filename,
-        type => $type,
-    });
+    my $dbm_factory = new_dbm( type => $type );
+    while ( my $dbm_maker = $dbm_factory->() ) {
+        my $db = $dbm_maker->();
 
-    # Load a scalar
-    throws_ok {
-        $db->import( 'foo' );
-    } qr/Cannot import a scalar/, "Importing a scalar to type '$type' fails";
+        # Load a scalar
+        throws_ok {
+            $db->import( 'foo' );
+        } qr/Cannot import a scalar/, "Importing a scalar to type '$type' fails";
 
-    # Load a ref of the wrong type
-    # Load something with bad stuff in it
-    my $x = 3;
-    if ( $type eq 'A' ) {
-        throws_ok {
-            $db->import( { foo => 'bar' } );
-        } qr/Cannot import a hash into an array/, "Wrong type fails";
+        # Load a ref of the wrong type
+        # Load something with bad stuff in it
+        my $x = 3;
+        if ( $type eq 'A' ) {
+            throws_ok {
+                $db->import( { foo => 'bar' } );
+            } qr/Cannot import a hash into an array/, "Wrong type fails";
 
-        throws_ok {
-            $db->import( [ \$x ] );
-        } qr/Storage of references of type 'SCALAR' is not supported/, "Bad stuff fails";
-    }
-    else {
-        throws_ok {
-            $db->import( [ 1 .. 3 ] );
-        } qr/Cannot import an array into a hash/, "Wrong type fails";
+            throws_ok {
+                $db->import( [ \$x ] );
+            } qr/Storage of references of type 'SCALAR' is not supported/, "Bad stuff fails";
+        }
+        else {
+            throws_ok {
+                $db->import( [ 1 .. 3 ] );
+            } qr/Cannot import an array into a hash/, "Wrong type fails";
 
-        throws_ok {
-            $db->import( { foo => \$x } );
-        } qr/Storage of references of type 'SCALAR' is not supported/, "Bad stuff fails";
+            throws_ok {
+                $db->import( { foo => \$x } );
+            } qr/Storage of references of type 'SCALAR' is not supported/, "Bad stuff fails";
+        }
     }
 }
 
-{
-    my ($fh, $filename) = new_fh();
-    my $db = DBM::Deep->new({
-        file      => $filename,
-        autobless => 1,
-    });
+my $dbm_factory = new_dbm( autobless => 1 );
+while ( my $dbm_maker = $dbm_factory->() ) {
+    my $db = $dbm_maker->();
 
-##
-# Create structure in memory
-##
+    ##
+    # Create structure in memory
+    ##
     my $struct = {
         key1 => "value1",
         key2 => "value2",
@@ -92,12 +87,9 @@ foreach my $type ( DBM::Deep->TYPE_HASH, DBM::Deep->TYPE_ARRAY ) {
     ok( !exists $db->{hash1}->{foo}, "\$db->{hash1} doesn't have the 'foo' key, so \$struct->{hash1} is not tied" );
 }
 
-{
-    my ($fh, $filename) = new_fh();
-    my $db = DBM::Deep->new({
-        file => $filename,
-        type => DBM::Deep->TYPE_ARRAY,
-    });
+$dbm_factory = new_dbm( type => DBM::Deep->TYPE_ARRAY );
+while ( my $dbm_maker = $dbm_factory->() ) {
+    my $db = $dbm_maker->();
 
     my $struct = [
         1 .. 3,
@@ -125,12 +117,9 @@ foreach my $type ( DBM::Deep->TYPE_HASH, DBM::Deep->TYPE_ARRAY ) {
 }
 
 # Failure case to verify that rollback occurs
-{
-    my ($fh, $filename) = new_fh();
-    my $db = DBM::Deep->new({
-        file      => $filename,
-        autobless => 1,
-    });
+$dbm_factory = new_dbm( autobless => 1 );
+while ( my $dbm_maker = $dbm_factory->() ) {
+    my $db = $dbm_maker->();
 
     $db->{foo} = 'bar';
 
@@ -157,6 +146,8 @@ foreach my $type ( DBM::Deep->TYPE_HASH, DBM::Deep->TYPE_ARRAY ) {
         );
     }
 }
+
+done_testing;
 
 __END__
 

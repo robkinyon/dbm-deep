@@ -1,8 +1,8 @@
-use 5.006_000;
-
 use strict;
 use warnings FATAL => 'all';
 
+# Need to have an explicit plan in order for the sub-testing to work right.
+#XXX Figure out how to use subtests for that.
 use Test::More tests => 14;
 use Test::Exception;
 use t::common qw( new_fh );
@@ -76,8 +76,9 @@ __END_FH__
         my $db = DBM::Deep->new({
             file        => $filename,
             file_offset => $offset,
-#XXX For some reason, this is needed to make the test pass. Figure out why later.
-locking => 0,
+            #XXX For some reason, this is needed to make the test pass. Figure
+            #XXX out why later.
+            locking => 0,
         });
 
         $db->{x} = 'b';

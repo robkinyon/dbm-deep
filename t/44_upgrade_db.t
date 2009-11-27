@@ -2,6 +2,8 @@ $|++;
 use strict;
 use Test::More;
 
+plan skip_all => "upgrade_db.pl doesn't actually do anything correct.";
+
 # Add skips here
 BEGIN {
     plan skip_all => "Skipping the upgrade_db.pl tests on Win32/cygwin for now."

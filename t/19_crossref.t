@@ -1,70 +1,70 @@
-##
-# DBM::Deep Test
-##
 use strict;
-use Test::More tests => 9;
+use warnings FATAL => 'all';
+
+use Test::More;
 use Test::Exception;
-use t::common qw( new_fh );
+use t::common qw( new_dbm );
 
 use_ok( 'DBM::Deep' );
 
-my ($fh2, $filename2) = new_fh();
-my $db2 = DBM::Deep->new( $filename2 );
+my $dbm_factory = new_dbm();
+while ( my $dbm_maker = $dbm_factory->() ) {
+    my $db = $dbm_maker->();
 
-SKIP: {
-    skip "Apparently, we cannot detect a tied scalar?", 1;
-    tie my $foo, 'Tied::Scalar';
-    throws_ok {
-        $db2->{failure} = $foo;
-    } qr/Cannot store something that is tied\./, "tied scalar storage fails";
-}
+    SKIP: {
+        skip "Apparently, we cannot detect a tied scalar?", 1;
+        tie my $foo, 'Tied::Scalar';
+        throws_ok {
+            $db->{failure} = $foo;
+        } qr/Cannot store something that is tied\./, "tied scalar storage fails";
+    }
 
-{
-    tie my @foo, 'Tied::Array';
-    throws_ok {
-        $db2->{failure} = \@foo;
-    } qr/Cannot store something that is tied\./, "tied array storage fails";
-}
+    {
+        tie my @foo, 'Tied::Array';
+        throws_ok {
+            $db->{failure} = \@foo;
+        } qr/Cannot store something that is tied\./, "tied array storage fails";
+    }
 
-{
-    tie my %foo, 'Tied::Hash';
-    throws_ok {
-        $db2->{failure} = \%foo;
-    } qr/Cannot store something that is tied\./, "tied hash storage fails";
-}
+    {
+        tie my %foo, 'Tied::Hash';
+        throws_ok {
+            $db->{failure} = \%foo;
+        } qr/Cannot store something that is tied\./, "tied hash storage fails";
+    }
 
-{
-    my ($fh, $filename) = new_fh();
-    my $db = DBM::Deep->new( $filename );
+    my $dbm_factory2 = new_dbm();
+    while ( my $dbm_maker2 = $dbm_factory2->() ) {
+        my $db2 = $dbm_maker2->();
+
+        $db2->import({
+            hash1 => {
+                subkey1 => "subvalue1",
+                subkey2 => "subvalue2",
+            }
+        });
+        is( $db2->{hash1}{subkey1}, 'subvalue1', "Value imported correctly" );
+        is( $db2->{hash1}{subkey2}, 'subvalue2', "Value imported correctly" );
+
+        # Test cross-ref nested hash accross DB objects
+        throws_ok {
+            $db->{copy} = $db2->{hash1};
+        } qr/Cannot store values across DBM::Deep files\. Please use export\(\) instead\./, "cross-ref fails";
+
+        # This error text is for when internal cross-refs are implemented
+        #} qr/Cannot cross-reference\. Use export\(\) instead\./
+
+        $db->{copy} = $db2->{hash1}->export;
+    }
 
     ##
-    # Create structure in $db
+    # Make sure $db has copy of $db2's hash structure
     ##
-    $db->import({
-        hash1 => {
-            subkey1 => "subvalue1",
-            subkey2 => "subvalue2",
-        }
-    });
-    is( $db->{hash1}{subkey1}, 'subvalue1', "Value imported correctly" );
-    is( $db->{hash1}{subkey2}, 'subvalue2', "Value imported correctly" );
-
-    # Test cross-ref nested hash accross DB objects
-    throws_ok {
-        $db2->{copy} = $db->{hash1};
-    } qr/Cannot store values across DBM::Deep files\. Please use export\(\) instead\./, "cross-ref fails";
-
-    # This error text is for when internal cross-refs are implemented
-    #} qr/Cannot cross-reference\. Use export\(\) instead\./, "cross-ref fails";
-
-    $db2->{copy} = $db->{hash1}->export;
+    is( $db->{copy}{subkey1}, 'subvalue1', "Value copied correctly" );
+    is( $db->{copy}{subkey2}, 'subvalue2', "Value copied correctly" );
 }
 
-##
-# Make sure $db2 has copy of $db's hash structure
-##
-is( $db2->{copy}{subkey1}, 'subvalue1', "Value copied correctly" );
-is( $db2->{copy}{subkey2}, 'subvalue2', "Value copied correctly" );
+done_testing;
 
 package Tied::Scalar;
 sub TIESCALAR { bless {}, $_[0]; }

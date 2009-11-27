@@ -1,9 +1,9 @@
-##
-# DBM::Deep Test
-##
+
 $|++;
 use strict;
-use Test::More tests => 23;
+use warnings FATAL => 'all';
+
+use Test::More;
 use Test::Exception;
 use Test::Warn;
 use t::common qw( new_fh );
@@ -135,3 +135,5 @@ use_ok( 'DBM::Deep' );
         DBM::Deep->new( 't/etc/db-0-99_04' );
     } qr/DBM::Deep: Wrong file version found - 1 - expected 3/, "Fail if opening a file version 1";
 }
+
+done_testing;

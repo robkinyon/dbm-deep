@@ -1,17 +1,18 @@
 use strict;
-use Test::More tests => 11;
+use warnings FATAL => 'all';
+
+use Test::More;
 use Test::Deep;
-use t::common qw( new_fh );
+use t::common qw( new_dbm );
 
 use_ok( 'DBM::Deep' );
 
-{
-    my ($fh, $filename) = new_fh();
-    my $db = DBM::Deep->new(
-        file => $filename,
-        locking => 1,
-        autoflush => 1,
-    );
+my $dbm_factory = new_dbm(
+    locking => 1,
+    autoflush => 1,
+);
+while ( my $dbm_maker = $dbm_factory->() ) {
+    my $db = $dbm_maker->();
 
     $db->{a} = 1;
     $db->{foo} = { a => 'b' };
@@ -40,25 +41,29 @@ use_ok( 'DBM::Deep' );
 
 SKIP: {
     skip "What do we do with external references and txns?", 2;
-    my ($fh, $filename) = new_fh();
-    my $db = DBM::Deep->new(
-        file => $filename,
-        locking => 1,
+
+    my $dbm_factory = new_dbm(
+        locking   => 1,
         autoflush => 1,
-        num_txns => 2,
+        num_txns  => 2,
     );
+    while ( my $dbm_maker = $dbm_factory->() ) {
+        my $db = $dbm_maker->();
 
-    $db->{foo} = { a => 'b' };
-    my $x = $db->{foo};
+        $db->{foo} = { a => 'b' };
+        my $x = $db->{foo};
 
-    $db->begin_work;
+        $db->begin_work;
     
-        $db->{foo} = { c => 'd' };
-        my $y = $db->{foo};
+            $db->{foo} = { c => 'd' };
+            my $y = $db->{foo};
 
-        # XXX What should happen here with $x and $y?
-        is( $x, $y );
-        is( $x->{c}, 'd' );
+            # XXX What should happen here with $x and $y?
+            is( $x, $y );
+            is( $x->{c}, 'd' );
 
-    $db->rollback;
+        $db->rollback;
+    }
 }
+
+done_testing;

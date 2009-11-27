@@ -1,13 +1,10 @@
-##
-# DBM::Deep Test
-##
 use strict;
+use warnings FATAL => 'all';
+
 use Test::More;
 
 plan skip_all => "Skipping the optimize tests on Win32/cygwin for now."
     if ( $^O eq 'MSWin32' || $^O eq 'cygwin' );
-
-plan tests => 9;
 
 use t::common qw( new_fh );
 
@@ -130,3 +127,5 @@ SKIP: {
     is( $db->{key1}, 'value1', "key1's value is still there after optimize" );
     is( $db->{a}{c}, 'value2', "key2's value is still there after optimize" );
 }
+
+done_testing;

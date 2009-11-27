@@ -1,6 +1,7 @@
 use strict;
+use warnings FATAL => 'all';
 
-use Test::More tests => 5;
+use Test::More;
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
@@ -24,3 +25,5 @@ use Scalar::Util qw( reftype );
     isa_ok( $obj, 'DBM::Deep' );
     is( reftype( $obj ), 'HASH', "... and its underlying representation is an HASH" );
 }
+
+done_testing;

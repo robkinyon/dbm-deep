@@ -1,9 +1,8 @@
-##
-# DBM::Deep Test
-##
 use strict;
+use warnings FATAL => 'all';
+
 use Config;
-use Test::More tests => 10;
+use Test::More;
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
@@ -121,3 +120,5 @@ SKIP: {
 #    }
 #
 #}
+
+done_testing;

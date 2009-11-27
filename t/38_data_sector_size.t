@@ -1,8 +1,7 @@
-##
-# DBM::Deep Test
-##
 use strict;
-use Test::More tests => 8;
+use warnings FATAL => 'all';
+
+use Test::More;
 
 use t::common qw( new_fh );
 
@@ -106,3 +105,4 @@ cmp_ok( $sizes{256}, '>', $sizes{128}, "Filesize for 256 > filesize for 128" );
 cmp_ok( $sizes{128}, '>', $sizes{64}, "Filesize for 128 > filesize for 64" );
 cmp_ok( $sizes{64}, '>', $sizes{32}, "Filesize for 64 > filesize for 32" );
 
+done_testing;

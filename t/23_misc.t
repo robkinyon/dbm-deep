@@ -1,8 +1,7 @@
-##
-# DBM::Deep Test
-##
 use strict;
-use Test::More tests => 7;
+use warnings FATAL => 'all';
+
+use Test::More;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -54,3 +53,5 @@ throws_ok {
     $db->_get_self->_engine->storage->close( $db->_get_self );
     ok( !$db->unlock, "Calling unlock() on a closed database returns false" );
 }
+
+done_testing;

@@ -42,7 +42,7 @@ sub new_dbm {
         my @these_args = @{ shift @extra_args };
         return sub {
             DBM::Deep->new(
-                @these_args, @args,
+                @these_args, @args, @_,
             );
         };
     };

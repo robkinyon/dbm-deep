@@ -1,16 +1,13 @@
-##
-# DBM::Deep Test
-##
 use strict;
-use Test::More tests => 11;
+use warnings FATAL => 'all';
+
+use Test::More;
 use Test::Exception;
 use t::common qw( new_fh );
 
 use_ok( 'DBM::Deep' );
 
-##
 # testing the various modes of opening a file
-##
 {
     my ($fh, $filename) = new_fh();
     my %hash;
@@ -67,3 +64,5 @@ throws_ok {
 throws_ok {
     tie my @array, 'DBM::Deep', undef, file => $filename;
 } qr/Odd number of parameters/, "Odd number of params to TIEARRAY fails";
+
+done_testing;

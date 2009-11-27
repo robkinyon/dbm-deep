@@ -1,5 +1,7 @@
 use strict;
-use Test::More tests => 3;
+use warnings FATAL => 'all';
+
+use Test::More;
 use Test::Deep;
 use t::common qw( new_fh );
 
@@ -18,7 +20,7 @@ __END_DUMP__
 
 $db->{foo} = 'bar';
 
-is( $db->_dump_file, <<"__END_DUMP__", "Dump of initial file correct" );
+is( $db->_dump_file, <<"__END_DUMP__", "Dump of file after single assignment" );
 NumTxns: 1
 Chains(B):
 Chains(D):
@@ -30,3 +32,4 @@ Chains(I):
 00000545: D  0064 foo
 __END_DUMP__
 
+done_testing;

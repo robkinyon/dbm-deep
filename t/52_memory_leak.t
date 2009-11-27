@@ -1,4 +1,3 @@
-
 # This was discussed here:
 # http://groups.google.com/group/DBM-Deep/browse_thread/thread/a6b8224ffec21bab
 # brought up by Alex Gallichotte
@@ -7,38 +6,39 @@ use strict;
 use warnings FATAL => 'all';
 
 use Test::More;
-use DBM::Deep;
 
 plan skip_all => "Need to figure out what platforms this runs on";
 
-use t::common qw( new_fh );
+use_ok( 'DBM::Deep' );
 
-my ($fh, $filename) = new_fh();
-my $db = DBM::Deep->new( $filename );
+use t::common qw( new_dbm );
 
-my $todo  = 1000;
-my $allow = $todo*0.02; # NOTE: a 2% fail rate is hardly a failure
+my $dbm_factory = new_dbm();
+while ( my $dbm_maker = $dbm_factory->() ) {
+    my $db = $dbm_maker->();
 
-$db->{randkey()} = 1 for 1 .. 1000;
+    my $todo  = 1000;
+    my $allow = $todo*0.02; # NOTE: a 2% fail rate is hardly a failure
 
-plan tests => $todo*2;
+    $db->{randkey()} = 1 for 1 .. 1000;
 
-my $error_count = 0;
-my @mem = (mem(0), mem(1));
-for my $i (1 .. $todo) {
-    $db->{randkey()} = [@mem];
+    my $error_count = 0;
+    my @mem = (mem(0), mem(1));
+    for my $i (1 .. $todo) {
+        $db->{randkey()} = [@mem];
 
-    ## DEBUG ## print STDERR " @mem     \r";
+        ## DEBUG ## print STDERR " @mem     \r";
 
-    my @tm = (mem(0), mem(1));
+        my @tm = (mem(0), mem(1));
 
-    skip( not($mem[0]), ($tm[0] <= $mem[0] or --$allow>0) );
-    skip( not($mem[1]), ($tm[1] <= $mem[1] or --$allow>0) );
+        skip( not($mem[0]), ($tm[0] <= $mem[0] or --$allow>0) );
+        skip( not($mem[1]), ($tm[1] <= $mem[1] or --$allow>0) );
 
-    $error_count ++ if $tm[0] > $mem[0] or $tm[1] > $mem[1];
-    die " ERROR: that's enough failures to prove the point ... " if $error_count > 20;
+        $error_count ++ if $tm[0] > $mem[0] or $tm[1] > $mem[1];
+        die " ERROR: that's enough failures to prove the point ... " if $error_count > 20;
 
-    @mem = @tm;
+        @mem = @tm;
+    }
 }
 
 sub randkey {

@@ -1,28 +1,28 @@
-use 5.006_000;
-
 use strict;
 use warnings FATAL => 'all';
 
 use Test::More;
 
-use t::common qw( new_fh );
+use t::common qw( new_dbm );
 
 my $max = 10;
 
-plan tests => $max + 1;
-
 use_ok( 'DBM::Deep' );
 
-my ($fh, $filename) = new_fh();
-my $db = DBM::Deep->new( $filename );
+my $dbm_factory = new_dbm();
+while ( my $dbm_maker = $dbm_factory->() ) {
+    my $db = $dbm_maker->();
 
-my $x = 1;
-while( $x <= $max ) {
-    eval {
-        delete $db->{borked}{test};
-        $db->{borked}{test} = 1;
-    };
+    my $x = 1;
+    while( $x <= $max ) {
+        eval {
+            delete $db->{borked}{test};
+            $db->{borked}{test} = 1;
+        };
 
-    ok(!$@, "No eval failure after ${x}th iteration");
-    $x++;
+        ok(!$@, "No eval failure after ${x}th iteration");
+        $x++;
+    }
 }
+
+done_testing;

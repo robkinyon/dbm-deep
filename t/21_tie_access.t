@@ -1,8 +1,7 @@
-##
-# DBM::Deep Test
-##
 use strict;
-use Test::More tests => 7;
+use warnings FATAL => 'all';
+
+use Test::More;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -52,3 +51,5 @@ my ($fh, $filename) = new_fh();
     } qr/DBM::Deep: File type mismatch/, "\$SIG_TYPE doesn't match file's type";
     $db->_get_self->_engine->storage->close( $db->_get_self );
 }
+
+done_testing;

@@ -115,30 +115,31 @@ with only one file.
 
 =head2 STALENESS
 
-If another process uses a transaction slot and writes stuff to it, then terminates,
-the data that process wrote it still within the file. In order to address this,
-there is also a transaction staleness counter associated within every write.
-Each time a transaction is started, that process increments that transaction's
-staleness counter. If, when it reads a value, the staleness counters aren't
-identical, DBM::Deep will consider the value on disk to be stale and discard it.
+If another process uses a transaction slot and writes stuff to it, then
+terminates, the data that process wrote it still within the file. In order to
+address this, there is also a transaction staleness counter associated within
+every write.  Each time a transaction is started, that process increments that
+transaction's staleness counter. If, when it reads a value, the staleness
+counters aren't identical, DBM::Deep will consider the value on disk to be stale
+and discard it.
 
 =head2 DURABILITY
 
 The fourth leg of ACID is Durability, the guarantee that when a commit returns,
 the data will be there the next time you read from it. This should be regardless
-of any crashes or powerdowns in between the commit and subsequent read. DBM::Deep
-does provide that guarantee; once the commit returns, all of the data has been
-transferred from the transaction shadow to the HEAD. The issue arises with partial
-commits - a commit that is interrupted in some fashion. In keeping with DBM::Deep's
-"tradition" of very light error-checking and non-existent error-handling, there is
-no way to recover from a partial commit. (This is probably a failure in Consistency
-as well as Durability.)
+of any crashes or powerdowns in between the commit and subsequent read.
+DBM::Deep does provide that guarantee; once the commit returns, all of the data
+has been transferred from the transaction shadow to the HEAD. The issue arises
+with partial commits - a commit that is interrupted in some fashion. In keeping
+with DBM::Deep's "tradition" of very light error-checking and non-existent
+error-handling, there is no way to recover from a partial commit. (This is
+probably a failure in Consistency as well as Durability.)
 
-Other DBMSes use transaction logs (a separate file, generally) to achieve Durability.
-As DBM::Deep is a single-file, we would have to do something similar to what SQLite
-and BDB do in terms of committing using synchonized writes. To do this, we would have
-to use a much higher RAM footprint and some serious programming that make my head
-hurts just to think about it.
+Other DBMSes use transaction logs (a separate file, generally) to achieve
+Durability.  As DBM::Deep is a single-file, we would have to do something
+similar to what SQLite and BDB do in terms of committing using synchonized
+writes. To do this, we would have to use a much higher RAM footprint and some
+serious programming that make my head hurts just to think about it.
 
 =head1 EXTERNAL METHODS
 
@@ -269,8 +270,8 @@ sub read_value {
 
 =head2 get_classname( $obj )
 
-This takes an object that provides _base_offset() and returns the classname (if any)
-associated with it.
+This takes an object that provides _base_offset() and returns the classname (if
+any) associated with it.
 
 It delegates to Sector::Reference::get_classname() for the heavy lifting.
 
@@ -297,7 +298,7 @@ sub get_classname {
 
 This takes an object that provides _base_offset() and two strings. The
 strings correspond to the old key and new key, respectively. This operation
-is equivalent to (given C<< $db->{foo} = []; >>) C<< $db->{bar} = $db->{foo}; >>.
+is equivalent to (given C<< $db->{foo} = []; >>) C<< $db->{bar} = $db->{foo} >>.
 
 This returns nothing.
 
@@ -935,8 +936,8 @@ sub get_entries {
 
 =head2 add_entry( $trans_id, $location )
 
-This takes a transaction ID and a file location and marks the sector at that location
-as having been modified by the transaction identified by $trans_id.
+This takes a transaction ID and a file location and marks the sector at that
+location as having been modified by the transaction identified by $trans_id.
 
 This returns nothing.
 
@@ -955,8 +956,8 @@ sub add_entry {
 
 =head2 reindex_entry( $old_loc, $new_loc )
 
-This takes two locations (old and new, respectively). If a location that has been
-modified by this transaction is subsequently reindexed due to a bucketlist
+This takes two locations (old and new, respectively). If a location that has
+been modified by this transaction is subsequently reindexed due to a bucketlist
 overflowing, then the entries hash needs to be made aware of this change.
 
 This returns nothing.
@@ -979,7 +980,8 @@ sub reindex_entry {
 
 =head2 clear_entries()
 
-This takes no arguments. It will clear the entries list for the running transaction.
+This takes no arguments. It will clear the entries list for the running
+transaction.
 
 This returns nothing.
 
@@ -1378,8 +1380,8 @@ sub clear_cache { %{$_[0]->cache} = () }
 
 =head2 _dump_file()
 
-This method takes no arguments. It's used to print out a textual representation of the DBM::Deep
-DB file. It assumes the file is not-corrupted.
+This method takes no arguments. It's used to print out a textual representation
+of the DBM::Deep DB file. It assumes the file is not-corrupted.
 
 =cut
 

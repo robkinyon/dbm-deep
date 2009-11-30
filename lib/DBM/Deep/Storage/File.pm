@@ -1,4 +1,4 @@
-package DBM::Deep::File;
+package DBM::Deep::Storage::File;
 
 use 5.006_000;
 
@@ -11,7 +11,7 @@ use constant DEBUG => 0;
 
 =head1 NAME
 
-DBM::Deep::File
+DBM::Deep::Storage::File
 
 =head1 PURPOSE
 
@@ -22,8 +22,8 @@ Currently, the only storage mechanism supported is the file system.
 
 =head1 OVERVIEW
 
-This class provides an abstraction to the storage mechanism so that the Engine (the
-only class that uses this class) doesn't have to worry about that.
+This class provides an abstraction to the storage mechanism so that the Engine
+(the only class that uses this class) doesn't have to worry about that.
 
 =head1 METHODS
 
@@ -142,8 +142,8 @@ sub size {
 
 This will set the inode value of the underlying file object.
 
-This is only needed to handle some obscure Win32 bugs. It reqlly shouldn't be needed outside
-this object.
+This is only needed to handle some obscure Win32 bugs. It reqlly shouldn't be
+needed outside this object.
 
 There is no return value.
 
@@ -165,9 +165,9 @@ sub set_inode {
 
 This takes an optional offset and some data to print.
 
-C< $offset >, if defined, will be used to seek into the file. If file_offset is set, it will be used
-as the zero location. If it is undefined, no seeking will occur. Then, C< @data > will be printed to
-the current location.
+C< $offset >, if defined, will be used to seek into the file. If file_offset is
+set, it will be used as the zero location. If it is undefined, no seeking will
+occur. Then, C< @data > will be printed to the current location.
 
 There is no return value.
 
@@ -199,9 +199,9 @@ sub print_at {
 
 This takes an optional offset and a length.
 
-C< $offset >, if defined, will be used to seek into the file. If file_offset is set, it will be used
-as the zero location. If it is undefined, no seeking will occur. Then, C< $length > bytes will be
-read from the current location.
+C< $offset >, if defined, will be used to seek into the file. If file_offset is
+set, it will be used as the zero location. If it is undefined, no seeking will
+occur. Then, C< $length > bytes will be read from the current location.
 
 The data read will be returned.
 
@@ -231,7 +231,7 @@ sub read_at {
 
 =head2 DESTROY
 
-When the ::File object goes out of scope, it will be closed.
+When the ::Storage::File object goes out of scope, it will be closed.
 
 =cut
 

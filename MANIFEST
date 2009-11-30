@@ -12,7 +12,7 @@ lib/DBM/Deep/Engine/Sector/Index.pm
 lib/DBM/Deep/Engine/Sector/Null.pm
 lib/DBM/Deep/Engine/Sector/Reference.pm
 lib/DBM/Deep/Engine/Sector/Scalar.pm
-lib/DBM/Deep/File.pm
+lib/DBM/Deep/Storage/File.pm
 lib/DBM/Deep/Hash.pm
 lib/DBM/Deep/Internals.pod
 lib/DBM/Deep/Iterator.pm

@@ -1,12 +1,8 @@
 package # Hide from PAUSE
     t::common;
 
-use 5.006_000;
-
 use strict;
-use warnings;
-
-our $VERSION = '0.01';
+use warnings FATAL => 'all';
 
 use base 'Exporter';
 our @EXPORT_OK = qw(
@@ -20,7 +16,6 @@ use Fcntl qw( :flock );
 
 my $parent = $ENV{WORK_DIR} || File::Spec->tmpdir;
 my $dir = tempdir( CLEANUP => 1, DIR => $parent );
-#my $dir = tempdir( DIR => '.' );
 
 sub new_fh {
     my ($fh, $filename) = tempfile( 'tmpXXXX', DIR => $dir, UNLINK => 1 );
@@ -37,6 +32,23 @@ sub new_dbm {
     my @extra_args = (
         [ file => $filename ],
     );
+
+#    eval { require DBD::SQLite; };
+#    unless ( $@ ) {
+#        push @extra_args, [
+#        ];
+#    }
+
+    if ( $ENV{TEST_MYSQL_DSN} ) {
+        push @extra_args, [
+            dbi => {
+                dsn      => "dbi:mysql:$ENV{TEST_MYSQL_DSN}",
+                user     => $ENV{TEST_MYSQL_USER},
+                password => $ENV{TEST_MYSQL_PASS},
+            },
+        ];
+    }
+
     return sub {
         return unless @extra_args;
         my @these_args = @{ shift @extra_args };

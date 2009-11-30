@@ -29,6 +29,7 @@ sub SIG_BLIST    () { 'B'    }
 sub SIG_FREE     () { 'F'    }
 sub SIG_SIZE     () {  1     }
 
+use DBM::Deep::Storage::File ();
 use DBM::Deep::Iterator ();
 use DBM::Deep::Engine::Sector::Data ();
 use DBM::Deep::Engine::Sector::BucketList ();
@@ -152,7 +153,7 @@ sub new {
     my $class = shift;
     my ($args) = @_;
 
-    $args->{storage} = DBM::Deep::File->new( $args )
+    $args->{storage} = DBM::Deep::Storage::File->new( $args )
         unless exists $args->{storage};
 
     my $self = bless {

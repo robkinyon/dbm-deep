@@ -111,7 +111,7 @@ sub get_next_key {
     unless ( @$crumbs ) {
         # This will be a Reference sector
         my $sector = $e->_load_sector( $self->{base_offset} )
-            # If no sector is found, thist must have been deleted from under us.
+            # If no sector is found, this must have been deleted from under us.
             or return;
 
         if ( $sector->staleness != $obj->_staleness ) {

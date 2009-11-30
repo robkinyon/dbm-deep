@@ -51,7 +51,7 @@ my $result = $db->optimize();
 my $after = (stat($filename))[7];
 
 ok( $result, "optimize succeeded" );
-ok( $after < $before, "file size has shrunk" ); # make sure file shrunk
+cmp_ok( $after, '<', $before, "file size has shrunk" ); # make sure file shrunk
 
 is( $db->{key1}, 'value1', "key1's value is still there after optimize" );
 is( $db->{a}{c}, 'value2', "key2's value is still there after optimize" );

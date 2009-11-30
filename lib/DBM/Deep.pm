@@ -9,7 +9,7 @@ our $VERSION = q(1.0015);
 
 use Scalar::Util ();
 
-use DBM::Deep::Engine ();
+use DBM::Deep::Engine::File ();
 
 use DBM::Deep::SQL::Util;
 use DBM::Deep::SQL::Array;
@@ -155,7 +155,7 @@ sub _init {
         engine      => undef,
     }, $class;
 
-    $args->{engine} = DBM::Deep::Engine->new( { %{$args}, obj => $self } )
+    $args->{engine} = DBM::Deep::Engine::File->new( { %{$args}, obj => $self } )
         unless exists $args->{engine};
 
     # Grab the parameters we want to use
@@ -362,7 +362,7 @@ sub optimize {
 
     # Optimizing is only something we need to do when we're working with our
     # own file format. Otherwise, let the other guy do the optimizations.
-#    return unless $self->_engine->isa( 'DBM::Deep::Engine::File' );
+    return unless $self->_engine->isa( 'DBM::Deep::Engine::File' );
 
 #XXX Need to create a new test for this
 #    if ($self->_engine->storage->{links} > 1) {

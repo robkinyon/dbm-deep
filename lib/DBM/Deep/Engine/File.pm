@@ -1,36 +1,17 @@
-package DBM::Deep::Engine;
+package DBM::Deep::Engine::File;
 
 use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';
 
+use base qw( DBM::Deep::Engine );
+
 # Never import symbols into our namespace. We are a class, not a library.
-# -RobK, 2008-05-27
 use Scalar::Util ();
 
-#use Data::Dumper ();
-
-# File-wide notes:
-# * Every method in here assumes that the storage has been appropriately
-#   safeguarded. This can be anything from flock() to some sort of manual
-#   mutex. But, it's the caller's responsability to make sure that this has
-#   been done.
-
-# Setup file and tag signatures.  These should never change.
-sub SIG_FILE     () { 'DPDB' }
-sub SIG_HEADER   () { 'h'    }
-sub SIG_HASH     () { 'H'    }
-sub SIG_ARRAY    () { 'A'    }
-sub SIG_NULL     () { 'N'    }
-sub SIG_DATA     () { 'D'    }
-sub SIG_INDEX    () { 'I'    }
-sub SIG_BLIST    () { 'B'    }
-sub SIG_FREE     () { 'F'    }
-sub SIG_SIZE     () {  1     }
-
 use DBM::Deep::Storage::File ();
-use DBM::Deep::Iterator ();
+
 use DBM::Deep::Engine::Sector::Data ();
 use DBM::Deep::Engine::Sector::BucketList ();
 use DBM::Deep::Engine::Sector::Index ();
@@ -542,31 +523,6 @@ sub write_value {
     return 1;
 }
 
-=head2 get_next_key( $obj, $prev_key )
-
-This takes an object that provides _base_offset() and an optional string
-representing the prior key returned via a prior invocation of this method.
-
-This method delegates to C<< DBM::Deep::Iterator->get_next_key() >>.
-
-=cut
-
-# XXX Add staleness here
-sub get_next_key {
-    my $self = shift;
-    my ($obj, $prev_key) = @_;
-
-    # XXX Need to add logic about resetting the iterator if any key in the reference has changed
-    unless ( $prev_key ) {
-        $obj->{iterator} = DBM::Deep::Iterator->new({
-            base_offset => $obj->_base_offset,
-            engine      => $self,
-        });
-    }
-
-    return $obj->{iterator}->get_next_key( $obj );
-}
-
 =head2 setup_fh( $obj )
 
 This takes an object that provides _base_offset(). It will do everything needed
@@ -821,7 +777,7 @@ sub unlock {
 
 =head1 INTERNAL METHODS
 
-The following methods are internal-use-only to DBM::Deep::Engine.
+The following methods are internal-use-only to DBM::Deep::Engine::File.
 
 =cut
 
@@ -1005,7 +961,7 @@ settings that set how the file is interpreted.
 =cut
 
 {
-    my $header_fixed = length( SIG_FILE ) + 1 + 4 + 4;
+    my $header_fixed = length( __PACKAGE__->SIG_FILE ) + 1 + 4 + 4;
     my $this_file_version = 3;
 
     sub _write_file_header {
@@ -1019,8 +975,8 @@ settings that set how the file is interpreted.
         my $loc = $self->storage->request_space( $header_fixed + $header_var );
 
         $self->storage->print_at( $loc,
-            SIG_FILE,
-            SIG_HEADER,
+            $self->SIG_FILE,
+            $self->SIG_HEADER,
             pack('N', $this_file_version), # At this point, we're at 9 bytes
             pack('N', $header_var),        # header size
             # --- Above is $header_fixed. Below is $header_var
@@ -1055,12 +1011,12 @@ settings that set how the file is interpreted.
             'A4 A N N', $buffer
         );
 
-        unless ( $file_signature eq SIG_FILE ) {
+        unless ( $file_signature eq $self->SIG_FILE ) {
             $self->storage->close;
             DBM::Deep->_throw_error( "Signature not found -- file is not a Deep DB" );
         }
 
-        unless ( $sig_header eq SIG_HEADER ) {
+        unless ( $sig_header eq $self->SIG_HEADER ) {
             $self->storage->close;
             DBM::Deep->_throw_error( "Pre-1.00 file version found" );
         }
@@ -1213,9 +1169,9 @@ sub _add_free_sector {
 
     # Increment staleness.
     # XXX Can this increment+modulo be done by "&= 0x1" ?
-    my $staleness = unpack( $StP{$STALE_SIZE}, $storage->read_at( $offset + SIG_SIZE, $STALE_SIZE ) );
+    my $staleness = unpack( $StP{$STALE_SIZE}, $storage->read_at( $offset + $self->SIG_SIZE, $STALE_SIZE ) );
     $staleness = ($staleness + 1 ) % ( 2 ** ( 8 * $STALE_SIZE ) );
-    $storage->print_at( $offset + SIG_SIZE, pack( $StP{$STALE_SIZE}, $staleness ) );
+    $storage->print_at( $offset + $self->SIG_SIZE, pack( $StP{$STALE_SIZE}, $staleness ) );
 
     my $old_head = $storage->read_at( $self->chains_loc + $chains_offset, $self->byte_size );
 
@@ -1224,7 +1180,7 @@ sub _add_free_sector {
     );
 
     # Record the old head in the new sector after the signature and staleness counter
-    $storage->print_at( $offset + SIG_SIZE + $STALE_SIZE, $old_head );
+    $storage->print_at( $offset + $self->SIG_SIZE + $STALE_SIZE, $old_head );
 }
 
 =head2 _request_blist_sector( $size )
@@ -1273,10 +1229,10 @@ sub _request_sector {
     }
 
     # Read the new head after the signature and the staleness counter
-    my $new_head = $self->storage->read_at( $loc + SIG_SIZE + $STALE_SIZE, $self->byte_size );
+    my $new_head = $self->storage->read_at( $loc + $self->SIG_SIZE + $STALE_SIZE, $self->byte_size );
     $self->storage->print_at( $self->chains_loc + $chains_offset, $new_head );
     $self->storage->print_at(
-        $loc + SIG_SIZE + $STALE_SIZE,
+        $loc + $self->SIG_SIZE + $STALE_SIZE,
         pack( $StP{$self->byte_size}, 0 ),
     );
 
@@ -1425,7 +1381,7 @@ sub _dump_file {
             }
 
             $sectors{ $types{$multiple} }{ $loc } = undef;
-            $old_loc = $loc + SIG_SIZE + $STALE_SIZE;
+            $old_loc = $loc + $self->SIG_SIZE + $STALE_SIZE;
             $return .= " $loc";
         }
         $return .= $/;

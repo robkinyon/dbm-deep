@@ -1045,7 +1045,7 @@ Check out the DBM::Deep Google Group at L<http://groups.google.com/group/DBM-Dee
 or send email to L<DBM-Deep@googlegroups.com>. You can also visit #dbm-deep on
 irc.perl.org
 
-The source code repository is at L<http://svn.perl.org/modules/DBM-Deep>
+The source code repository is at L<http://github.com/robkinyon/dbm-deep>
 
 =head1 MAINTAINERS
 

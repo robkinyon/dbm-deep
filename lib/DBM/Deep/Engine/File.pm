@@ -123,13 +123,6 @@ sub new {
     return $self;
 }
 
-=head2 read_value( $obj, $key )
-
-This takes an object that provides _base_offset() and a string. It returns the
-value stored in the corresponding Sector::Value's data section.
-
-=cut
-
 sub read_value {
     my $self = shift;
     my ($obj, $key) = @_;
@@ -165,17 +158,6 @@ sub read_value {
     return $value_sector->data;
 }
 
-=head2 get_classname( $obj )
-
-This takes an object that provides _base_offset() and returns the classname (if
-any) associated with it.
-
-It delegates to Sector::Reference::get_classname() for the heavy lifting.
-
-It performs a staleness check.
-
-=cut
-
 sub get_classname {
     my $self = shift;
     my ($obj) = @_;
@@ -190,16 +172,6 @@ sub get_classname {
 
     return $sector->get_classname;
 }
-
-=head2 make_reference( $obj, $old_key, $new_key )
-
-This takes an object that provides _base_offset() and two strings. The
-strings correspond to the old key and new key, respectively. This operation
-is equivalent to (given C<< $db->{foo} = []; >>) C<< $db->{bar} = $db->{foo} >>.
-
-This returns nothing.
-
-=cut
 
 sub make_reference {
     my $self = shift;
@@ -252,13 +224,6 @@ sub make_reference {
     return;
 }
 
-=head2 key_exists( $obj, $key )
-
-This takes an object that provides _base_offset() and a string for
-the key to be checked. This returns 1 for true and "" for false.
-
-=cut
-
 sub key_exists {
     my $self = shift;
     my ($obj, $key) = @_;
@@ -280,14 +245,6 @@ sub key_exists {
     return $data ? 1 : '';
 }
 
-=head2 delete_key( $obj, $key )
-
-This takes an object that provides _base_offset() and a string for
-the key to be deleted. This returns the result of the Sector::Reference
-delete_key() method.
-
-=cut
-
 sub delete_key {
     my $self = shift;
     my ($obj, $key) = @_;
@@ -304,15 +261,6 @@ sub delete_key {
         allow_head => 0,
     });
 }
-
-=head2 write_value( $obj, $key, $value )
-
-This takes an object that provides _base_offset(), a string for the
-key, and a value. This value can be anything storable within L<DBM::Deep/>.
-
-This returns 1 upon success.
-
-=cut
 
 sub write_value {
     my $self = shift;
@@ -439,17 +387,7 @@ sub write_value {
     return 1;
 }
 
-=head2 setup_fh( $obj )
-
-This takes an object that provides _base_offset(). It will do everything needed
-in order to properly initialize all values for necessary functioning. If this is
-called upon an already initialized object, this will also reset the inode.
-
-This returns 1.
-
-=cut
-
-sub setup_fh {
+sub setup {
     my $self = shift;
     my ($obj) = @_;
 
@@ -495,18 +433,6 @@ sub setup_fh {
     return 1;
 }
 
-=head2 begin_work( $obj )
-
-This takes an object that provides _base_offset(). It will set up all necessary
-bookkeeping in order to run all work within a transaction.
-
-If $obj is already within a transaction, an error wiill be thrown. If there are
-no more available transactions, an error will be thrown.
-
-This returns undef.
-
-=cut
-
 sub begin_work {
     my $self = shift;
     my ($obj) = @_;
@@ -536,17 +462,6 @@ sub begin_work {
 
     return;
 }
-
-=head2 rollback( $obj )
-
-This takes an object that provides _base_offset(). It will revert all
-actions taken within the running transaction.
-
-If $obj is not within a transaction, an error will be thrown.
-
-This returns 1.
-
-=cut
 
 sub rollback {
     my $self = shift;
@@ -585,17 +500,6 @@ sub rollback {
 
     return 1;
 }
-
-=head2 commit( $obj )
-
-This takes an object that provides _base_offset(). It will apply all
-actions taken within the transaction to the HEAD.
-
-If $obj is not within a transaction, an error will be thrown.
-
-This returns 1.
-
-=cut
 
 sub commit {
     my $self = shift;
@@ -639,56 +543,6 @@ sub commit {
     $self->set_trans_id( 0 );
 
     return 1;
-}
-
-=head2 lock_exclusive()
-
-This takes an object that provides _base_offset(). It will guarantee that
-the storage has taken precautions to be safe for a write.
-
-This returns nothing.
-
-=cut
-
-sub lock_exclusive {
-    my $self = shift;
-    my ($obj) = @_;
-    return $self->storage->lock_exclusive( $obj );
-}
-
-=head2 lock_shared()
-
-This takes an object that provides _base_offset(). It will guarantee that
-the storage has taken precautions to be safe for a read.
-
-This returns nothing.
-
-=cut
-
-sub lock_shared {
-    my $self = shift;
-    my ($obj) = @_;
-    return $self->storage->lock_shared( $obj );
-}
-
-=head2 unlock()
-
-This takes an object that provides _base_offset(). It will guarantee that
-the storage has released all locks taken.
-
-This returns nothing.
-
-=cut
-
-sub unlock {
-    my $self = shift;
-    my ($obj) = @_;
-
-    my $rv = $self->storage->unlock( $obj );
-
-    $self->flush if $rv;
-
-    return $rv;
 }
 
 =head1 INTERNAL METHODS
@@ -1153,23 +1007,6 @@ sub _request_sector {
     );
 
     return $loc;
-}
-
-=head2 flush()
-
-This takes no arguments. It will do everything necessary to flush all things to
-disk. This is usually called during unlock() and setup_fh().
-
-This returns nothing.
-
-=cut
-
-sub flush {
-    my $self = shift;
-
-    # Why do we need to have the storage flush? Shouldn't autoflush take care of things?
-    # -RobK, 2008-06-26
-    $self->storage->flush;
 }
 
 =head2 ACCESSORS

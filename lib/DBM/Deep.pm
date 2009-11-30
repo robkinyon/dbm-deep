@@ -168,7 +168,7 @@ sub _init {
       local $SIG{'__DIE__'};
 
       $self->lock_exclusive;
-      $self->_engine->setup_fh( $self );
+      $self->_engine->setup( $self );
       $self->unlock;
     }; if ( $@ ) {
       my $e = $@;
@@ -417,7 +417,7 @@ sub optimize {
 
     $self->_engine->storage->open;
     $self->lock_exclusive;
-    $self->_engine->setup_fh( $self );
+    $self->_engine->setup( $self );
     $self->unlock;
 
     return 1;

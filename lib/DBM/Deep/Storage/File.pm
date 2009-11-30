@@ -406,7 +406,7 @@ sub _lock {
                 $self->open;
 
                 #XXX This needs work
-                $obj->{engine}->setup_fh( $obj );
+                $obj->{engine}->setup( $obj );
 
                 flock($self->{fh}, $type); # re-lock
 

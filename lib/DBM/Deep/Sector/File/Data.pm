@@ -1,11 +1,11 @@
-package DBM::Deep::Engine::Sector::Data;
+package DBM::Deep::Sector::File::Data;
 
 use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';
 
-use base qw( DBM::Deep::Engine::Sector );
+use base qw( DBM::Deep::Sector::File );
 
 # This is in bytes
 sub size { $_[0]{engine}->data_sector_size }

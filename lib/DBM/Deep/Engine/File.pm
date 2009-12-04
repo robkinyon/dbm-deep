@@ -7,18 +7,11 @@ use warnings FATAL => 'all';
 
 use base qw( DBM::Deep::Engine );
 
-# Never import symbols into our namespace. We are a class, not a library.
 use Scalar::Util ();
 
-use DBM::Deep::Storage::File ();
-
-use DBM::Deep::Engine::Sector::Data ();
-use DBM::Deep::Engine::Sector::BucketList ();
-use DBM::Deep::Engine::Sector::Index ();
-use DBM::Deep::Engine::Sector::Null ();
-use DBM::Deep::Engine::Sector::Reference ();
-use DBM::Deep::Engine::Sector::Scalar ();
 use DBM::Deep::Null ();
+use DBM::Deep::Sector::File ();
+use DBM::Deep::Storage::File ();
 
 my $STALE_SIZE = 2;
 
@@ -128,7 +121,7 @@ sub read_value {
     my ($obj, $key) = @_;
 
     # This will be a Reference sector
-    my $sector = $self->_load_sector( $obj->_base_offset )
+    my $sector = DBM::Deep::Sector::File->load( $self, $obj->_base_offset )
         or return;
 
     if ( $sector->staleness != $obj->_staleness ) {
@@ -143,7 +136,7 @@ sub read_value {
     });
 
     unless ( $value_sector ) {
-        $value_sector = DBM::Deep::Engine::Sector::Null->new({
+        $value_sector = DBM::Deep::Sector::File::Null->new({
             engine => $self,
             data   => undef,
         });
@@ -163,7 +156,7 @@ sub get_classname {
     my ($obj) = @_;
 
     # This will be a Reference sector
-    my $sector = $self->_load_sector( $obj->_base_offset )
+    my $sector = DBM::Deep::Sector::File->load( $self, $obj->_base_offset )
         or DBM::Deep->_throw_error( "How did get_classname fail (no sector for '$obj')?!" );
 
     if ( $sector->staleness != $obj->_staleness ) {
@@ -178,7 +171,7 @@ sub make_reference {
     my ($obj, $old_key, $new_key) = @_;
 
     # This will be a Reference sector
-    my $sector = $self->_load_sector( $obj->_base_offset )
+    my $sector = DBM::Deep::Sector::File->load( $self, $obj->_base_offset )
         or DBM::Deep->_throw_error( "How did make_reference fail (no sector for '$obj')?!" );
 
     if ( $sector->staleness != $obj->_staleness ) {
@@ -193,7 +186,7 @@ sub make_reference {
     });
 
     unless ( $value_sector ) {
-        $value_sector = DBM::Deep::Engine::Sector::Null->new({
+        $value_sector = DBM::Deep::Sector::File::Null->new({
             engine => $self,
             data   => undef,
         });
@@ -205,7 +198,7 @@ sub make_reference {
         });
     }
 
-    if ( $value_sector->isa( 'DBM::Deep::Engine::Sector::Reference' ) ) {
+    if ( $value_sector->isa( 'DBM::Deep::Sector::File::Reference' ) ) {
         $sector->write_data({
             key     => $new_key,
             key_md5 => $self->_apply_digest( $new_key ),
@@ -229,7 +222,7 @@ sub key_exists {
     my ($obj, $key) = @_;
 
     # This will be a Reference sector
-    my $sector = $self->_load_sector( $obj->_base_offset )
+    my $sector = DBM::Deep::Sector::File->load( $self, $obj->_base_offset )
         or return '';
 
     if ( $sector->staleness != $obj->_staleness ) {
@@ -249,7 +242,7 @@ sub delete_key {
     my $self = shift;
     my ($obj, $key) = @_;
 
-    my $sector = $self->_load_sector( $obj->_base_offset )
+    my $sector = DBM::Deep::Sector::File->load( $self, $obj->_base_offset )
         or return;
 
     if ( $sector->staleness != $obj->_staleness ) {
@@ -278,7 +271,7 @@ sub write_value {
     }
 
     # This will be a Reference sector
-    my $sector = $self->_load_sector( $obj->_base_offset )
+    my $sector = DBM::Deep::Sector::File->load( $self, $obj->_base_offset )
         or DBM::Deep->_throw_error( "Cannot write to a deleted spot in DBM::Deep." );
 
     if ( $sector->staleness != $obj->_staleness ) {
@@ -287,7 +280,7 @@ sub write_value {
 
     my ($class, $type);
     if ( !defined $value ) {
-        $class = 'DBM::Deep::Engine::Sector::Null';
+        $class = 'DBM::Deep::Sector::File::Null';
     }
     elsif ( $r eq 'ARRAY' || $r eq 'HASH' ) {
         my $tmpvar;
@@ -308,8 +301,8 @@ sub write_value {
                 DBM::Deep->_throw_error( "Cannot store values across DBM::Deep files. Please use export() instead." );
             }
 
-            # First, verify if we're storing the same thing to this spot. If we are, then
-            # this should be a no-op. -EJS, 2008-05-19
+            # First, verify if we're storing the same thing to this spot. If we
+            # are, then this should be a no-op. -EJS, 2008-05-19
             my $loc = $sector->get_data_location_for({
                 key_md5 => $self->_apply_digest( $key ),
                 allow_head => 1,
@@ -320,7 +313,7 @@ sub write_value {
             }
 
             #XXX Can this use $loc?
-            my $value_sector = $self->_load_sector( $tmpvar->_base_offset );
+            my $value_sector = DBM::Deep::Sector::File->load( $self, $tmpvar->_base_offset );
             $sector->write_data({
                 key     => $key,
                 key_md5 => $self->_apply_digest( $key ),
@@ -331,18 +324,18 @@ sub write_value {
             return 1;
         }
 
-        $class = 'DBM::Deep::Engine::Sector::Reference';
+        $class = 'DBM::Deep::Sector::File::Reference';
         $type = substr( $r, 0, 1 );
     }
     else {
         if ( tied($value) ) {
             DBM::Deep->_throw_error( "Cannot store something that is tied." );
         }
-        $class = 'DBM::Deep::Engine::Sector::Scalar';
+        $class = 'DBM::Deep::Sector::File::Scalar';
     }
 
-    # Create this after loading the reference sector in case something bad happens.
-    # This way, we won't allocate value sector(s) needlessly.
+    # Create this after loading the reference sector in case something bad
+    # happens. This way, we won't allocate value sector(s) needlessly.
     my $value_sector = $class->new({
         engine => $self,
         data   => $value,
@@ -355,11 +348,12 @@ sub write_value {
         value   => $value_sector,
     });
 
-    # This code is to make sure we write all the values in the $value to the disk
-    # and to make sure all changes to $value after the assignment are reflected
-    # on disk. This may be counter-intuitive at first, but it is correct dwimmery.
-    #   NOTE - simply tying $value won't perform a STORE on each value. Hence, the
-    # copy to a temp value.
+    # This code is to make sure we write all the values in the $value to the
+    # disk and to make sure all changes to $value after the assignment are
+    # reflected on disk. This may be counter-intuitive at first, but it is
+    # correct dwimmery.
+    #   NOTE - simply tying $value won't perform a STORE on each value. Hence,
+    # the copy to a temp value.
     if ( $r eq 'ARRAY' ) {
         my @temp = @$value;
         tie @$value, 'DBM::Deep', {
@@ -400,7 +394,7 @@ sub setup {
             $self->_write_file_header;
 
             # 1) Create Array/Hash entry
-            my $initial_reference = DBM::Deep::Engine::Sector::Reference->new({
+            my $initial_reference = DBM::Deep::Sector::File::Reference->new({
                 engine => $self,
                 type   => $obj->_type,
             });
@@ -412,7 +406,7 @@ sub setup {
         # Reading from an existing file
         else {
             $obj->{base_offset} = $bytes_read;
-            my $initial_reference = DBM::Deep::Engine::Sector::Reference->new({
+            my $initial_reference = DBM::Deep::Sector::File::Reference->new({
                 engine => $self,
                 offset => $obj->_base_offset,
             });
@@ -486,7 +480,7 @@ sub rollback {
         $self->storage->print_at( $read_loc, pack( $StP{$self->byte_size}, 0 ) );
 
         if ( $data_loc > 1 ) {
-            $self->_load_sector( $data_loc )->free;
+            DBM::Deep::Sector::File->load( $self, $data_loc )->free;
         }
     }
 
@@ -530,7 +524,7 @@ sub commit {
         );
 
         if ( $head_loc > 1 ) {
-            $self->_load_sector( $head_loc )->free;
+            DBM::Deep::Sector::File->load( $self, $head_loc )->free;
         }
     }
 
@@ -829,67 +823,6 @@ settings that set how the file is interpreted.
     }
 }
 
-=head2 _load_sector( $offset )
-
-This will instantiate and return the sector object that represents the data found
-at $offset.
-
-=cut
-
-sub _load_sector {
-    my $self = shift;
-    my ($offset) = @_;
-
-    # Add a catch for offset of 0 or 1
-    return if !$offset || $offset <= 1;
-
-    my $type = $self->storage->read_at( $offset, 1 );
-    return if $type eq chr(0);
-
-    if ( $type eq $self->SIG_ARRAY || $type eq $self->SIG_HASH ) {
-        return DBM::Deep::Engine::Sector::Reference->new({
-            engine => $self,
-            type   => $type,
-            offset => $offset,
-        });
-    }
-    # XXX Don't we need key_md5 here?
-    elsif ( $type eq $self->SIG_BLIST ) {
-        return DBM::Deep::Engine::Sector::BucketList->new({
-            engine => $self,
-            type   => $type,
-            offset => $offset,
-        });
-    }
-    elsif ( $type eq $self->SIG_INDEX ) {
-        return DBM::Deep::Engine::Sector::Index->new({
-            engine => $self,
-            type   => $type,
-            offset => $offset,
-        });
-    }
-    elsif ( $type eq $self->SIG_NULL ) {
-        return DBM::Deep::Engine::Sector::Null->new({
-            engine => $self,
-            type   => $type,
-            offset => $offset,
-        });
-    }
-    elsif ( $type eq $self->SIG_DATA ) {
-        return DBM::Deep::Engine::Sector::Scalar->new({
-            engine => $self,
-            type   => $type,
-            offset => $offset,
-        });
-    }
-    # This was deleted from under us, so just return and let the caller figure it out.
-    elsif ( $type eq $self->SIG_FREE ) {
-        return;
-    }
-
-    DBM::Deep->_throw_error( "'$offset': Don't know what to do with type '$type'" );
-}
-
 =head2 _apply_digest( @stuff )
 
 This will apply the digest methd (default to Digest::MD5::md5) to the arguments
@@ -1108,8 +1041,8 @@ sub _dump_file {
 
     my %sizes = (
         'D' => $self->data_sector_size,
-        'B' => DBM::Deep::Engine::Sector::BucketList->new({engine=>$self,offset=>1})->size,
-        'I' => DBM::Deep::Engine::Sector::Index->new({engine=>$self,offset=>1})->size,
+        'B' => DBM::Deep::Sector::File::BucketList->new({engine=>$self,offset=>1})->size,
+        'I' => DBM::Deep::Sector::File::Index->new({engine=>$self,offset=>1})->size,
     );
 
     my $return = "";
@@ -1143,7 +1076,7 @@ sub _dump_file {
     SECTOR:
     while ( $spot < $self->storage->{end} ) {
         # Read each sector in order.
-        my $sector = $self->_load_sector( $spot );
+        my $sector = DBM::Deep::Sector::File->load( $self, $spot );
         if ( !$sector ) {
             # Find it in the free-sectors that were found already
             foreach my $type ( keys %sectors ) {

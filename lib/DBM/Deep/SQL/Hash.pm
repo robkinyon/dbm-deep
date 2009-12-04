@@ -394,31 +394,25 @@ sub STORE
 	my $obj = $tobj->_get_self();
 	my $vt;
 	$val = '' unless (defined $val);
-	if (ref $val)
-	{
+	if (ref $val) {
 		my $done = 0;
-		unless ($obj->{'serialize'})
-		{
-			if ($val =~ /HASH/)
-			{
+		unless ($obj->{'serialize'}) {
+			if ($val =~ /HASH/) {
 				my $id = $obj->_create('hash');
 				my $ta = $obj->_tiehash($id);
 				$dval = $ta;
-				foreach my $k (keys %$val)
-				{
+				foreach my $k (keys %$val) {
 					$ta->{$k} = $val->{$k};
 				}
  				$vt = 'hash';
 				$val = $id;
 				$done = 1;
 			}
-			elsif ($val =~ /ARRAY/)
-			{
+			elsif ($val =~ /ARRAY/) {
 				my $id = $obj->_create('array');
 				my $ta = $obj->_tiearray($id);
 				$dval = $ta;
-				foreach my $i (0..$#{$val})
-				{
+				foreach my $i (0..$#{$val}) {
 					$ta->[$i] = $val->[$i];
 				}
  				$vt = 'array';
@@ -426,8 +420,7 @@ sub STORE
 				$done = 1;
 			}
 		}
-		unless ($done)
-		{
+		unless ($done) {
 			my $data = nfreeze($val);
 			$val = $obj->_create('value_data', {
 				'data' => $data,
@@ -435,15 +428,13 @@ sub STORE
  			$vt = 'data';
 		}
 	}
-	elsif (length($val) > 255)
-	{
+	elsif (length($val) > 255) {
 		$val = $obj->_create('value_data', {
 			'data' => $val,
 		});
  		$vt = 'text';
 	}
-	else
-	{
+	else {
  		$vt = 'value';
 	}
 	my $hcode = md5_base64($k);
@@ -456,10 +447,8 @@ sub STORE
 		},
 	);
 	my $create = 1;
-	if (scalar @$c)
-	{
-		if ($c->[0]->[0] eq 'value')
-		{
+	if (scalar @$c) {
+		if ($c->[0]->[0] eq 'value') {
 			$create = 0;
 			$obj->_update(
 				'table' => 'rec_hash_item',
@@ -472,23 +461,19 @@ sub STORE
 				},
 			);
 		}
-		else
-		{
+		else {
 			$obj->_delete($k);
 		}
 	}
-	if ($create)
-	{
+	if ($create) {
 		my $kt;
-		if (length($k) > 255)
-		{
+		if (length($k) > 255) {
 			$k = $obj->_create('value_text', {
 				'data' => $k,
 			});
 			$kt = 'text';
 		}
-		else
-		{
+		else {
 			$kt = 'value';
 		}
 		$obj->_create('hash_item', {

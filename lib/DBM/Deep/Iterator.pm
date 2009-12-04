@@ -78,16 +78,16 @@ sub get_sector_iterator {
     my $self = shift;
     my ($loc) = @_;
 
-    my $sector = $self->{engine}->_load_sector( $loc )
+    my $sector = DBM::Deep::Sector::File->load( $self->{engine}, $loc )
         or return;
 
-    if ( $sector->isa( 'DBM::Deep::Engine::Sector::Index' ) ) {
+    if ( $sector->isa( 'DBM::Deep::Sector::File::Index' ) ) {
         return DBM::Deep::Iterator::Index->new({
             iterator => $self,
             sector   => $sector,
         });
     }
-    elsif ( $sector->isa( 'DBM::Deep::Engine::Sector::BucketList' ) ) {
+    elsif ( $sector->isa( 'DBM::Deep::Sector::File::BucketList' ) ) {
         return DBM::Deep::Iterator::BucketList->new({
             iterator => $self,
             sector   => $sector,
@@ -110,7 +110,7 @@ sub get_next_key {
 
     unless ( @$crumbs ) {
         # This will be a Reference sector
-        my $sector = $e->_load_sector( $self->{base_offset} )
+        my $sector = DBM::Deep::Sector::File->load( $e, $self->{base_offset} )
             # If no sector is found, this must have been deleted from under us.
             or return;
 

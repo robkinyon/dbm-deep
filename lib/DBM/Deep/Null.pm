@@ -1,5 +1,3 @@
-# This was copied from MARCEL's Class::Null. However, I couldn't use it because
-# I need an undef value, not an implementation of the Null Class pattern.
 package DBM::Deep::Null;
 
 use 5.006_000;

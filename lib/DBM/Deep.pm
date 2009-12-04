@@ -56,14 +56,11 @@ sub new {
     my $args = $class->_get_args( @_ );
     my $self;
     
-    ##
-    # Check for SQL storage
-    ##
     if (exists $args->{dbi}) {
         eval {
             require DBIx::Abstract;
         }; if ( $@ ) {
-            DBM::Deep->_throw_error('DBIx::Abstract not installed. You cannot use the SQL mode.');
+            __PACKAGE__->_throw_error('DBIx::Abstract not installed. You cannot use the SQL mode.');
         }
         unless (UNIVERSAL::isa($args->{dbi}, 'DBIx::Abstract')) {
             $args->{dbi} = DBIx::Abstract->connect($args->{dbi});
@@ -71,7 +68,7 @@ sub new {
 
         if (defined $args->{id}) {
             unless ($args->{id} =~ /^\d+$/ && $args->{id} > 0) {
-                DBM::Deep->_throw_error('Invalid SQL record id');
+                __PACKAGE__->_throw_error('Invalid SQL record id');
             }
             my $util = {dbi => $args->{dbi}};
             bless $util, 'DBM::Deep::SQL::Util';
@@ -155,8 +152,16 @@ sub _init {
         engine      => undef,
     }, $class;
 
-    $args->{engine} = DBM::Deep::Engine::File->new( { %{$args}, obj => $self } )
-        unless exists $args->{engine};
+    unless ( exists $args->{engine} ) {
+        my $class = exists $args->{dbi}
+            ? 'DBM::Deep::Engine::DBI'
+            : 'DBM::Deep::Engine::File';
+
+        $args->{engine} = $class->new({
+            %{$args},
+            obj => $self,
+        });
+    }
 
     # Grab the parameters we want to use
     foreach my $param ( keys %$self ) {
@@ -165,15 +170,15 @@ sub _init {
     }
 
     eval {
-      local $SIG{'__DIE__'};
+        local $SIG{'__DIE__'};
 
-      $self->lock_exclusive;
-      $self->_engine->setup( $self );
-      $self->unlock;
+        $self->lock_exclusive;
+        $self->_engine->setup( $self );
+        $self->unlock;
     }; if ( $@ ) {
-      my $e = $@;
-      eval { local $SIG{'__DIE__'}; $self->unlock; };
-      die $e;
+        my $e = $@;
+        eval { local $SIG{'__DIE__'}; $self->unlock; };
+        die $e;
     }
 
     return $self;
@@ -219,13 +224,14 @@ sub _copy_value {
         if ( $r eq 'ARRAY' ) {
             $tied = tied(@$value);
         }
-        # This assumes hash or array only. This is a bad assumption moving
-        # forward. -RobK, 2008-05-27
-        else {
+        elsif ( $r eq 'HASH' ) {
             $tied = tied(%$value);
         }
+        else {
+            __PACKAGE__->_throw_error( "Unknown type for '$value'" );
+        }
 
-        if ( eval { local $SIG{__DIE__}; $tied->isa( 'DBM::Deep' ) } ) {
+        if ( eval { local $SIG{__DIE__}; $tied->isa( __PACKAGE__ ) } ) {
             ${$spot} = $tied->_repr;
             $tied->_copy_node( ${$spot} );
         }
@@ -239,7 +245,7 @@ sub _copy_value {
         }
 
         my $c = Scalar::Util::blessed( $value );
-        if ( defined $c && !$c->isa( 'DBM::Deep') ) {
+        if ( defined $c && !$c->isa( __PACKAGE__ ) ) {
             ${$spot} = bless ${$spot}, $c
         }
     }
@@ -282,7 +288,7 @@ sub _check_legality {
     return $r if 'HASH' eq $r;
     return $r if 'ARRAY' eq $r;
 
-    DBM::Deep->_throw_error(
+    __PACKAGE__->_throw_error(
         "Storage of references of type '$r' is not supported."
     );
 }
@@ -295,11 +301,11 @@ sub import {
 
     my $type = $self->_check_legality( $struct );
     if ( !$type ) {
-        DBM::Deep->_throw_error( "Cannot import a scalar" );
+        __PACKAGE__->_throw_error( "Cannot import a scalar" );
     }
 
     if ( substr( $type, 0, 1 ) ne $self->_type ) {
-        DBM::Deep->_throw_error(
+        __PACKAGE__->_throw_error(
             "Cannot import " . ('HASH' eq $type ? 'a hash' : 'an array')
             . " into " . ('HASH' eq $type ? 'an array' : 'a hash')
         );
@@ -373,7 +379,7 @@ sub optimize {
 
     #XXX Should we use tempfile() here instead of a hard-coded name?
     my $temp_filename = $self->_engine->storage->{file} . '.tmp';
-    my $db_temp = DBM::Deep->new(
+    my $db_temp = __PACKAGE__->new(
         file => $temp_filename,
         type => $self->_type,
 
@@ -429,7 +435,7 @@ sub clone {
     ##
     my $self = shift->_get_self;
 
-    return DBM::Deep->new(
+    return __PACKAGE__->new(
         type        => $self->_type,
         base_offset => $self->_base_offset,
         staleness   => $self->_staleness,
@@ -546,7 +552,7 @@ sub STORE {
         $value = $self->_engine->storage->{filter_store_value}->( $value );
     }
 
-    $self->_engine->write_value( $self, $key, $value);
+    $self->_engine->write_value( $self, $key, $value );
 
     $self->unlock;
 
@@ -561,7 +567,7 @@ sub FETCH {
 
     $self->lock_shared;
 
-    my $result = $self->_engine->read_value( $self, $key);
+    my $result = $self->_engine->read_value( $self, $key );
 
     $self->unlock;
 

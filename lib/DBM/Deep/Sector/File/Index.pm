@@ -1,6 +1,6 @@
-package DBM::Deep::Engine::Sector::Index;
+package DBM::Deep::Sector::File::Index;
 
-use base qw( DBM::Deep::Engine::Sector );
+use base qw( DBM::Deep::Sector::File );
 
 my $STALE_SIZE = 2;
 
@@ -49,7 +49,7 @@ sub free {
 
     for my $i ( 0 .. $e->hash_chars - 1 ) {
         my $l = $self->get_entry( $i ) or next;
-        $e->_load_sector( $l )->free;
+        DBM::Deep::Sector::File->load( $e, $l )->free;
     }
 
     $self->SUPER::free();

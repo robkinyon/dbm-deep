@@ -337,5 +337,30 @@ sub flush {
     return;
 }
 
+=head2 load_sector( $loc )
+
+This takes an id/location/offset and loads the sector based on the engine's
+defined sector type.
+
+=cut
+
+sub load_sector { $_[0]->sector_type->load( @_ ) }
+
+=head2 ACCESSORS
+
+The following are readonly attributes.
+
+=over 4
+
+=item * storage
+
+=back
+
+=cut
+
+sub storage { $_[0]{storage} }
+
+sub sector_type { die "sector_type must be implemented in a child class" }
+
 1;
 __END__

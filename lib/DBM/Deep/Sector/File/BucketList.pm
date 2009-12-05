@@ -68,7 +68,7 @@ sub free {
 
         # Delete the keysector
         my $l = unpack( $StP{$e->byte_size}, substr( $rest, $e->hash_size, $e->byte_size ) );
-        my $s = DBM::Deep::Sector::File->load( $e, $l ); $s->free if $s;
+        my $s = $e->load_sector( $l ); $s->free if $s;
 
         # Delete the HEAD sector
         $l = unpack( $StP{$e->byte_size},
@@ -77,7 +77,7 @@ sub free {
                 $e->byte_size,
             ),
         );
-        $s = DBM::Deep::Sector::File->load( $e, $l ); $s->free if $s;
+        $s = $e->load_sector( $l ); $s->free if $s;
 
         foreach my $txn ( 0 .. $e->num_txns - 2 ) {
             my $l = unpack( $StP{$e->byte_size},
@@ -86,7 +86,7 @@ sub free {
                     $e->byte_size,
                 ),
             );
-            my $s = DBM::Deep::Sector::File->load( $e, $l ); $s->free if $s;
+            my $s = $e->load_sector( $l ); $s->free if $s;
         }
     }
 
@@ -283,7 +283,7 @@ sub delete_md5 {
 
     $key_sector->free;
 
-    my $data_sector = DBM::Deep::Sector::File->load( $self->engine, $location );
+    my $data_sector = $self->engine->load_sector( $location );
     my $data = $data_sector->data({ export => 1 });
     $data_sector->free;
 
@@ -350,7 +350,7 @@ sub get_data_for {
     my $location = $self->get_data_location_for({
         allow_head => $args->{allow_head},
     });
-    return DBM::Deep::Sector::File->load( $self->engine, $location );
+    return $self->engine->load_sector( $location );
 }
 
 sub get_key_for {
@@ -369,7 +369,7 @@ sub get_key_for {
     $location = unpack( $StP{$self->engine->byte_size}, $location );
     DBM::Deep->_throw_error( "get_key_for: No location?" ) unless $location;
 
-    return DBM::Deep::Sector::File->load( $self->engine, $location );
+    return $self->engine->load_sector( $location );
 }
 
 1;

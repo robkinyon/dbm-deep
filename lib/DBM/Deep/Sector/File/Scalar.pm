@@ -25,7 +25,7 @@ sub free {
     $self->SUPER::free();
 
     if ( $chain_loc ) {
-        DBM::Deep::Sector::File->load( $self->engine, $chain_loc )->free;
+        $self->engine->load_sector( $chain_loc )->free;
     }
 
     return;
@@ -120,7 +120,7 @@ sub data {
 
         last unless $chain_loc;
 
-        $self = DBM::Deep::Sector::File->load( $self->engine, $chain_loc );
+        $self = $self->engine->load_sector( $chain_loc );
     }
 
     return $data;

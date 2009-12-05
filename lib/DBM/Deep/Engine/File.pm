@@ -13,6 +13,8 @@ use DBM::Deep::Null ();
 use DBM::Deep::Sector::File ();
 use DBM::Deep::Storage::File ();
 
+sub sector_type { 'DBM::Deep::Sector::File' }
+
 my $STALE_SIZE = 2;
 
 # Please refer to the pack() documentation for further information
@@ -121,7 +123,7 @@ sub read_value {
     my ($obj, $key) = @_;
 
     # This will be a Reference sector
-    my $sector = DBM::Deep::Sector::File->load( $self, $obj->_base_offset )
+    my $sector = $self->load_sector( $obj->_base_offset )
         or return;
 
     if ( $sector->staleness != $obj->_staleness ) {
@@ -156,7 +158,7 @@ sub get_classname {
     my ($obj) = @_;
 
     # This will be a Reference sector
-    my $sector = DBM::Deep::Sector::File->load( $self, $obj->_base_offset )
+    my $sector = $self->load_sector( $obj->_base_offset )
         or DBM::Deep->_throw_error( "How did get_classname fail (no sector for '$obj')?!" );
 
     if ( $sector->staleness != $obj->_staleness ) {
@@ -171,7 +173,7 @@ sub make_reference {
     my ($obj, $old_key, $new_key) = @_;
 
     # This will be a Reference sector
-    my $sector = DBM::Deep::Sector::File->load( $self, $obj->_base_offset )
+    my $sector = $self->load_sector( $obj->_base_offset )
         or DBM::Deep->_throw_error( "How did make_reference fail (no sector for '$obj')?!" );
 
     if ( $sector->staleness != $obj->_staleness ) {
@@ -222,7 +224,7 @@ sub key_exists {
     my ($obj, $key) = @_;
 
     # This will be a Reference sector
-    my $sector = DBM::Deep::Sector::File->load( $self, $obj->_base_offset )
+    my $sector = $self->load_sector( $obj->_base_offset )
         or return '';
 
     if ( $sector->staleness != $obj->_staleness ) {
@@ -242,7 +244,7 @@ sub delete_key {
     my $self = shift;
     my ($obj, $key) = @_;
 
-    my $sector = DBM::Deep::Sector::File->load( $self, $obj->_base_offset )
+    my $sector = $self->load_sector( $obj->_base_offset )
         or return;
 
     if ( $sector->staleness != $obj->_staleness ) {
@@ -271,7 +273,7 @@ sub write_value {
     }
 
     # This will be a Reference sector
-    my $sector = DBM::Deep::Sector::File->load( $self, $obj->_base_offset )
+    my $sector = $self->load_sector( $obj->_base_offset )
         or DBM::Deep->_throw_error( "Cannot write to a deleted spot in DBM::Deep." );
 
     if ( $sector->staleness != $obj->_staleness ) {
@@ -313,7 +315,7 @@ sub write_value {
             }
 
             #XXX Can this use $loc?
-            my $value_sector = DBM::Deep::Sector::File->load( $self, $tmpvar->_base_offset );
+            my $value_sector = $self->load_sector( $tmpvar->_base_offset );
             $sector->write_data({
                 key     => $key,
                 key_md5 => $self->_apply_digest( $key ),
@@ -480,7 +482,7 @@ sub rollback {
         $self->storage->print_at( $read_loc, pack( $StP{$self->byte_size}, 0 ) );
 
         if ( $data_loc > 1 ) {
-            DBM::Deep::Sector::File->load( $self, $data_loc )->free;
+            $self->load_sector( $data_loc )->free;
         }
     }
 
@@ -524,7 +526,7 @@ sub commit {
         );
 
         if ( $head_loc > 1 ) {
-            DBM::Deep::Sector::File->load( $self, $head_loc )->free;
+            $self->load_sector( $head_loc )->free;
         }
     }
 
@@ -948,8 +950,6 @@ The following are readonly attributes.
 
 =over 4
 
-=item * storage
-
 =item * byte_size
 
 =item * hash_size
@@ -970,7 +970,6 @@ The following are readonly attributes.
 
 =cut
 
-sub storage     { $_[0]{storage} }
 sub byte_size   { $_[0]{byte_size} }
 sub hash_size   { $_[0]{hash_size} }
 sub hash_chars  { $_[0]{hash_chars} }
@@ -1076,7 +1075,7 @@ sub _dump_file {
     SECTOR:
     while ( $spot < $self->storage->{end} ) {
         # Read each sector in order.
-        my $sector = DBM::Deep::Sector::File->load( $self, $spot );
+        my $sector = $self->load_sector( $spot );
         if ( !$sector ) {
             # Find it in the free-sectors that were found already
             foreach my $type ( keys %sectors ) {

@@ -78,7 +78,7 @@ sub get_sector_iterator {
     my $self = shift;
     my ($loc) = @_;
 
-    my $sector = DBM::Deep::Sector::File->load( $self->{engine}, $loc )
+    my $sector = $self->{engine}->load_sector( $loc )
         or return;
 
     if ( $sector->isa( 'DBM::Deep::Sector::File::Index' ) ) {
@@ -110,7 +110,7 @@ sub get_next_key {
 
     unless ( @$crumbs ) {
         # This will be a Reference sector
-        my $sector = DBM::Deep::Sector::File->load( $e, $self->{base_offset} )
+        my $sector = $e->load_sector( $self->{base_offset} )
             # If no sector is found, this must have been deleted from under us.
             or return;
 

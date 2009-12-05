@@ -49,7 +49,7 @@ sub free {
 
     for my $i ( 0 .. $e->hash_chars - 1 ) {
         my $l = $self->get_entry( $i ) or next;
-        DBM::Deep::Sector::File->load( $e, $l )->free;
+        $e->load_sector( $l )->free;
     }
 
     $self->SUPER::free();

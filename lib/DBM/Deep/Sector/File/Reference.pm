@@ -93,7 +93,7 @@ sub get_data_for {
     my $location = $self->get_data_location_for( $args )
         or return;
 
-    return DBM::Deep::Sector::File->load( $self->engine, $location );
+    return $self->engine->load_sector( $location );
 }
 
 sub write_data {
@@ -175,7 +175,7 @@ sub delete_key {
     my $location = $blist->get_data_location_for({
         allow_head => 0,
     });
-    my $old_value = $location && DBM::Deep::Sector::File->load( $self->engine, $location );
+    my $old_value = $location && $self->engine->load_sector( $location );
 
     my @trans_ids = $self->engine->get_running_txn_ids;
 
@@ -246,7 +246,7 @@ sub get_bucket_list {
         return $blist;
     }
 
-    my $sector = DBM::Deep::Sector::File->load( $engine, $blist_loc )
+    my $sector = $engine->load_sector( $blist_loc )
         or DBM::Deep->_throw_error( "Cannot read sector at $blist_loc in get_bucket_list()" );
     my $i = 0;
     my $last_sector = undef;
@@ -254,7 +254,7 @@ sub get_bucket_list {
         $blist_loc = $sector->get_entry( ord( substr( $args->{key_md5}, $i++, 1 ) ) );
         $last_sector = $sector;
         if ( $blist_loc ) {
-            $sector = DBM::Deep::Sector::File->load( $engine, $blist_loc )
+            $sector = $engine->load_sector( $blist_loc )
                 or DBM::Deep->_throw_error( "Cannot read sector at $blist_loc in get_bucket_list()" );
         }
         else {
@@ -404,7 +404,7 @@ sub get_classname {
 
     return unless $class_offset;
 
-    return DBM::Deep::Sector::File->load( $self->engine, $class_offset )->data;
+    return $self->engine->load_sector( $class_offset )->data;
 }
 
 sub data {
@@ -460,10 +460,10 @@ sub free {
     delete $self->engine->cache->{ $self->offset };
 
     my $blist_loc = $self->get_blist_loc;
-    DBM::Deep::Sector::File->load( $self->engine, $blist_loc )->free if $blist_loc;
+    $self->engine->load_sector( $blist_loc )->free if $blist_loc;
 
     my $class_loc = $self->get_class_offset;
-    DBM::Deep::Sector::File->load( $self->engine, $class_loc )->free if $class_loc;
+    $self->engine->load_sector( $class_loc )->free if $class_loc;
 
     $self->SUPER::free();
 }

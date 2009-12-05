@@ -7,6 +7,13 @@ use warnings FATAL => 'all';
 
 use base 'DBM::Deep::Engine';
 
+use DBM::Deep::Sector::DBI ();
+use DBM::Deep::Storage::DBI ();
+
+sub sector_type { 'DBM::Deep::Sector::DBI' }
+
+__END__
+
 sub read_value {
     my $self = shift;
     my ($obj, $key) = @_;

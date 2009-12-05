@@ -13,18 +13,6 @@ use DBM::Deep::Iterator ();
 #   mutex. But, it's the caller's responsability to make sure that this has
 #   been done.
 
-# Setup file and tag signatures.  These should never change.
-sub SIG_FILE     () { 'DPDB' }
-sub SIG_HEADER   () { 'h'    }
-sub SIG_HASH     () { 'H'    }
-sub SIG_ARRAY    () { 'A'    }
-sub SIG_NULL     () { 'N'    }
-sub SIG_DATA     () { 'D'    }
-sub SIG_INDEX    () { 'I'    }
-sub SIG_BLIST    () { 'B'    }
-sub SIG_FREE     () { 'F'    }
-sub SIG_SIZE     () {  1     }
-
 =head1 NAME
 
 DBM::Deep::Engine

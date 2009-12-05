@@ -17,6 +17,18 @@ sub sector_type { 'DBM::Deep::Sector::File' }
 
 my $STALE_SIZE = 2;
 
+# Setup file and tag signatures.  These should never change.
+sub SIG_FILE     () { 'DPDB' }
+sub SIG_HEADER   () { 'h'    }
+sub SIG_HASH     () { 'H'    }
+sub SIG_ARRAY    () { 'A'    }
+sub SIG_NULL     () { 'N'    }
+sub SIG_DATA     () { 'D'    }
+sub SIG_INDEX    () { 'I'    }
+sub SIG_BLIST    () { 'B'    }
+sub SIG_FREE     () { 'F'    }
+sub SIG_SIZE     () {  1     }
+
 # Please refer to the pack() documentation for further information
 my %StP = (
     1 => 'C', # Unsigned char value (no order needed as it's just one byte)

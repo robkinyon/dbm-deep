@@ -20,14 +20,13 @@ my $STALE_SIZE = 2;
 # Setup file and tag signatures.  These should never change.
 sub SIG_FILE     () { 'DPDB' }
 sub SIG_HEADER   () { 'h'    }
-sub SIG_HASH     () { 'H'    }
-sub SIG_ARRAY    () { 'A'    }
 sub SIG_NULL     () { 'N'    }
 sub SIG_DATA     () { 'D'    }
 sub SIG_INDEX    () { 'I'    }
 sub SIG_BLIST    () { 'B'    }
 sub SIG_FREE     () { 'F'    }
 sub SIG_SIZE     () {  1     }
+# SIG_HASH and SIG_ARRAY are defined in DBM::Deep::Engine
 
 # Please refer to the pack() documentation for further information
 my %StP = (
@@ -231,6 +230,7 @@ sub make_reference {
     return;
 }
 
+# exists returns '', not undefined.
 sub key_exists {
     my $self = shift;
     my ($obj, $key) = @_;

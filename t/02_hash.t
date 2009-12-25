@@ -50,6 +50,7 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     #
     # Q: How do we make sure that the iterator is unique? Is it supposed to be?
 
+=pod
     ##
     # count keys
     ##
@@ -173,6 +174,7 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     throws_ok {
         $db->exists(undef);
     } qr/Cannot use an undefined hash key/, "EXISTS fails on an undefined key";
+=cut
 }
 
 done_testing;

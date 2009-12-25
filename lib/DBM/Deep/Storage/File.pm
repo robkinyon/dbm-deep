@@ -76,6 +76,7 @@ There is no return value.
 
 =cut
 
+# TODO: What happens if we ->open when we already have a $fh?
 sub open {
     my $self = shift;
 

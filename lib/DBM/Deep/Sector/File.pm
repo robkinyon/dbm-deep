@@ -7,11 +7,11 @@ use warnings FATAL => 'all';
 
 use base qw( DBM::Deep::Sector );
 
-use DBM::Deep::Sector::File::Reference;
-use DBM::Deep::Sector::File::BucketList;
-use DBM::Deep::Sector::File::Index;
-use DBM::Deep::Sector::File::Null;
-use DBM::Deep::Sector::File::Scalar;
+use DBM::Deep::Sector::File::BucketList ();
+use DBM::Deep::Sector::File::Index ();
+use DBM::Deep::Sector::File::Null ();
+use DBM::Deep::Sector::File::Reference ();
+use DBM::Deep::Sector::File::Scalar ();
 
 my $STALE_SIZE = 2;
 

@@ -9,6 +9,7 @@ our $VERSION = q(1.0015);
 
 use Scalar::Util ();
 
+use DBM::Deep::Engine::DBI ();
 use DBM::Deep::Engine::File ();
 
 use DBM::Deep::SQL::Util;
@@ -56,6 +57,7 @@ sub new {
     my $args = $class->_get_args( @_ );
     my $self;
     
+=pod
     if (exists $args->{dbi}) {
         eval {
             require DBIx::Abstract;
@@ -117,6 +119,7 @@ sub new {
             return bless $self, $class;
         }
     }
+=cut
 
     ##
     # Check if we want a tied hash or array.

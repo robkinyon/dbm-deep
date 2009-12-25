@@ -13,6 +13,9 @@ use DBM::Deep::Iterator ();
 #   mutex. But, it's the caller's responsability to make sure that this has
 #   been done.
 
+sub SIG_HASH     () { 'H' }
+sub SIG_ARRAY    () { 'A' }
+
 =head1 NAME
 
 DBM::Deep::Engine

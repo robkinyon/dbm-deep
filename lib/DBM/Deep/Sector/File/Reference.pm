@@ -179,8 +179,8 @@ sub delete_key {
 
     my @trans_ids = $self->engine->get_running_txn_ids;
 
-    # If we're the HEAD and there are running txns, then we need to clone this value to the other
-    # transactions to preserve Isolation.
+    # If we're the HEAD and there are running txns, then we need to clone this
+    # value to the other transactions to preserve Isolation.
     if ( $self->engine->trans_id == 0 ) {
         if ( @trans_ids ) {
             foreach my $other_trans_id ( @trans_ids ) {
@@ -200,6 +200,7 @@ sub delete_key {
         $blist->mark_deleted( $args );
 
         if ( $old_value ) {
+            #XXX Is this export => 1 actually doing anything?
             $data = $old_value->data({ export => 1 });
             $old_value->free;
         }

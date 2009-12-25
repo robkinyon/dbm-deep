@@ -5,7 +5,46 @@ use 5.006_000;
 use strict;
 use warnings FATAL => 'all';
 
-use base 'DBM::Deep::Sector';
+use base qw( DBM::Deep::Sector );
+
+use DBM::Deep::Sector::DBI::Reference ();
+use DBM::Deep::Sector::DBI::Scalar ();
+
+sub _init {
+}
+
+sub free {
+    my $self = shift;
+
+    $self->engine->storage->delete_from(
+        $self->table, $self->offset,
+    );
+}
+
+sub reload {
+    my $self = shift;
+    $self->_init;
+}
+
+sub load {
+    my $self = shift;
+    my ($engine, $offset, $type) = @_;
+
+    if ( $type eq 'refs' ) {
+        return DBM::Deep::Sector::DBI::Reference->new({
+            engine => $engine,
+            offset => $offset,
+        });
+    }
+    elsif ( $type eq 'datas' ) {
+        return DBM::Deep::Sector::DBI::Scalar->new({
+            engine => $engine,
+            offset => $offset,
+        });
+    }
+
+    DBM::Deep->_throw_error( "'$offset': Don't know what to do with type '$type'" );
+}
 
 1;
 __END__

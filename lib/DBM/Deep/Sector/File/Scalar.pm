@@ -31,6 +31,15 @@ sub free {
     return;
 }
 
+sub clone {
+    my $self = shift;
+    return ref($self)->new({
+        engine => $self->engine,
+        type   => $self->type,
+        data   => $self->data,
+    });
+}
+
 sub type { $_[0]{engine}->SIG_DATA }
 sub _init {
     my $self = shift;
@@ -107,8 +116,6 @@ sub chain_loc {
 
 sub data {
     my $self = shift;
-#    my ($args) = @_;
-#    $args ||= {};
 
     my $data;
     while ( 1 ) {

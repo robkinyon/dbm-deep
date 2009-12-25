@@ -14,6 +14,7 @@ use DBM::Deep::Sector::File ();
 use DBM::Deep::Storage::File ();
 
 sub sector_type { 'DBM::Deep::Sector::File' }
+sub iterator_class { 'DBM::Deep::Iterator::File' }
 
 my $STALE_SIZE = 2;
 

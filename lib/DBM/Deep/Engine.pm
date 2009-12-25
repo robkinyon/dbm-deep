@@ -243,7 +243,7 @@ sub get_next_key {
     # XXX Need to add logic about resetting the iterator if any key in the
     # reference has changed
     unless ( $prev_key ) {
-        $obj->{iterator} = DBM::Deep::Iterator->new({
+        $obj->{iterator} = $self->iterator_class->new({
             base_offset => $obj->_base_offset,
             engine      => $self,
         });

@@ -11,6 +11,7 @@ use DBM::Deep::Sector::DBI ();
 use DBM::Deep::Storage::DBI ();
 
 sub sector_type { 'DBM::Deep::Sector::DBI' }
+sub iterator_class { 'DBM::Deep::Iterator::DBI' }
 
 sub new {
     my $class = shift;

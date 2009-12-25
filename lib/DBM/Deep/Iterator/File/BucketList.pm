@@ -1,4 +1,4 @@
-package DBM::Deep::Iterator::Index;
+package DBM::Deep::Iterator::File::BucketList;
 
 use 5.006_000;
 
@@ -7,12 +7,12 @@ use warnings FATAL => 'all';
 
 =head1 NAME
 
-DBM::Deep::Iterator::Index
+DBM::Deep::Iterator::BucketList
 
 =head1 PURPOSE
 
 This is an internal-use-only object for L<DBM::Deep/>. It acts as the mediator
-between the L<DBM::Deep::Iterator/> object and a L<DBM::Deep::Engine::Sector::Index/>
+between the L<DBM::Deep::Iterator/> object and a L<DBM::Deep::Engine::Sector::BucketList/>
 sector.
 
 =head1 OVERVIEW
@@ -20,7 +20,7 @@ sector.
 This object, despite the implied class hiearchy, does B<NOT> inherit from
 L<DBM::Deep::Iterator/>. Instead, it delegates to it, essentially acting as a
 facade over it. L<DBM::Deep::Iterator/get_next_key> will instantiate one of
-these objects as needed to handle an Index sector.
+these objects as needed to handle an BucketList sector.
 
 =head1 METHODS
 
@@ -33,7 +33,7 @@ hashref is assumed to have the following elements:
 
 =item * iterator (of type L<DBM::Deep::Iterator/>
 
-=item * sector (of type L<DBM::Deep::Engine::Sector::Index/>
+=item * sector (of type L<DBM::Deep::Engine::Sector::BucketList/>
 
 =back
 
@@ -56,30 +56,34 @@ iterated over.
 
 sub at_end {
     my $self = shift;
-    return $self->{curr_index} >= $self->{iterator}{engine}->hash_chars;
+    return $self->{curr_index} >= $self->{iterator}{engine}->max_buckets;
 }
 
 =head2 get_next_iterator()
 
 This takes no arguments.
 
-This returns an iterator (built by L<DBM::Deep::Iterator/get_sector_iterator>) based
-on the sector pointed to by the next occupied location in this index.
+This returns the next key pointed to by this bucketlist. This value is suitable for
+returning by FIRSTKEY or NEXTKEY().
 
-If the sector is exhausted, it returns nothing.
+If the bucketlist is exhausted, it returns nothing.
 
 =cut
 
-sub get_next_iterator {
+sub get_next_key {
     my $self = shift;
 
-    my $loc;
-    while ( !$loc ) {
-        return if $self->at_end;
-        $loc = $self->{sector}->get_entry( $self->{curr_index}++ );
-    }
+    return if $self->at_end;
 
-    return $self->{iterator}->get_sector_iterator( $loc );
+    my $idx = $self->{curr_index}++;
+
+    my $data_loc = $self->{sector}->get_data_location_for({
+        allow_head => 1,
+        idx        => $idx,
+    }) or return;
+
+    #XXX Do we want to add corruption checks here?
+    return $self->{sector}->get_key_for( $idx )->data;
 }
 
 1;

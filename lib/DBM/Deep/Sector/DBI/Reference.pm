@@ -153,20 +153,37 @@ sub free {
 }
 
 sub increment_refcount {
-    return 1;
+    my $self = shift;
+    my $refcount = $self->get_refcount;
+    $refcount++;
+    $self->write_refcount( $refcount );
+    return $refcount;
 }
 
 sub decrement_refcount {
-    return 0;
+    my $self = shift;
+    my $refcount = $self->get_refcount;
+    $refcount--;
+    $self->write_refcount( $refcount );
+    return $refcount;
 }
 
 sub get_refcount {
-    return 1;
+    my $self = shift;
+    my ($rows) = $self->engine->storage->read_from(
+        'refs', $self->offset,
+        qw( refcount ),
+    );
+    return $rows->[0]{refcount};
 }
 
 sub write_refcount {
     my $self = shift;
     my ($num) = @_;
+    $self->engine->storage->{dbh}->do(
+        "UPDATE refs SET refcount = ? WHERE id = ?", undef,
+        $num, $self->offset,
+    );
 }
 
 1;

@@ -14,11 +14,17 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     ##
     # basic put/get/push
     ##
+warn "1\n";
     $db->[0] = "elem1";
+warn "2\n";
     $db->push( "elem2" );
+warn "3\n";
     $db->put(2, "elem3");
+warn "4\n";
     $db->store(3, "elem4");
+warn "5\n";
     $db->unshift("elem0");
+warn "6\n";
 
     is( $db->[0], 'elem0', "Array get for shift works" );
     is( $db->[1], 'elem1', "Array get for array set works" );
@@ -242,7 +248,8 @@ while ( my $dbm_maker = $dbm_factory->() ) {
         $db->exists();
     } qr/Cannot use an undefined array index/, "EXISTS fails on an undefined key";
 }
-
+done_testing;
+__END__
 # Bug reported by Mike Schilli
 # Also, RT #29583 reported by HANENKAMP
 $dbm_factory = new_dbm( type => DBM::Deep->TYPE_ARRAY );

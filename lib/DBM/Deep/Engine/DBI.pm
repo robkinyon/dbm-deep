@@ -103,12 +103,50 @@ sub get_classname {
     return;
 }
 
-=pod
 sub make_reference {
     my $self = shift;
     my ($obj, $old_key, $new_key) = @_;
+
+    my $sector = $self->load_sector( $obj->_base_offset, 'refs' )
+        or return;
+
+#    if ( $sector->staleness != $obj->_staleness ) {
+#        return;
+#    }
+
+    my $value_sector = $sector->get_data_for({
+        key        => $old_key,
+        allow_head => 1,
+    });
+
+    unless ( $value_sector ) {
+        $value_sector = DBM::Deep::Sector::DBI::Scalar->new({
+            engine => $self,
+            data   => undef,
+        });
+
+        $sector->write_data({
+            key     => $old_key,
+            value   => $value_sector,
+        });
+    }
+
+    if ( $value_sector->isa( 'DBM::Deep::Sector::DBI::Reference' ) ) {
+        $sector->write_data({
+            key     => $new_key,
+            value   => $value_sector,
+        });
+        $value_sector->increment_refcount;
+    }
+    else {
+        $sector->write_data({
+            key     => $new_key,
+            value   => $value_sector->clone,
+        });
+    }
+
+    return;
 }
-=cut
 
 # exists returns '', not undefined.
 sub key_exists {

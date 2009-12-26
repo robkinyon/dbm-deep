@@ -105,9 +105,6 @@ sub write_to {
       . ") VALUES ("
           . join( ',', ('?') x (@keys + 1) )
       . ")";
-#warn $sql. $/;
-#no warnings;
-#warn "@args{@keys}\n";
     $self->{dbh}->do( $sql, undef, $id, @args{@keys} );
 
     return $self->{dbh}{mysql_insertid};

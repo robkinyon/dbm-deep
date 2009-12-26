@@ -15,7 +15,16 @@ sub new {
 }
 
 sub _init {}
-sub clone { die "clone must be implemented in a child class" }
+#sub clone { die "clone must be implemented in a child class" }
+sub clone {
+    my $self = shift;
+    return ref($self)->new({
+        engine => $self->engine,
+        type   => $self->type,
+        data   => $self->data,
+    });
+}
+
 
 sub engine { $_[0]{engine} }
 sub offset { $_[0]{offset} }

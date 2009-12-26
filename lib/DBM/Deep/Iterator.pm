@@ -43,12 +43,13 @@ sub new {
     my ($args) = @_;
 
     my $self = bless {
-        breadcrumbs => [],
         engine      => $args->{engine},
         base_offset => $args->{base_offset},
     }, $class;
 
     Scalar::Util::weaken( $self->{engine} );
+
+    $self->reset;
 
     return $self;
 }
@@ -63,18 +64,7 @@ This method returns nothing.
 
 =cut
 
-sub reset { $_[0]{breadcrumbs} = []; return }
-
-=head2 get_sector_iterator( $loc )
-
-This takes a location. It will load the sector for $loc, then instantiate the
-right iteartor type for it.
-
-This returns the sector iterator.
-
-=cut
-
-sub get_sector_iterator { die "get_sector_iterator must be implemented in a child class" }
+sub reset { die "reset must be implemented in a child class" }
 
 =head2 get_next_key( $obj )
 

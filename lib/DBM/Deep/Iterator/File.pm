@@ -8,6 +8,8 @@ use base qw( DBM::Deep::Iterator );
 use DBM::Deep::Iterator::File::BucketList ();
 use DBM::Deep::Iterator::File::Index ();
 
+sub reset { $_[0]{breadcrumbs} = []; return }
+
 sub get_sector_iterator {
     my $self = shift;
     my ($loc) = @_;
@@ -16,13 +18,13 @@ sub get_sector_iterator {
         or return;
 
     if ( $sector->isa( 'DBM::Deep::Sector::File::Index' ) ) {
-        return DBM::Deep::Iterator::Index->new({
+        return DBM::Deep::Iterator::File::Index->new({
             iterator => $self,
             sector   => $sector,
         });
     }
     elsif ( $sector->isa( 'DBM::Deep::Sector::File::BucketList' ) ) {
-        return DBM::Deep::Iterator::BucketList->new({
+        return DBM::Deep::Iterator::File::BucketList->new({
             iterator => $self,
             sector   => $sector,
         });
@@ -69,7 +71,7 @@ sub get_next_key {
             redo FIND_NEXT_KEY;
         }
 
-        if ( $iterator->isa( 'DBM::Deep::Iterator::Index' ) ) {
+        if ( $iterator->isa( 'DBM::Deep::Iterator::File::Index' ) ) {
             # If we don't have any more, it will be caught at the
             # prior check.
             if ( my $next = $iterator->get_next_iterator ) {
@@ -78,7 +80,7 @@ sub get_next_key {
             redo FIND_NEXT_KEY;
         }
 
-        unless ( $iterator->isa( 'DBM::Deep::Iterator::BucketList' ) ) {
+        unless ( $iterator->isa( 'DBM::Deep::Iterator::File::BucketList' ) ) {
             DBM::Deep->_throw_error(
                 "Should have a bucketlist iterator here - instead have $iterator"
             );

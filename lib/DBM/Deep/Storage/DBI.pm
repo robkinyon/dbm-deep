@@ -98,22 +98,16 @@ sub write_to {
     my $self = shift;
     my ($table, $id, %args) = @_;
 
-    if ( $id ) {
-        $self->{dbh}->do(
-            "DELETE FROM $table WHERE id = $id",
-        );
-    }
-
     my @keys = keys %args;
     my $sql =
-        "INSERT INTO $table ( `id`, "
+        "REPLACE INTO $table ( `id`, "
           . join( ',', map { "`$_`" } @keys )
       . ") VALUES ("
           . join( ',', ('?') x (@keys + 1) )
       . ")";
-    warn $sql. $/;
-    no warnings;
-    warn "@args{@keys}\n";
+#warn $sql. $/;
+#no warnings;
+#warn "@args{@keys}\n";
     $self->{dbh}->do( $sql, undef, $id, @args{@keys} );
 
     return $self->{dbh}{mysql_insertid};
@@ -121,10 +115,15 @@ sub write_to {
 
 sub delete_from {
     my $self = shift;
-    my ($table, $id) = @_;
+    my ($table, $cond) = @_;
+
+    $cond = { id => $cond } unless ref $cond;
+
+    my @keys = keys %$cond;
+    my $where = join ' AND ', map { "`$_` = ?" } @keys;
 
     $self->{dbh}->do(
-        "DELETE FROM $table WHERE id = ?", undef, $id,
+        "DELETE FROM $table WHERE $where", undef, @{$cond}{@keys},
     );
 }
 

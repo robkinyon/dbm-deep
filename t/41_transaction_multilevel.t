@@ -1,5 +1,5 @@
 use strict;
-use Test::More tests => 41;
+use Test::More;
 use Test::Deep;
 use t::common qw( new_dbm );
 

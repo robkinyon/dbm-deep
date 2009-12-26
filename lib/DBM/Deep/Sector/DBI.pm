@@ -37,10 +37,18 @@ sub load {
         });
     }
     elsif ( $type eq 'datas' ) {
-        return DBM::Deep::Sector::DBI::Scalar->new({
+        my $sector = DBM::Deep::Sector::DBI::Scalar->new({
             engine => $engine,
             offset => $offset,
         });
+
+        if ( $sector->{data_type} eq 'R' ) {
+            return $self->load(
+                $engine, $sector->{offset}, 'refs',
+            );
+        }
+
+        return $sector;
     }
 
     DBM::Deep->_throw_error( "'$offset': Don't know what to do with type '$type'" );

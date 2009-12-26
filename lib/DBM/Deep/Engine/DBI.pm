@@ -96,12 +96,14 @@ sub read_value {
     return $value_sector->data;
 }
 
-=pod
 sub get_classname {
     my $self = shift;
     my ($obj) = @_;
+
+    return;
 }
 
+=pod
 sub make_reference {
     my $self = shift;
     my ($obj, $old_key, $new_key) = @_;

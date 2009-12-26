@@ -29,9 +29,16 @@ sub new_fh {
 sub new_dbm {
     my @args = @_;
     my ($fh, $filename) = new_fh();
-    my @extra_args = (
-        [ file => $filename ],
-    );
+
+    my @reset_funcs;
+    my @extra_args;
+
+    unless ( $ENV{NO_TEST_FILE} ) {
+        push @reset_funcs, undef;
+        push @extra_args, (
+            [ file => $filename ],
+        );
+    }
 
 #    eval { require DBD::SQLite; };
 #    unless ( $@ ) {
@@ -40,6 +47,23 @@ sub new_dbm {
 #    }
 
     if ( $ENV{TEST_MYSQL_DSN} ) {
+        push @reset_funcs, sub {
+            my $dbh = DBI->connect(
+                "dbi:mysql:$ENV{TEST_MYSQL_DSN}",
+                $ENV{TEST_MYSQL_USER},
+                $ENV{TEST_MYSQL_PASS},
+            );
+            my $sql = do {
+                my $filename = 'etc/mysql_tables.sql';
+                open my $fh, '<', $filename
+                    or die "Cannot open '$filename' for reading: $!\n";
+                local $/;
+                <$fh>
+            };
+            foreach my $line ( split ';', $sql ) {
+                $dbh->do( "$line" ) if $line =~ /\S/;
+            }
+        };
         push @extra_args, [
             dbi => {
                 dsn      => "dbi:mysql:$ENV{TEST_MYSQL_DSN}",
@@ -52,6 +76,9 @@ sub new_dbm {
     return sub {
         return unless @extra_args;
         my @these_args = @{ shift @extra_args };
+        if ( my $reset = shift @reset_funcs ) {
+            $reset->();
+        }
         return sub {
             DBM::Deep->new(
                 @these_args, @args, @_,

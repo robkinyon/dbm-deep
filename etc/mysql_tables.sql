@@ -11,9 +11,9 @@ CREATE TABLE datas (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY
    ,ref_id BIGINT UNSIGNED NOT NULL
    ,data_type ENUM( 'S', 'R' ) DEFAULT 'S'
-   ,`key` TEXT NOT NULL
-   ,value TEXT
-   ,class TEXT
+   ,`key` LONGTEXT NOT NULL
+   ,value LONGTEXT
+   ,class LONGTEXT
    ,FOREIGN KEY (ref_id) REFERENCES refs (id)
         ON DELETE CASCADE ON UPDATE CASCADE
    ,UNIQUE INDEX (ref_id, `key` (900) )

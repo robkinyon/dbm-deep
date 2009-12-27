@@ -35,24 +35,27 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     ok(
         ($test_key eq $key1) || 
         ($test_key eq $key2) || 
-        ($test_key eq $key3)
+        ($test_key eq $key3),
+        "First key found",
     );
 
     $test_key = $db->next_key($test_key);
     ok(
         ($test_key eq $key1) || 
         ($test_key eq $key2) || 
-        ($test_key eq $key3)
+        ($test_key eq $key3),
+        "Second key found",
     );
 
     $test_key = $db->next_key($test_key);
     ok(
         ($test_key eq $key1) || 
         ($test_key eq $key2) || 
-        ($test_key eq $key3)
+        ($test_key eq $key3),
+        "Third key found",
     );
 
     $test_key = $db->next_key($test_key);
-    ok( !$test_key );
+    ok( !$test_key, "No fourth key" );
 }
 done_testing;

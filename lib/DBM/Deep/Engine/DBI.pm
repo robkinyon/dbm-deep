@@ -238,10 +238,10 @@ sub write_value {
             
             # See whether or not we are storing ourselves to ourself.
             # Write the sector as data in this reference (keyed by $key)
-            my $value_sector = $self->load_sector( $tmpvar->_base_offset );
+            my $value_sector = $self->load_sector( $tmpvar->_base_offset, 'refs' );
             $sector->write_data({
                 key     => $key,
-                key_md5 => $self->_apply_digest( $key ),
+#                key_md5 => $self->_apply_digest( $key ),
                 value   => $value_sector,
             });
             $value_sector->increment_refcount;

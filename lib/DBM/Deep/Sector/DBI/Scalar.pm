@@ -10,17 +10,10 @@ sub table { 'datas' }
 sub _init {
     my $self = shift;
 
-    my $engine = $self->engine;
-    unless ( $self->offset ) {
-#        my ($rows) = $self->engine->storage->write_to(
-#            datas => undef,
-#            ( map { $_ => $self->{$_} } qw( ref_id data_type key value class ) ),
-#        );
-    }
-    else {
+    if ( $self->offset ) {
         my ($rows) = $self->engine->storage->read_from(
             datas => $self->offset,
-            qw( data_type key value class ),
+            qw( id data_type key value class ),
         );
 
         $self->{$_} = $rows->[0]{$_} for qw( data_type key value class );

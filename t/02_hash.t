@@ -4,6 +4,7 @@ use warnings FATAL => 'all';
 use Test::More;
 use Test::Exception;
 use t::common qw( new_dbm );
+use Scalar::Util qw( reftype );
 
 use_ok( 'DBM::Deep' );
 
@@ -139,6 +140,7 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     # Test autovivification
     $db->{unknown}{bar} = 1;
     ok( $db->{unknown}, 'Autovivified hash exists' );
+    is( reftype($db->{unknown}), 'HASH', "... and it's a HASH" );
     cmp_ok( $db->{unknown}{bar}, '==', 1, 'And the value stored is there' );
 
     # Test failures

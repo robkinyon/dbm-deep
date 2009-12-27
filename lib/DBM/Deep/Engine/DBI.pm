@@ -82,8 +82,9 @@ sub read_value {
 
     unless ( $value_sector ) {
         $value_sector = DBM::Deep::Sector::DBI::Scalar->new({
-            engine => $self,
-            data   => undef,
+            engine    => $self,
+            data      => undef,
+            data_type => 'S',
         });
 
         $sector->write_data({

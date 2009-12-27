@@ -55,7 +55,7 @@ sub write_data {
     my ($args) = @_;
 
     if ( ( $args->{value}->type || 'S' ) eq 'S' ) {
-        $self->engine->storage->write_to(
+        $args->{value}{offset} = $self->engine->storage->write_to(
             datas => $args->{value}{offset},
             ref_id    => $self->offset,
             data_type => 'S',
@@ -63,10 +63,13 @@ sub write_data {
             value     => $args->{value}{data},
             class     => $args->{value}{class},
         );
+
+        $args->{value}->reload;
     }
     else {
+        # Write the Scalar of the Reference
         $self->engine->storage->write_to(
-            datas => $args->{value}{offset},
+            datas => undef,
             ref_id    => $self->offset,
             data_type => 'R',
             key       => $args->{key},
@@ -74,8 +77,6 @@ sub write_data {
             class     => $args->{value}{class},
         );
     }
-
-    $args->{value}->reload;
 }
 
 sub delete_key {

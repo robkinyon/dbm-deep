@@ -44,7 +44,7 @@ sub load {
 
         if ( $sector->{data_type} eq 'R' ) {
             return $self->load(
-                $engine, $sector->{offset}, 'refs',
+                $engine, $sector->{value}, 'refs',
             );
         }
 

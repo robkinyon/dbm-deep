@@ -13,10 +13,10 @@ sub _init {
     if ( $self->offset ) {
         my ($rows) = $self->engine->storage->read_from(
             datas => $self->offset,
-            qw( id data_type key value class ),
+            qw( id data_type key value ),
         );
 
-        $self->{$_} = $rows->[0]{$_} for qw( data_type key value class );
+        $self->{$_} = $rows->[0]{$_} for qw( data_type key value );
     }
 
     return;

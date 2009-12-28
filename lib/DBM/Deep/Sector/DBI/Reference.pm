@@ -15,9 +15,11 @@ sub _init {
     my $e = $self->engine;
 
     unless ( $self->offset ) {
+        my $classname = Scalar::Util::blessed( delete $self->{data} );
         $self->{offset} = $self->engine->storage->write_to(
             refs => undef,
-            ref_type => $self->type,
+            ref_type  => $self->type,
+            classname => $classname,
         );
     }
     else {
@@ -61,7 +63,6 @@ sub write_data {
             data_type => 'S',
             key       => $args->{key},
             value     => $args->{value}{data},
-            class     => $args->{value}{class},
         );
 
         $args->{value}->reload;
@@ -74,7 +75,6 @@ sub write_data {
             data_type => 'R',
             key       => $args->{key},
             value     => $args->{value}{offset},
-            class     => $args->{value}{class},
         );
     }
 }
@@ -98,7 +98,12 @@ sub delete_key {
 
 sub get_classname {
     my $self = shift;
-    return;
+    my ($rows) = $self->engine->storage->read_from(
+        'refs', $self->offset,
+        qw( classname ),
+    );
+    return unless @$rows;
+    return $rows->[0]{classname};
 }
 
 sub data {

@@ -5,6 +5,7 @@ CREATE TABLE refs (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY
    ,ref_type ENUM( 'H', 'A' ) NOT NULL DEFAULT 'H'
    ,refcount BIGINT UNSIGNED NOT NULL DEFAULT 1
+   ,classname LONGTEXT
 );
 
 CREATE TABLE datas (
@@ -13,7 +14,6 @@ CREATE TABLE datas (
    ,data_type ENUM( 'S', 'R' ) DEFAULT 'S'
    ,`key` LONGTEXT NOT NULL
    ,value LONGTEXT
-   ,class LONGTEXT
    ,FOREIGN KEY (ref_id) REFERENCES refs (id)
         ON DELETE CASCADE ON UPDATE CASCADE
    ,UNIQUE INDEX (ref_id, `key` (900) )

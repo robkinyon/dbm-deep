@@ -101,7 +101,10 @@ sub get_classname {
     my $self = shift;
     my ($obj) = @_;
 
-    return;
+    my $sector = $self->load_sector( $obj->_base_offset, 'refs' )
+        or return;
+
+    return $sector->get_classname;
 }
 
 sub make_reference {

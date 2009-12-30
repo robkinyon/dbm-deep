@@ -311,21 +311,17 @@ sub write_value {
     return 1;
 }
 
-sub begin_work {
-    my $self = shift;
-    my ($obj) = @_;
-}
+sub begin_work { die "Transactions are not supported by thie engine" } 
+sub rollback   { die "Transactions are not supported by thie engine" } 
+sub commit     { die "Transactions are not supported by thie engine" }
 
-sub rollback {
-    my $self = shift;
-    my ($obj) = @_;
-}
+sub supports {
+    shift;
+    my ($feature) = @_;
 
-sub commit {
-    my $self = shift;
-    my ($obj) = @_;
+    return if $feature eq 'transactions';
+    return;
 }
-
 
 1;
 __END__

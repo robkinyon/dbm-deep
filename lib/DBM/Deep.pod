@@ -412,6 +412,17 @@ This copy is in RAM, not on disk like the DB is.
 
 These are the transactional functions. L</TRANSACTIONS> for more information.
 
+=item * supports( $option )
+
+This returns a boolean depending on if this instance of DBM::Dep supports
+that feature. C<$option> can be one of:
+
+=over 4
+
+=item * transactions
+
+=back
+
 =back
 
 =head2 Hashes

@@ -346,6 +346,21 @@ This is the cache of loaded Reference sectors.
 sub cache       { $_[0]{cache} ||= {} }
 sub clear_cache { %{$_[0]->cache} = () }
 
+=head2 supports( $option )
+
+This returns a boolean depending on if this instance of DBM::Dep supports
+that feature. C<$option> can be one of:
+
+=over 4
+
+=item * transactions
+
+=back
+
+=cut
+
+sub supports { die "supports must be implemented in a child class" }
+
 =head2 ACCESSORS
 
 The following are readonly attributes.

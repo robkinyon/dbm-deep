@@ -379,6 +379,11 @@ sub clone {
     );
 }
 
+sub supports {
+    my $self = shift;
+    return $self->_engine->supports( @_ );
+}
+
 #XXX Migrate this to the engine, where it really belongs and go through some
 # API - stop poking in the innards of someone else..
 {

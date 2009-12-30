@@ -1029,6 +1029,14 @@ sub set_trans_loc { $_[0]{trans_loc} = $_[1] }
 sub chains_loc     { $_[0]{chains_loc} }
 sub set_chains_loc { $_[0]{chains_loc} = $_[1] }
 
+sub supports {
+    shift;
+    my ($feature) = @_;
+
+    return 1 if $feature eq 'transactions';
+    return;
+}
+
 =head2 _dump_file()
 
 This method takes no arguments. It's used to print out a textual representation

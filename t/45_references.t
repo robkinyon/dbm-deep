@@ -7,11 +7,6 @@ use t::common qw( new_dbm );
 
 use_ok( 'DBM::Deep' );
 
-if ( $ENV{NO_TEST_TRANSACTIONS} ) {
-    done_testing;
-    exit;
-}
-
 my $dbm_factory = new_dbm(
     locking => 1,
     autoflush => 1,
@@ -19,6 +14,7 @@ my $dbm_factory = new_dbm(
 );
 while ( my $dbm_maker = $dbm_factory->() ) {
     my $db1 = $dbm_maker->();
+    next unless $db1->supports( 'transactions' );
     my $db2 = $dbm_maker->();
 
     $db1->{foo} = 5;

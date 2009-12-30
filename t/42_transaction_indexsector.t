@@ -14,11 +14,6 @@ use_ok( 'DBM::Deep' );
 # reindexing at 17 keys vs. attempting to hit the second-level reindex which
 # can occur as early as 18 keys and as late as 4097 (256*16+1) keys.
 
-if ( $ENV{NO_TEST_TRANSACTIONS} ) {
-    done_testing;
-    exit;
-}
-
 {
     my $dbm_factory = new_dbm(
         locking => 1,
@@ -27,6 +22,7 @@ if ( $ENV{NO_TEST_TRANSACTIONS} ) {
     );
     while ( my $dbm_maker = $dbm_factory->() ) {
         my $db1 = $dbm_maker->();
+        next unless $db1->supports( 'transactions' );
         my $db2 = $dbm_maker->();
 
         $db1->{x} = 'y';
@@ -62,6 +58,7 @@ if ( $ENV{NO_TEST_TRANSACTIONS} ) {
     );
     while ( my $dbm_maker = $dbm_factory->() ) {
         my $db1 = $dbm_maker->();
+        next unless $db1->supports( 'transactions' );
         my $db2 = $dbm_maker->();
 
         $db1->{x} = 'y';

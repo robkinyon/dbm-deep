@@ -10,19 +10,16 @@ use_ok( 'DBM::Deep' );
 
 my $max_txns = 255;
 
-if ( $ENV{NO_TEST_TRANSACTIONS} ) {
-    done_testing;
-    exit;
-}
-
 my $dbm_factory = new_dbm(
     num_txns  => $max_txns,
 );
 while ( my $dbm_maker = $dbm_factory->() ) {
-    my @dbs = grep { $_ } map {
-        eval { $dbm_maker->() }
-    } 1 .. $max_txns;
+    my @dbs = ( $dbm_maker->() );
+    next unless $dbs[0]->supports('transactions');
 
+    push @dbs, grep { $_ } map {
+        eval { $dbm_maker->() }
+    } 2 .. $max_txns;
 
     cmp_ok( scalar(@dbs), '==', $max_txns, "We could open enough DB handles" );
 

@@ -7,6 +7,11 @@ use t::common qw( new_dbm );
 
 use_ok( 'DBM::Deep' );
 
+if ( $ENV{NO_TEST_TRANSACTIONS} ) {
+    done_testing;
+    exit;
+}
+
 my $dbm_factory = new_dbm(
     locking => 1,
     autoflush => 1,

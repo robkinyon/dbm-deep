@@ -7,6 +7,11 @@ use t::common qw( new_dbm );
 
 use_ok( 'DBM::Deep' );
 
+if ( $ENV{NO_TEST_TRANSACTIONS} ) {
+    done_testing;
+    exit;
+}
+
 my $dbm_factory = new_dbm(
     locking => 1,
     autoflush => 1,
@@ -65,15 +70,10 @@ while ( my $dbm_maker = $dbm_factory->() ) {
 done_testing;
 
 __END__
-warn "-2\n";
 $db2->begin_work;
 
-warn "-1\n";
   delete $db2->{bar};
 
-warn "0\n";
 $db2->commit;
 
-warn "1\n";
 ok( !exists $db1->{bar}, "After commit, bar is gone" );
-warn "2\n";

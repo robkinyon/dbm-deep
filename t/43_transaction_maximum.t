@@ -10,6 +10,11 @@ use_ok( 'DBM::Deep' );
 
 my $max_txns = 255;
 
+if ( $ENV{NO_TEST_TRANSACTIONS} ) {
+    done_testing;
+    exit;
+}
+
 my $dbm_factory = new_dbm(
     num_txns  => $max_txns,
 );

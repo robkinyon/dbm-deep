@@ -6,7 +6,7 @@ CREATE TABLE refs (
    ,ref_type ENUM( 'H', 'A' ) NOT NULL DEFAULT 'H'
    ,refcount BIGINT UNSIGNED NOT NULL DEFAULT 1
    ,classname LONGTEXT
-);
+) ENGINE=MyISAM;
 
 CREATE TABLE datas (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY
@@ -16,5 +16,5 @@ CREATE TABLE datas (
    ,value LONGTEXT
    ,FOREIGN KEY (ref_id) REFERENCES refs (id)
         ON DELETE CASCADE ON UPDATE CASCADE
-   ,UNIQUE INDEX (ref_id, `key` (900) )
-);
+   ,UNIQUE INDEX (ref_id, `key` (700) )
+) ENGINE=MyISAM;

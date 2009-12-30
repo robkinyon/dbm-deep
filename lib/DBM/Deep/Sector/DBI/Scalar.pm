@@ -27,23 +27,5 @@ sub data {
     $self->{value};
 }
 
-=pod
-sub write_data {
-    my $self = shift;
-    my ($args) = @_;
-
-    $self->engine->storage->write_to(
-        datas => $args->{value}{offset},
-        ref_id    => $self->offset,
-        data_type => 'S',
-        key       => $args->{key},
-        value     => $args->{value}{value},
-        class     => $args->{value}{class},
-    );
-
-    $args->{value}->reload;
-}
-=cut
-
 1;
 __END__

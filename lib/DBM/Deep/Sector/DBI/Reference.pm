@@ -106,24 +106,29 @@ sub get_classname {
     return $rows->[0]{classname};
 }
 
+# Look to hoist this method into a ::Reference trait
 sub data {
     my $self = shift;
     my ($args) = @_;
     $args ||= {};
 
-    my $obj = DBM::Deep->new({
-        type        => $self->type,
-        base_offset => $self->offset,
-#        staleness   => $self->staleness,
-        storage     => $self->engine->storage,
-        engine      => $self->engine,
-    });
+    my $obj;
+    unless ( $obj = $self->engine->cache->{ $self->offset } ) {
+        $obj = DBM::Deep->new({
+            type        => $self->type,
+            base_offset => $self->offset,
+            storage     => $self->engine->storage,
+            engine      => $self->engine,
+        });
 
-    if ( $self->engine->storage->{autobless} ) {
-        my $classname = $self->get_classname;
-        if ( defined $classname ) {
-            bless $obj, $classname;
+        if ( $self->engine->storage->{autobless} ) {
+            my $classname = $self->get_classname;
+            if ( defined $classname ) {
+                bless $obj, $classname;
+            }
         }
+
+        $self->engine->cache->{$self->offset} = $obj;
     }
 
     # We're not exporting, so just return.
@@ -143,9 +148,13 @@ sub free {
     my $self = shift;
 
     # We're not ready to be removed yet.
-    if ( $self->decrement_refcount > 0 ) {
-        return;
-    }
+    return if $self->decrement_refcount > 0;
+
+    # Rebless the object into DBM::Deep::Null.
+    eval { %{ $self->engine->cache->{ $self->offset } } = (); };
+    eval { @{ $self->engine->cache->{ $self->offset } } = (); };
+    bless $self->engine->cache->{ $self->offset }, 'DBM::Deep::Null';
+    delete $self->engine->cache->{ $self->offset };
 
     $self->engine->storage->delete_from(
         'datas', { ref_id => $self->offset },

@@ -337,6 +337,15 @@ defined sector type.
 
 sub load_sector { $_[0]->sector_type->load( @_ ) }
 
+=head2 cache / clear_cache
+
+This is the cache of loaded Reference sectors.
+
+=cut
+
+sub cache       { $_[0]{cache} ||= {} }
+sub clear_cache { %{$_[0]->cache} = () }
+
 =head2 ACCESSORS
 
 The following are readonly attributes.
@@ -344,6 +353,8 @@ The following are readonly attributes.
 =over 4
 
 =item * storage
+
+=item * sector_type
 
 =back
 

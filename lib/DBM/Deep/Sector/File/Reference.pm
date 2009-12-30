@@ -408,6 +408,7 @@ sub get_classname {
     return $self->engine->load_sector( $class_offset )->data;
 }
 
+# Look to hoist this method into a ::Reference trait
 sub data {
     my $self = shift;
     my ($args) = @_;
@@ -450,9 +451,7 @@ sub free {
     my $self = shift;
 
     # We're not ready to be removed yet.
-    if ( $self->decrement_refcount > 0 ) {
-        return;
-    }
+    return if $self->decrement_refcount > 0;
 
     # Rebless the object into DBM::Deep::Null.
     eval { %{ $self->engine->cache->{ $self->offset } } = (); };

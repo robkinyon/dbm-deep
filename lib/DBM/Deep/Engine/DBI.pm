@@ -311,9 +311,9 @@ sub write_value {
     return 1;
 }
 
-sub begin_work { die "Transactions are not supported by thie engine" } 
-sub rollback   { die "Transactions are not supported by thie engine" } 
-sub commit     { die "Transactions are not supported by thie engine" }
+sub begin_work { die "Transactions are not supported by this engine" } 
+sub rollback   { die "Transactions are not supported by this engine" } 
+sub commit     { die "Transactions are not supported by this engine" }
 
 sub supports {
     shift;

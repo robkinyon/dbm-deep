@@ -49,7 +49,7 @@ sub new_dbm {
     if ( $ENV{TEST_MYSQL_DSN} ) {
         push @reset_funcs, sub {
             my $dbh = DBI->connect(
-                "dbi:mysql:$ENV{TEST_MYSQL_DSN}",
+                $ENV{TEST_MYSQL_DSN},
                 $ENV{TEST_MYSQL_USER},
                 $ENV{TEST_MYSQL_PASS},
             );
@@ -66,7 +66,7 @@ sub new_dbm {
         };
         push @extra_args, [
             dbi => {
-                dsn      => "dbi:mysql:$ENV{TEST_MYSQL_DSN}",
+                dsn      => $ENV{TEST_MYSQL_DSN},
                 user     => $ENV{TEST_MYSQL_USER},
                 password => $ENV{TEST_MYSQL_PASS},
             },

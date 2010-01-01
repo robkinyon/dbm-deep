@@ -1,7 +1,23 @@
 Revision history for DBM::Deep.
 
-1.0015 Nov 22 20:00:00 2009 EST
-	- DBM::Deep::SQL added
+1.0019_001 Dec 31 22:00:00 2009 EST
+    (This is the first developer release for 1.0020.)
+    (This version is compatible with 1.0014)
+	- DBM::Deep has been refactored to allow for multiple engines. There are two
+      engines built so far:
+        - File (the original engine)
+        - DBI (an engine based on DBI)
+    - The DBI engine has only been tested on MySQL and isn't transactional.
+        - InnoDB sucks horribly. When run in a sufficient isolation mode, it
+          creates deadlocks. 
+    - A custom Build.PL has been written to allow for running tests under
+      CPAN.pm against the various engines.
+        - This also allows running the long tests under CPAN.pm
+    - This has meant a ton of refactoring. Hopefullly, this refactoring will
+      allow finding some of the niggly bugs more easily. Those tests have not
+      been enabled yet. That's the next developer release.
+    - Hopefully, this multi-engine support will allow deprecation of the file
+      format in the future.
 
 1.0014 Jun 13 23:15:00 2008 EST
     - (This version is compatible with 1.0013)

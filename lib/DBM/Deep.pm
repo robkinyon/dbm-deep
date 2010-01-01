@@ -5,16 +5,12 @@ use 5.006_000;
 use strict;
 use warnings FATAL => 'all';
 
-our $VERSION = q(1.0015);
+our $VERSION = q(1.0019_001);
 
 use Scalar::Util ();
 
 use DBM::Deep::Engine::DBI ();
 use DBM::Deep::Engine::File ();
-
-use DBM::Deep::SQL::Util;
-use DBM::Deep::SQL::Array;
-use DBM::Deep::SQL::Hash;
 
 use overload
     '""' => sub { overload::StrVal( $_[0] ) },

@@ -25,7 +25,12 @@ sub new {
         $self->{$param} = $args->{$param};
     }
 
-    $self->open unless $self->{dbh};
+    if ( $self->{dbh} ) {
+        $self->{driver} = lc $self->{dbh}->{Driver}->{Name};
+    }
+    else {
+        $self->open;
+    }
 
     return $self;
 }
@@ -33,7 +38,6 @@ sub new {
 sub open {
     my $self = shift;
 
-    # TODO: Is this really what should happen?
     return if $self->{dbh};
 
     $self->{dbh} = DBI->connect(
@@ -44,6 +48,9 @@ sub open {
             %{ $self->{dbi}{connect_args} || {} },
         },
     ) or die $DBI::error;
+
+    # Should we use the same method as done in new() if passed a $dbh?
+    (undef, $self->{driver}) = map lc, DBI->parse_dsn( $self->{dbi}{dsn} );
 
     return 1;
 }
@@ -75,6 +82,7 @@ sub lock_shared {
 
 sub unlock {
     my $self = shift;
+    $self->{dbh}->commit;
 }
 
 sub read_from {
@@ -107,7 +115,7 @@ sub write_to {
       . ")";
     $self->{dbh}->do( $sql, undef, $id, @args{@keys} );
 
-    return $self->{dbh}{mysql_insertid};
+    return $self->{dbh}->last_insert_id("", "", "", "");
 }
 
 sub delete_from {
@@ -122,6 +130,21 @@ sub delete_from {
     $self->{dbh}->do(
         "DELETE FROM $table WHERE $where", undef, @{$cond}{@keys},
     );
+}
+
+sub driver { $_[0]{driver} }
+
+sub rand_function {
+    my $self = shift;
+    my $driver = $self->driver;
+    if ( $driver eq 'sqlite' ) {
+        return 'random()';
+    }
+    elsif ( $driver eq 'mysql' ) {
+        return 'RAND()';
+    }
+
+    die "rand_function undefined for $driver\n";
 }
 
 1;

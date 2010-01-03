@@ -14,10 +14,9 @@ sub ACTION_test {
             TEST_MYSQL_DSN TEST_MYSQL_USER TEST_MYSQL_PASS
         );
     }
-    if ( $self->notes( 'LONG_TESTS' ) ) {
-        $ENV{LONG_TESTS} = 1;
+    foreach my $name ( qw( LONG_TESTS TEST_SQLITE ) ) {
+        $ENV{$name} = 1 if $self->notes( $name );
     }
-    $self->SUPER::ACTION_test;
 }
 SUBCLASS
 
@@ -46,8 +45,15 @@ my $build = $class->new(
     ],
     test_files => 't/??_*.t',
     auto_features => {
-        dbi_engine => {
-            description => 'DBI support (mysql only so far)',
+        sqlite_engine => {
+            description => 'DBI support via SQLite',
+            requires => {
+                'DBI'         => '1.5',
+                'DBD::SQLite' => '1.25',
+            },
+        },
+        mysql_engine => {
+            description => 'DBI support via MySQL',
             requires => {
                 'DBI'        => '1.5',
                 'DBD::mysql' => '4.001',
@@ -60,8 +66,14 @@ if ( $build->y_n( "Run the long-running tests", 'n' ) ) {
     $build->notes( 'LONG_TESTS' => 1 );
 }
 
-if ( $build->features( 'dbi_engine' ) ) {
-    if ( $build->y_n( "Run the tests against the DBI engine (for MySQL only)?", 'n' ) ) {
+if ( $build->features( 'sqlite_engine' ) ) {
+    if ( $build->y_n( "Run the tests against the DBI engine via SQLite?", 'n' ) ) {
+        $build->notes( 'TEST_SQLITE' => 1 );
+    }
+}
+
+if ( $build->features( 'mysql_engine' ) ) {
+    if ( $build->y_n( "Run the tests against the DBI engine via MySQL?", 'n' ) ) {
         my ($dsn, $user, $pass) = ('') x 3;
         $dsn = $build->prompt( "\tWhat is the full DSN (for example 'dbi:mysql:test')" );
         if ( $dsn ) {

@@ -19,8 +19,12 @@ sub get_next_key {
     my ($obj) = @_;
 
     unless ( exists $self->{sth} ) {
-        $self->{sth} = $self->{engine}->storage->{dbh}->prepare(
-            "SELECT `key` FROM datas WHERE ref_id = ? ORDER BY RAND()",
+        # For mysql, this needs to be RAND()
+        # For sqlite, this needs to be random()
+        my $storage = $self->{engine}->storage;
+        $self->{sth} = $storage->{dbh}->prepare(
+            "SELECT `key` FROM datas WHERE ref_id = ? ORDER BY "
+          . $storage->rand_function,
         );
         $self->{sth}->execute( $self->{base_offset} );
     }

@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings FATAL => 'all';
 
-our $VERSION = q(1.0019_001);
+our $VERSION = q(1.0019_002);
 
 use Scalar::Util ();
 

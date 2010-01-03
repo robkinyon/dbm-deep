@@ -1,5 +1,14 @@
 Revision history for DBM::Deep.
 
+1.0019_002 Jan XX XX:00:00 2010 EST
+    (This is the second developer release for 1.0020.)
+    (This version is compatible with 1.0014)
+	- Fixed bug where attempting to store a value tied to something other than
+      DBM::Deep would leave the file flocked.
+	- Added support for DBD::SQLite
+        - Build.PL has been extended to support sqlite vs. mysql
+        - Storage::DBI now detects between the two DBDs
+
 1.0019_001 Dec 31 22:00:00 2009 EST
     (This is the first developer release for 1.0020.)
     (This version is compatible with 1.0014)

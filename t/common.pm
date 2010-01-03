@@ -42,7 +42,8 @@ sub new_dbm {
 
     if ( $ENV{TEST_SQLITE} ) {
         (undef, my $filename) = new_fh();
-        $filename = 'test.db';
+#        $filename = 'test.db';
+#warn "$filename\n";
         push @reset_funcs, sub {
             my $dbh = DBI->connect(
                 "dbi:SQLite:dbname=$filename", '', '',
@@ -101,9 +102,7 @@ sub new_dbm {
             $reset->();
         }
         return sub {
-            DBM::Deep->new(
-                @these_args, @args, @_,
-            );
+            DBM::Deep->new( @these_args, @args, @_ )
         };
     };
 }

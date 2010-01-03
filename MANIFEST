@@ -91,6 +91,7 @@ t/etc/db-0-99_04
 t/etc/db-1-0000
 t/etc/db-1-0003
 etc/mysql_tables.sql
+etc/sqlite_tables.sql
 utils/lib/DBM/Deep/09830.pm
 utils/lib/DBM/Deep/10002.pm
 utils/upgrade_db.pl

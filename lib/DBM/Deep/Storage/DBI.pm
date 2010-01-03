@@ -32,6 +32,13 @@ sub new {
         $self->open;
     }
 
+    # Foreign keys are turned off by default in SQLite3 (for now)
+    #q.v.  http://search.cpan.org/~adamk/DBD-SQLite-1.27/lib/DBD/SQLite.pm#Foreign_Keys
+    # for more info.
+    if ( $self->driver eq 'sqlite' ) {
+        $self->{dbh}->do( 'PRAGMA foreign_keys = ON' );
+    }
+
     return $self;
 }
 

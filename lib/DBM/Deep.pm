@@ -489,7 +489,12 @@ sub STORE {
         $value = $self->_engine->storage->{filter_store_value}->( $value );
     }
 
-    $self->_engine->write_value( $self, $key, $value );
+    eval {
+        $self->_engine->write_value( $self, $key, $value );
+    }; if ( my $e = $@ ) {
+        $self->unlock;
+        die $e;
+    }
 
     $self->unlock;
 

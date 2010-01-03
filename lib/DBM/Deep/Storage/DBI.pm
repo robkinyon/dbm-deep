@@ -89,7 +89,7 @@ sub lock_shared {
 
 sub unlock {
     my $self = shift;
-    $self->{dbh}->commit;
+#    $self->{dbh}->commit;
 }
 
 sub begin_work {

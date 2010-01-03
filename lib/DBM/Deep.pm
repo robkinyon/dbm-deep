@@ -9,14 +9,13 @@ our $VERSION = q(1.0019_002);
 
 use Scalar::Util ();
 
-use DBM::Deep::Engine::DBI ();
-use DBM::Deep::Engine::File ();
-
 use overload
     '""' => sub { overload::StrVal( $_[0] ) },
     fallback => 1;
 
 use constant DEBUG => 0;
+
+use DBM::Deep::Engine;
 
 sub TYPE_HASH   () { DBM::Deep::Engine->SIG_HASH  }
 sub TYPE_ARRAY  () { DBM::Deep::Engine->SIG_ARRAY }
@@ -89,6 +88,7 @@ sub _init {
             ? 'DBM::Deep::Engine::DBI'
             : 'DBM::Deep::Engine::File';
 
+        eval "use $class"; die $@ if $@;
         $args->{engine} = $class->new({
             %{$args},
             obj => $self,

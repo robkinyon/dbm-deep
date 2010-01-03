@@ -43,8 +43,8 @@ sub new_dbm {
     if ( $ENV{TEST_SQLITE} ) {
         (undef, my $filename) = new_fh();
 #        $filename = 'test.db';
-#warn "$filename\n";
         push @reset_funcs, sub {
+            require 'DBI.pm';
             my $dbh = DBI->connect(
                 "dbi:SQLite:dbname=$filename", '', '',
             );

@@ -311,15 +311,68 @@ sub write_value {
     return 1;
 }
 
-sub begin_work { die "Transactions are not supported by this engine" } 
-sub rollback   { die "Transactions are not supported by this engine" } 
-sub commit     { die "Transactions are not supported by this engine" }
+sub begin_work {
+    my $self = shift;
+    die "Transactions are not supported by this engine"
+        unless $self->supports('transactions');
+
+    if ( $self->in_txn ) {
+        DBM::Deep->_throw_error( "Cannot begin_work within an active transaction" );
+    }
+
+    $self->storage->begin_work;
+
+    $self->in_txn( 1 );
+
+    return 1;
+} 
+
+sub rollback {
+    my $self = shift;
+    die "Transactions are not supported by this engine"
+        unless $self->supports('transactions');
+
+    if ( !$self->in_txn ) {
+        DBM::Deep->_throw_error( "Cannot rollback without an active transaction" );
+    }
+
+    $self->storage->rollback;
+
+    $self->in_txn( 0 );
+
+    return 1;
+} 
+
+sub commit {
+    my $self = shift;
+    die "Transactions are not supported by this engine"
+        unless $self->supports('transactions');
+
+    if ( !$self->in_txn ) {
+        DBM::Deep->_throw_error( "Cannot commit without an active transaction" );
+    }
+
+    $self->storage->commit;
+
+    $self->in_txn( 0 );
+
+    return 1;
+}
+
+sub in_txn {
+    my $self = shift;
+    $self->{in_txn} = shift if @_;
+    $self->{in_txn};
+}
 
 sub supports {
-    shift;
+    my $self = shift;
     my ($feature) = @_;
 
-    return if $feature eq 'transactions';
+    if ( $feature eq 'transactions' ) {
+#        return 1 if $self->storage->driver eq 'sqlite';
+        return;
+    }
     return;
 }
 

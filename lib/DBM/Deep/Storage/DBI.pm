@@ -49,7 +49,7 @@ sub open {
 
     $self->{dbh} = DBI->connect(
         $self->{dbi}{dsn}, $self->{dbi}{username}, $self->{dbi}{password}, {
-            AutoCommit => 0,
+            AutoCommit => 1,
             PrintError => 0,
             RaiseError => 1,
             %{ $self->{dbi}{connect_args} || {} },
@@ -90,6 +90,21 @@ sub lock_shared {
 sub unlock {
     my $self = shift;
     $self->{dbh}->commit;
+}
+
+sub begin_work {
+    my $self = shift;
+    $self->{dbh}->begin_work;
+}
+
+sub commit {
+    my $self = shift;
+    $self->{dbh}->commit;
+}
+
+sub rollback {
+    my $self = shift;
+    $self->{dbh}->rollback;
 }
 
 sub read_from {

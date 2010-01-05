@@ -371,7 +371,7 @@ hash reference, not a lookup. Meaning, you should B<never> do this:
 This causes an infinite loop, because for each iteration, Perl is calling
 FETCH() on the $db handle, resulting in a "new" hash for foo every time, so
 it effectively keeps returning the first key over and over again. Instead,
-assign a temporary variable to C<$db->{foo}>, then pass that to each().
+assign a temporary variable to C<<$db->{foo}>>, then pass that to each().
 
 =head2 Arrays
 

@@ -9,6 +9,7 @@ Revision history for DBM::Deep.
         - Build.PL has been extended to support sqlite vs. mysql
         - Storage::DBI now detects between the two DBDs
     - (RT #51888) Applied POD patch (Thanks, FWIE!)
+    - (RT #44981) Added VERSION to ::Array, ::Engine, and ::Hash
 
 1.0019_001 Dec 31 22:00:00 2009 EST
     (This is the first developer release for 1.0020.)

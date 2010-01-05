@@ -5,6 +5,8 @@ use 5.006_000;
 use strict;
 use warnings FATAL => 'all';
 
+our $VERSION = $DBM::Deep::VERSION;
+
 # This is to allow DBM::Deep::Array to handle negative indices on
 # its own. Otherwise, Perl would intercept the call to negative
 # indices for us. This was causing bugs for negative index handling.

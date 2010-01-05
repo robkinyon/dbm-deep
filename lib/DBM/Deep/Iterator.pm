@@ -14,7 +14,7 @@ DBM::Deep::Iterator
 
 =head1 PURPOSE
 
-This is an internal-use-only object for L<DBM::Deep/>. It is the iterator
+This is an internal-use-only object for L<DBM::Deep>. It is the iterator
 for FIRSTKEY() and NEXTKEY().
 
 =head1 OVERVIEW
@@ -30,7 +30,7 @@ following elements:
 
 =over 4
 
-=item * engine (of type L<DBM::Deep::Engine/>
+=item * engine (of type L<DBM::Deep::Engine>
 
 =item * base_offset (the base_offset of the invoking DBM::Deep object)
 

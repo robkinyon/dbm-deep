@@ -11,8 +11,8 @@ DBM::Deep::Null
 
 =head1 PURPOSE
 
-This is an internal-use-only object for L<DBM::Deep/>. It acts as a NULL object
-in the same vein as MARCEL's L<Class::Null/>. I couldn't use L<Class::Null/>
+This is an internal-use-only object for L<DBM::Deep>. It acts as a NULL object
+in the same vein as MARCEL's L<Class::Null>. I couldn't use L<Class::Null>
 because DBM::Deep needed an object that always evaluated as undef, not an
 implementation of the Null Class pattern.
 

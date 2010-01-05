@@ -17,7 +17,7 @@ DBM::Deep::Storage::File
 
 =head1 PURPOSE
 
-This is an internal-use-only object for L<DBM::Deep/>. It mediates the low-level
+This is an internal-use-only object for L<DBM::Deep>. It mediates the low-level
 interaction with the storage mechanism.
 
 Currently, the only storage mechanism supported is the file system.

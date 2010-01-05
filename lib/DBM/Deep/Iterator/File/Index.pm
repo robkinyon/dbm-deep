@@ -11,14 +11,14 @@ DBM::Deep::Iterator::Index
 
 =head1 PURPOSE
 
-This is an internal-use-only object for L<DBM::Deep/>. It acts as the mediator
-between the L<DBM::Deep::Iterator/> object and a L<DBM::Deep::Engine::Sector::Index/>
+This is an internal-use-only object for L<DBM::Deep>. It acts as the mediator
+between the L<DBM::Deep::Iterator> object and a L<DBM::Deep::Engine::Sector::Index>
 sector.
 
 =head1 OVERVIEW
 
 This object, despite the implied class hiearchy, does B<NOT> inherit from
-L<DBM::Deep::Iterator/>. Instead, it delegates to it, essentially acting as a
+L<DBM::Deep::Iterator>. Instead, it delegates to it, essentially acting as a
 facade over it. L<DBM::Deep::Iterator/get_next_key> will instantiate one of
 these objects as needed to handle an Index sector.
 
@@ -31,9 +31,9 @@ hashref is assumed to have the following elements:
 
 =over 4
 
-=item * iterator (of type L<DBM::Deep::Iterator/>
+=item * iterator (of type L<DBM::Deep::Iterator>
 
-=item * sector (of type L<DBM::Deep::Engine::Sector::Index/>
+=item * sector (of type L<DBM::Deep::Engine::Sector::Index>
 
 =back
 

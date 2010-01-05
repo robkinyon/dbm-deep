@@ -24,8 +24,8 @@ DBM::Deep::Engine
 
 =head1 PURPOSE
 
-This is an internal-use-only object for L<DBM::Deep/>. It mediates the low-level
-mapping between the L<DBM::Deep/> objects and the storage medium.
+This is an internal-use-only object for L<DBM::Deep>. It mediates the low-level
+mapping between the L<DBM::Deep> objects and the storage medium.
 
 The purpose of this documentation is to provide low-level documentation for
 developers. It is B<not> intended to be used by the general public. This
@@ -168,7 +168,7 @@ sub delete_key { die "delete_key must be implemented in a child class" }
 =head2 write_value( $obj, $key, $value )
 
 This takes an object that provides _base_offset(), a string for the
-key, and a value. This value can be anything storable within L<DBM::Deep/>.
+key, and a value. This value can be anything storable within L<DBM::Deep>.
 
 This returns 1 upon success.
 

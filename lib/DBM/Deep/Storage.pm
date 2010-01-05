@@ -37,7 +37,7 @@ whole-file lock. In the future, more granular locking may be supported.
 The API for that is unclear right now.
 
 The following methods manage the locking status. In all cases, they take
-a L<DBM::Deep/> object and returns nothing.
+a L<DBM::Deep> object and returns nothing.
 
 =over 4
 

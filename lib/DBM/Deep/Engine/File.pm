@@ -43,7 +43,7 @@ DBM::Deep::Engine::File
 
 =head1 PURPOSE
 
-This is the engine for use with L<DBM::Deep::Storage::File/>.
+This is the engine for use with L<DBM::Deep::Storage::File>.
 
 =head1 EXTERNAL METHODS
 

@@ -1,6 +1,6 @@
 Revision history for DBM::Deep.
 
-1.0019_002 Jan XX XX:00:00 2010 EST
+1.0019_002 Jan 05 22:30:00 2010 EST
     (This is the second developer release for 1.0020.)
     (This version is compatible with 1.0014)
 	- Fixed bug where attempting to store a value tied to something other than

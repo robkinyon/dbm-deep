@@ -5,6 +5,7 @@ Revision history for DBM::Deep.
     - New caveat in the docs explaining stale references (RT#42129)
     - All included modules now have the same version in META.yml, so
       the CPAN shell will no longer try to downgrade.
+    - Fixed bug in clear() for hashes (RT#50541)
 
 1.0015 Jan 25 22:05:00 2010 PST
     - (This version is compatible with 1.0014)

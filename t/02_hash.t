@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 51;
+use Test::More tests => 53;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -202,3 +202,22 @@ throws_ok {
     $db->exists(undef);
 } qr/Cannot use an undefined hash key/, "EXISTS fails on an undefined key";
 
+{
+    # RT# 50541 (reported by Peter Scott)
+    # clear() leaves one key unless there's only one
+    my ($fh, $filename) = new_fh();
+    my $db = DBM::Deep->new(
+        file => $filename,
+        fh => $fh,
+    );
+
+    $db->{block} = { };
+    $db->{critical} = { };
+    $db->{minor} = { };
+
+    cmp_ok( scalar(keys( %$db )), '==', 3, "Have 3 keys" );
+
+    $db->clear;
+
+    cmp_ok( scalar(keys( %$db )), '==', 0, "clear clears everything" );
+}

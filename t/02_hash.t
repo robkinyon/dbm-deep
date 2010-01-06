@@ -25,15 +25,15 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     is( $db->fetch("key2"), undef, "... fetch() works with put()" );
     is( $db->{key2}, undef, "... and hash-access also works" );
 
-    $db->store( "key3", "value3" );
-    is( $db->get("key3"), "value3", "get() works with store()" );
-    is( $db->fetch("key3"), "value3", "... fetch() works with put()" );
-    is( $db->{key3}, 'value3', "... and hash-access also works" );
+    $db->store( "0", "value3" );
+    is( $db->get("0"), "value3", "get() works with store()" );
+    is( $db->fetch("0"), "value3", "... fetch() works with put()" );
+    is( $db->{0}, 'value3', "... and hash-access also works" );
 
     # Verify that the keyval pairs are still correct.
     is( $db->{key1}, "value1", "Key1 is still correct" );
     is( $db->{key2}, undef, "Key2 is still correct" );
-    is( $db->{key3}, 'value3', "Key3 is still correct" );
+    is( $db->{0}, 'value3', "Key3 is still correct" );
 
     ok( $db->exists("key1"), "exists() function works" );
     ok( exists $db->{key2}, "exists() works against tied hash" );
@@ -66,25 +66,25 @@ while ( my $dbm_maker = $dbm_factory->() ) {
 
     is( $temphash->{key1}, 'value1', "First key copied successfully using tied interface" );
     is( $temphash->{key2}, undef, "Second key copied successfully" );
-    is( $temphash->{key3}, 'value3', "Third key copied successfully" );
+    is( $temphash->{0}, 'value3', "Third key copied successfully" );
 
     $temphash = {};
     my $key = $db->first_key();
-    while ($key) {
+    while (defined $key) {
         $temphash->{$key} = $db->get($key);
         $key = $db->next_key($key);
     }
 
     is( $temphash->{key1}, 'value1', "First key copied successfully using OO interface" );
     is( $temphash->{key2}, undef, "Second key copied successfully" );
-    is( $temphash->{key3}, 'value3', "Third key copied successfully" );
+    is( $temphash->{0}, 'value3', "Third key copied successfully" );
 
     ##
     # delete keys
     ##
     is( delete $db->{key2}, undef, "delete through tied inteface works" );
     is( $db->delete("key1"), 'value1', "delete through OO inteface works" );
-    is( $db->{key3}, 'value3', "The other key is still there" );
+    is( $db->{0}, 'value3', "The other key is still there" );
     ok( !exists $db->{key1}, "key1 doesn't exist" );
     ok( !exists $db->{key2}, "key2 doesn't exist" );
 

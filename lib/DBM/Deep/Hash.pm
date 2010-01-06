@@ -105,7 +105,7 @@ sub next_key  { (shift)->NEXTKEY(@_)  }
 sub _clear {
     my $self = shift;
 
-    while ( my $key = $self->first_key ) {
+    while ( defined( my $key = $self->first_key ) ) {
         $self->_engine->delete_key( $self, $key, $key );
     }
 

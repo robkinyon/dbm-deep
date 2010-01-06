@@ -16,6 +16,7 @@ Revision history for DBM::Deep.
           large hashes using running with the File backend. ->clear() (on my
           machine) now takes ( N / 40 ) ** (1.66) seconds. So, clearing 4000
           keys (as is the test in t/03_bighash.t) would take ~2070 seconds.
+    - (RT #40782) Fixed bug when handling a key of '0' (Thanks Sterling!)
 
 1.0019_001 Dec 31 22:00:00 2009 EST
     (This is the first developer release for 1.0020.)

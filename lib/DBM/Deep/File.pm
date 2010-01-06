@@ -177,7 +177,7 @@ sub print_at {
     my $self = shift;
     my $loc  = shift;
 
-    local ($/,$\);
+    local ($,,$\);
 
     my $fh = $self->{fh};
     if ( defined $loc ) {
@@ -210,8 +210,6 @@ The data read will be returned.
 sub read_at {
     my $self = shift;
     my ($loc, $size) = @_;
-
-    local ($/,$\);
 
     my $fh = $self->{fh};
     if ( defined $loc ) {

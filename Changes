@@ -11,6 +11,11 @@ Revision history for DBM::Deep.
     - (RT #51888) Applied POD patch (Thanks, FWIE!)
     - (RT #44981) Added VERSION to ::Array, ::Engine, and ::Hash
     - Removed extraneous slashes from POD links (Thanks ilmari!)
+    - (RT #50541) Fixed bug in clear() for hashes in the File backend.
+        - This has caused a regression in speed for clear() when clearing
+          large hashes using running with the File backend. ->clear() (on my
+          machine) now takes ( N / 40 ) ** (1.66) seconds. So, clearing 4000
+          keys (as is the test in t/03_bighash.t) would take ~2070 seconds.
 
 1.0019_001 Dec 31 22:00:00 2009 EST
     (This is the first developer release for 1.0020.)

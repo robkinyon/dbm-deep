@@ -70,6 +70,7 @@ sub new_dbm {
 
     if ( $ENV{TEST_MYSQL_DSN} ) {
         push @reset_funcs, sub {
+            require 'DBI.pm';
             my $dbh = DBI->connect(
                 $ENV{TEST_MYSQL_DSN},
                 $ENV{TEST_MYSQL_USER},

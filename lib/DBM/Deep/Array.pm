@@ -394,6 +394,18 @@ sub _copy_node {
     return 1;
 }
 
+sub _clear {
+    my $self = shift;
+
+    my $size = $self->FETCHSIZE;
+    for my $key ( 0 .. $size - 1 ) {
+        $self->_engine->delete_key( $self, $key, $key );
+    }
+    $self->STORESIZE( 0 );
+
+    return;
+}
+
 sub length  { (shift)->FETCHSIZE(@_) }
 sub pop     { (shift)->POP(@_)       }
 sub push    { (shift)->PUSH(@_)      }

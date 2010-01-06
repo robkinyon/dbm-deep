@@ -284,9 +284,10 @@ sub get_bucket_list {
     $sector->find_md5( $args->{key_md5} );
 
     # See whether or not we need to reindex the bucketlist
-    # Yes, the double-braces are there for a reason. if() doesn't create a redo-able block,
-    # so we have to create a bare block within the if() for redo-purposes. Patch and idea
-    # submitted by sprout@cpan.org. -RobK, 2008-01-09
+    # Yes, the double-braces are there for a reason. if() doesn't create a
+    # redo-able block, so we have to create a bare block within the if() for
+    # redo-purposes.
+    # Patch and idea submitted by sprout@cpan.org. -RobK, 2008-01-09
     if ( !$sector->has_md5 && $args->{create} && $sector->{idx} == -1 ) {{
         my $redo;
 

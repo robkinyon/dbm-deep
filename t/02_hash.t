@@ -177,4 +177,23 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     } qr/Cannot use an undefined hash key/, "EXISTS fails on an undefined key";
 }
 
+{
+    # RT# 50541 (reported by Peter Scott)
+    # clear() leaves one key unless there's only one
+    my $dbm_factory = new_dbm();
+    while ( my $dbm_maker = $dbm_factory->() ) {
+        my $db = $dbm_maker->();
+
+        $db->{block} = { };
+        $db->{critical} = { };
+        $db->{minor} = { };
+
+        cmp_ok( scalar(keys( %$db )), '==', 3, "Have 3 keys" );
+
+        $db->clear;
+
+        cmp_ok( scalar(keys( %$db )), '==', 0, "clear clears everything" );
+    }
+}
+
 done_testing;

@@ -556,7 +556,7 @@ sub get_next_key {
     my ($obj, $prev_key) = @_;
 
     # XXX Need to add logic about resetting the iterator if any key in the reference has changed
-    unless ( $prev_key ) {
+    unless ( defined $prev_key ) {
         $obj->{iterator} = DBM::Deep::Iterator->new({
             base_offset => $obj->_base_offset,
             engine      => $self,

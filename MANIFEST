@@ -82,6 +82,7 @@ t/48_autoexport_after_delete.t
 t/50_deletes.t
 t/52_memory_leak.t
 t/53_misc_transactions.t
+t/54_output_punct_vars.t
 t/97_dump_file.t
 t/98_pod.t
 t/99_pod_coverage.t

@@ -17,6 +17,8 @@ sub ACTION_test {
     foreach my $name ( qw( LONG_TESTS TEST_SQLITE ) ) {
         $ENV{$name} = 1 if $self->notes( $name );
     }
+
+    $self->SUPER::ACTION_test( @_ );
 }
 SUBCLASS
 

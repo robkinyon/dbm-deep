@@ -363,35 +363,7 @@ sub write_value {
         value   => $value_sector,
     });
 
-    # This code is to make sure we write all the values in the $value to the
-    # disk and to make sure all changes to $value after the assignment are
-    # reflected on disk. This may be counter-intuitive at first, but it is
-    # correct dwimmery.
-    #   NOTE - simply tying $value won't perform a STORE on each value. Hence,
-    # the copy to a temp value.
-    if ( $r eq 'ARRAY' ) {
-        my @temp = @$value;
-        tie @$value, 'DBM::Deep', {
-            base_offset => $value_sector->offset,
-            staleness   => $value_sector->staleness,
-            storage     => $self->storage,
-            engine      => $self,
-        };
-        @$value = @temp;
-        bless $value, 'DBM::Deep::Array' unless Scalar::Util::blessed( $value );
-    }
-    elsif ( $r eq 'HASH' ) {
-        my %temp = %$value;
-        tie %$value, 'DBM::Deep', {
-            base_offset => $value_sector->offset,
-            staleness   => $value_sector->staleness,
-            storage     => $self->storage,
-            engine      => $self,
-        };
-
-        %$value = %temp;
-        bless $value, 'DBM::Deep::Hash' unless Scalar::Util::blessed( $value );
-    }
+    $self->_descend( $value, $value_sector );
 
     return 1;
 }

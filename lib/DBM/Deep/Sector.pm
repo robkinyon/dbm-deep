@@ -29,6 +29,7 @@ sub clone {
 sub engine { $_[0]{engine} }
 sub offset { $_[0]{offset} }
 sub type   { $_[0]{type}   }
+sub staleness { $_[0]{staleness} }
 
 sub load { die "load must be implemented in a child class" }
 

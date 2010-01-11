@@ -57,8 +57,6 @@ sub _init {
     return;
 }
 
-sub staleness { $_[0]{staleness} }
-
 sub get_data_location_for {
     my $self = shift;
     my ($args) = @_;
@@ -212,6 +210,17 @@ sub delete_key {
     return $data;
 }
 
+sub write_blist_loc {
+    my $self = shift;
+    my ($loc) = @_;
+
+    my $engine = $self->engine;
+    $engine->storage->print_at( $self->offset + $self->base_size,
+        pack( $StP{$engine->byte_size}, $loc ),
+    );
+
+}
+
 sub get_blist_loc {
     my $self = shift;
 
@@ -219,6 +228,27 @@ sub get_blist_loc {
     my $blist_loc = $e->storage->read_at( $self->offset + $self->base_size, $e->byte_size );
     return unpack( $StP{$e->byte_size}, $blist_loc );
 }
+
+#sub clear {
+#    my $self = shift;
+#    my ($args) = @_;
+#    $args ||= {};
+#
+#    my $engine = $self->engine;
+#
+#    # If there's nothing pointed to from this reference, there's nothing to do.
+#    my $loc = $self->get_blist_loc
+#        or return;
+#
+#    my $sector = $engine->load_sector( $loc )
+#        or DBM::Deep->_throw_error( "Cannot read sector at $loc in clear()" );
+#
+#    $sector->clear;
+#
+#    $self->write_blist_loc( 0 );
+#
+#    return;
+#}
 
 sub get_bucket_list {
     my $self = shift;
@@ -240,9 +270,10 @@ sub get_bucket_list {
             key_md5 => $args->{key_md5},
         });
 
-        $engine->storage->print_at( $self->offset + $self->base_size,
-            pack( $StP{$engine->byte_size}, $blist->offset ),
-        );
+        $self->write_blist_loc( $blist->offset );
+#        $engine->storage->print_at( $self->offset + $self->base_size,
+#            pack( $StP{$engine->byte_size}, $blist->offset ),
+#        );
 
         return $blist;
     }
@@ -341,23 +372,6 @@ sub get_bucket_list {
                     }),
                 });
             }
-#            my $blist = $blist_cache{$idx}
-#                ||= DBM::Deep::Sector::File::BucketList->new({
-#                    engine => $engine,
-#                });
-#
-#            $new_index->set_entry( $idx => $blist->offset );
-#
-#            #XXX THIS IS HACKY!
-#            $blist->find_md5( $args->{key_md5} );
-#            $blist->write_md5({
-#                key     => $args->{key},
-#                key_md5 => $args->{key_md5},
-#                value   => DBM::Deep::Sector::File::Null->new({
-#                    engine => $engine,
-#                    data   => undef,
-#                }),
-#            });
         }
 
         if ( $last_sector ) {
@@ -371,7 +385,7 @@ sub get_bucket_list {
             );
         }
 
-        $sector->clear;
+        $sector->wipe;
         $sector->free;
 
         if ( $redo ) {

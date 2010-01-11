@@ -288,7 +288,7 @@ sub write_value {
         my @temp = @$value;
         tie @$value, 'DBM::Deep', {
             base_offset => $value_sector->offset,
-#            staleness   => $value_sector->staleness,
+            staleness   => $value_sector->staleness,
             storage     => $self->storage,
             engine      => $self,
         };
@@ -299,7 +299,7 @@ sub write_value {
         my %temp = %$value;
         tie %$value, 'DBM::Deep', {
             base_offset => $value_sector->offset,
-#            staleness   => $value_sector->staleness,
+            staleness   => $value_sector->staleness,
             storage     => $self->storage,
             engine      => $self,
         };

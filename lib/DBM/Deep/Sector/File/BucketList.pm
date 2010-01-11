@@ -40,7 +40,7 @@ sub _init {
     return $self;
 }
 
-sub clear {
+sub wipe {
     my $self = shift;
     $self->engine->storage->print_at( $self->offset + $self->base_size,
         chr(0) x ($self->size - $self->base_size), # Zero-fill the data

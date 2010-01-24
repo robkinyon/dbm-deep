@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 49;
+use Test::More tests => 51;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -142,6 +142,24 @@ ok(
     ($first_key ne $next_key)
     ,"keys() still works if you replace long values with shorter ones"
 );
+
+# Make sure we do not trigger a deep recursion warning [RT #53575]
+{
+    my $w;
+    local $SIG{__WARN__} = sub { $w = shift };
+    my ($fh, $filename) = new_fh();
+    my $db = DBM::Deep->new( file => $filename, fh => $fh, );
+    my $h = {};
+    my $tmp = $h;
+    for(1..100) {
+        %$tmp = ("" => {});
+        $tmp = $$tmp{""};
+    }
+    ok eval {
+        $db->{""} = $h;
+    }, 'deep recursion in hash assignment' or diag $@;
+    is $w, undef, 'no warnings with deep recursion in hash assignment';
+}
 
 # Test autovivification
 $db->{unknown}{bar} = 1;

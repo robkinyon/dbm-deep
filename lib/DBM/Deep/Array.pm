@@ -4,6 +4,7 @@ use 5.006_000;
 
 use strict;
 use warnings;
+no warnings 'recursion';
 
 our $VERSION = q(1.0013);
 

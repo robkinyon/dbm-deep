@@ -4,6 +4,7 @@ use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';
+no warnings 'recursion';
 
 use base qw( DBM::Deep::Engine::Sector::Data );
 

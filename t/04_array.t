@@ -2,7 +2,7 @@
 # DBM::Deep Test
 ##
 use strict;
-use Test::More tests => 128;
+use Test::More tests => 130;
 use Test::Exception;
 use t::common qw( new_fh );
 
@@ -275,4 +275,20 @@ throws_ok {
     } "Splice doesn't die moving references around";
     is( $db->[4][3][1], 2, "Right arrayref there" );
     is( $db->[5]{foo}, 1, "Right hashref there" );
+}
+
+{ # Make sure we do not trigger a deep recursion warning [RT #53575]
+    my $w;
+    local $SIG{__WARN__} = sub { $w = shift };
+    my ($fh, $filename) = new_fh();
+    my $db = DBM::Deep->new( file => $filename, fh => $fh, );
+    my $a = [];
+    my $tmp = $a;
+    for(1..100) {
+        ($tmp) = @$tmp = [];
+    }
+    ok eval {
+        $db->{""} = $a;
+    }, 'deep recursion in array assignment' or diag $@;
+    is $w, undef, 'no warnings with deep recursion in array assignment';
 }

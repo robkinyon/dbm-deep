@@ -4,6 +4,7 @@ use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';
+no warnings 'recursion';
 
 # Never import symbols into our namespace. We are a class, not a library.
 # -RobK, 2008-05-27

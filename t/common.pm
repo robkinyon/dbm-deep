@@ -18,7 +18,7 @@ use File::Temp qw( tempfile tempdir );
 use Fcntl qw( :flock );
 
 my $parent = $ENV{WORK_DIR} || File::Spec->tmpdir;
-my $dir = tempdir( CLEANUP => 1, DIR => $parent );
+our $dir = tempdir( CLEANUP => 1, DIR => $parent );
 #my $dir = tempdir( DIR => '.' );
 
 sub new_fh {

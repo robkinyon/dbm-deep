@@ -61,6 +61,14 @@ my $db = DBM::Deep->new({
 });
 is($db->{x}, 'b', "and get at stuff in the database");
 __END_FH__
+
+    # The exec below prevents END blocks from doing this.
+    (my $esc_dir = $t::common::dir) =~ s/(.)/sprintf "\\x{%x}", ord $1/egg;
+    print $fh <<__END_FH_AGAIN__;
+use File::Path 'rmtree';
+rmtree "$esc_dir"; 
+__END_FH_AGAIN__
+
     print $fh "__DATA__\n";
     close $fh;
 

@@ -13,7 +13,7 @@ while ( my $dbm_maker = $dbm_factory->() ) {
 
     my $h = {};
     my $tmp = $h;
-    for (1..4) { # 98 is ok, 99 is bad.
+    for (1..99) { # 98 is ok, 99 is bad.
         %$tmp = ("" => {});
         $tmp = $tmp->{""};
     }

@@ -414,6 +414,8 @@ sub _descend {
         %$value = %temp;
         bless $value, 'DBM::Deep::Hash' unless Scalar::Util::blessed( $value );
     }
+
+    return;
 }
 
 1;

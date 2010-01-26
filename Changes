@@ -1,6 +1,6 @@
 Revision history for DBM::Deep.
 
-1.0015 Jan 24 ??:??:00 2010 PST
+1.0015 Jan 25 22:05:00 2010 PST
     - (This version is compatible with 1.0014)
     - Fix deep recursion errors (RT#53575)
     - Avoid leaving temp files lying around (RT#32462)

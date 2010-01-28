@@ -1,8 +1,18 @@
-use Module::Build;
+use Module::Build 0.28; # prepare_metadata
 
 use strict;
 
-my $build = Module::Build->new(
+my $build = Module::Build->subclass(
+    class => 'Any::Thing',
+    code => '
+        sub prepare_metadata {
+            my $node = shift->SUPER::prepare_metadata(@_);
+            my $ver = $node->{version};
+            $_->{version} = $ver for values %{$node->{provides}};
+            $node;
+        }
+   ',
+)->new(
     module_name => 'DBM::Deep',
     license => 'perl',
     requires => {

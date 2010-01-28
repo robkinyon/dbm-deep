@@ -1023,6 +1023,26 @@ been an C<$x> or what memory location to assign an C<export()> to.
 B<NOTE:> This does not affect importing because imports do a walk over the
 reference to be imported in order to explicitly leave it untied.
 
+=head2 Stale References
+
+If you take a reference to an array or hash from the database, it is tied
+to the database itself. This means that if the datum in question is subsequently deleted from the database, the reference to it will point to
+an invalid location and unpredictable things will happen if you try to use
+it.
+
+So a seemingly innocuous piece of code like this:
+
+  my %hash = %{ $db->{some_hash} };
+
+can fail if another process deletes or clobbers C<< $db->{some_hash} >>
+while the data are being extracted, since S<C<%{ ... }>> is not atomic.
+(This actually happened.) The solution is to lock the database before
+reading the data:
+
+  $db->lock_exclusive;
+  my %hash = %{ $db->{some_hash} };
+  $db->unlock;
+
 =head1 CODE COVERAGE
 
 L<Devel::Cover> is used to test the code coverage of the tests. Below is the

@@ -97,9 +97,6 @@ is( scalar keys %$db, 1, "After deleting two keys, 1 remains" );
 ##
 ok( $db->clear(), "clear() returns true" );
 
-# ~~~ Temporary band-aid until the fix for RT#50541 is merged
-delete $db->{0};
-
 is( scalar keys %$db, 0, "After clear(), everything is removed" );
 
 ##

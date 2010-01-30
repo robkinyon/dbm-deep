@@ -86,6 +86,8 @@ is the following:
 
 =item * get_next_key
 
+=item * clear
+
 =item * setup_fh
 
 =item * begin_work
@@ -564,6 +566,28 @@ sub get_next_key {
     }
 
     return $obj->{iterator}->get_next_key( $obj );
+}
+
+=head2 clear( $obj )
+
+This takes an object that provides _base_offset() and deletes all its 
+elements, returning nothing.
+
+=cut
+
+sub clear {
+    my $self = shift;
+    my $obj = shift;
+
+    my $sector = $self->_load_sector( $obj->_base_offset )
+        or return;
+
+    if ( $sector->staleness != $obj->_staleness ) {
+        return;
+    }
+
+    $sector->clear;
+    return;
 }
 
 =head2 setup_fh( $obj )

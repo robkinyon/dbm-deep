@@ -115,7 +115,9 @@ sub _clear {
     my $self = shift;
 
     while ( defined(my $key = $self->first_key) ) {
+      do {
         $self->_engine->delete_key( $self, $key, $key );
+      } while defined($key = $self->next_key($key));
     }
 
     return;

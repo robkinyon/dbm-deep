@@ -575,14 +575,15 @@ sub CLEAR {
     my $self = shift->_get_self;
     warn "CLEAR($self)\n" if DEBUG;
 
-    unless ( $self->_engine->storage->is_writable ) {
+    my $engine = $self->_engine;
+    unless ( $engine->storage->is_writable ) {
         $self->_throw_error( 'Cannot write to a readonly filehandle' );
     }
 
     $self->lock_exclusive;
 
     # Dispatch to the specific clearing functionality.
-    $self->_clear;
+    $engine->clear($self);
 
     $self->unlock;
 

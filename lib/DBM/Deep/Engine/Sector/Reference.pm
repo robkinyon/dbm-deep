@@ -211,6 +211,36 @@ sub delete_key {
     return $data;
 }
 
+sub clear {
+    my $self = shift;
+
+    my $blist_loc = $self->get_blist_loc or return;
+
+    my $engine = $self->engine;
+
+    if($engine->get_running_txn_ids) {
+        # ~~~ Temporary; the code below this block needs to be modified to
+        #     take transactions into account.
+        $self->data->_clear;
+        return;
+    }
+
+    my $sector = $engine->_load_sector( $blist_loc )
+        or DBM::Deep->_throw_error(
+           "Cannot read sector at $blist_loc in clear()"
+        );
+
+    # Set blist offset to 0
+    $engine->storage->print_at( $self->offset + $self->base_size,
+        pack( $StP{$engine->byte_size}, 0 ),
+    );
+
+    # Free the blist
+    $sector->free;
+
+    return;
+}
+
 sub get_blist_loc {
     my $self = shift;
 

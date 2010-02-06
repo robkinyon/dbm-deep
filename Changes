@@ -1,6 +1,6 @@
 Revision history for DBM::Deep.
 
-1.0016 ??? ?? ??:??:00 2010 P?T
+1.0016 Feb 05 22:10:00 2010 PST
     - (This version is compatible with 1.0015)
     - New caveat in the docs explaining stale references (RT#42129)
     - All included modules now have the same version in META.yml, so

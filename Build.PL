@@ -1,4 +1,4 @@
-use Module::Build;
+use Module::Build 0.28; # for prepare_metadata
 
 use strict;
 use warnings FATAL => 'all';

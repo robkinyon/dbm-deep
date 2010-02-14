@@ -339,6 +339,31 @@ defined sector type.
 
 sub load_sector { $_[0]->sector_type->load( @_ ) }
 
+=head2 clear
+
+=cut
+
+=head2 clear( $obj )
+
+This takes an object that provides _base_offset() and deletes all its 
+elements, returning nothing.
+
+=cut
+
+sub clear {
+    my $self = shift;
+    my $obj = shift;
+
+    my $sector = $self->_load_sector( $obj->_base_offset )
+        or return;
+
+    return unless $sector->staleness == $obj->_staleness;
+
+    $sector->clear;
+
+    return;
+}
+
 =head2 cache / clear_cache
 
 This is the cache of loaded Reference sectors.

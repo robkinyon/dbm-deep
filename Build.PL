@@ -3,26 +3,31 @@ use Module::Build 0.28; # for prepare_metadata
 use strict;
 use warnings FATAL => 'all';
 
-my $class = Module::Build->subclass(
+my $build = Module::Build->subclass(
     class => "Module::Build::Custom",
-    code => <<'SUBCLASS' );
+    code => '
+        sub prepare_metadata {
+            my $node = shift->SUPER::prepare_metadata(@_);
+            my $ver = $node->{version};
+            $_->{version} = $ver for values %{$node->{provides}};
+            $node;
+        }
 
-sub ACTION_test {
-    my $self = shift;
-    if ( $self->notes('TEST_MYSQL_DSN') ) {
-        $ENV{$_} = $self->notes($_) for qw(
-            TEST_MYSQL_DSN TEST_MYSQL_USER TEST_MYSQL_PASS
-        );
-    }
-    foreach my $name ( qw( LONG_TESTS TEST_SQLITE ) ) {
-        $ENV{$name} = 1 if $self->notes( $name );
-    }
+        sub ACTION_test {
+            my $self = shift;
+            if ( $self->notes('TEST_MYSQL_DSN') ) {
+                $ENV{$_} = $self->notes($_) for qw(
+                    TEST_MYSQL_DSN TEST_MYSQL_USER TEST_MYSQL_PASS
+                );
+            }
+            foreach my $name ( qw( LONG_TESTS TEST_SQLITE ) ) {
+                $ENV{$name} = 1 if $self->notes( $name );
+            }
 
-    $self->SUPER::ACTION_test( @_ );
-}
-SUBCLASS
-
-my $build = $class->new(
+            $self->SUPER::ACTION_test( @_ );
+        }
+    ',
+)->new(
     module_name => 'DBM::Deep',
     license => 'perl',
     requires => {

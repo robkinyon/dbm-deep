@@ -4,8 +4,7 @@ use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';
-
-our $VERSION = $DBM::Deep::VERSION;
+no warnings 'recursion';
 
 use base 'DBM::Deep';
 

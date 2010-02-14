@@ -5,7 +5,7 @@ use 5.006_000;
 use strict;
 use warnings FATAL => 'all';
 
-our $VERSION = q(1.0019_002);
+our $VERSION = q(1.0019_003);
 
 use Scalar::Util ();
 
@@ -163,7 +163,7 @@ sub _copy_value {
             __PACKAGE__->_throw_error( "Unknown type for '$value'" );
         }
 
-        if ( eval { local $SIG{__DIE__}; $tied->isa( __PACKAGE__ ) } ) {
+        if ( eval { local $SIG{'__DIE__'}; $tied->isa( __PACKAGE__ ) } ) {
             ${$spot} = $tied->_repr;
             $tied->_copy_node( ${$spot} );
         }
@@ -412,7 +412,10 @@ sub supports {
 sub begin_work {
     my $self = shift->_get_self;
     $self->lock_exclusive;
-    my $rv = eval { $self->_engine->begin_work( $self, @_ ) };
+    my $rv = eval {
+        local $SIG{'__DIE__'};
+        $self->_engine->begin_work( $self, @_ );
+    };
     my $e = $@;
     $self->unlock;
     die $e if $e;
@@ -422,7 +425,10 @@ sub begin_work {
 sub rollback {
     my $self = shift->_get_self;
     $self->lock_exclusive;
-    my $rv = eval { $self->_engine->rollback( $self, @_ ) };
+    my $rv = eval {
+        local $SIG{'__DIE__'};
+        $self->_engine->rollback( $self, @_ );
+    };
     my $e = $@;
     $self->unlock;
     die $e if $e;
@@ -432,7 +438,10 @@ sub rollback {
 sub commit {
     my $self = shift->_get_self;
     $self->lock_exclusive;
-    my $rv = eval { $self->_engine->commit( $self, @_ ) };
+    my $rv = eval {
+        local $SIG{'__DIE__'};
+        $self->_engine->commit( $self, @_ );
+    };
     my $e = $@;
     $self->unlock;
     die $e if $e;
@@ -490,6 +499,7 @@ sub STORE {
     }
 
     eval {
+        local $SIG{'__DIE__'};
         $self->_engine->write_value( $self, $key, $value );
     }; if ( my $e = $@ ) {
         $self->unlock;

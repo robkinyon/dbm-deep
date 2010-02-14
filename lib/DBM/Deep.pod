@@ -1060,8 +1060,28 @@ returns a new, blessed and tied hash or array to the same level in the DB.
 
   my $copy = $db->clone();
 
-B<Note>: Since clone() here is cloning the object, not the database location, any
-modifications to either $db or $copy will be visible to both.
+B<Note>: Since clone() here is cloning the object, not the database location,
+any modifications to either $db or $copy will be visible to both.
+
+=head2 Stale References
+
+If you take a reference to an array or hash from the database, it is tied
+to the database itself. This means that if the datum in question is subsequentl
+an invalid location and unpredictable things will happen if you try to use
+it.
+
+So a seemingly innocuous piece of code like this:
+
+  my %hash = %{ $db->{some_hash} };
+
+can fail if another process deletes or clobbers C<< $db->{some_hash} >>
+while the data are being extracted, since S<C<%{ ... }>> is not atomic.
+(This actually happened.) The solution is to lock the database before
+reading the data:
+
+  $db->lock_exclusive;
+  my %hash = %{ $db->{some_hash} };
+  $db->unlock;
 
 =head2 Large Arrays
 

@@ -1,3 +1,4 @@
 * clear() should use the Engine to clear. In the File backend, this would mean
   that Sector::File::Reference should have a function similar to get_bucket_list
   that iterates and deletes as appropriate.
+* Does the cache work with reblessing?

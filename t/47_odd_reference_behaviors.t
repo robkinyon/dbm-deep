@@ -20,13 +20,14 @@ use_ok( 'DBM::Deep' );
         eval {
             $db->{bar} = $bar;
             $db->{bar} = $bar;
-        };
+        }; if ( $@ ) { warn $@ }
 
         ok(!$@, "repeated object assignment");
         isa_ok($db->{bar}, 'Foo');
     }
 }
-
+done_testing;
+__END__
 # This is bug #29957, reported by HANENKAMP
 {
     my $dbm_factory = new_dbm();

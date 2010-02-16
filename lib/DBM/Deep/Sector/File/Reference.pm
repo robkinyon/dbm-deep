@@ -218,7 +218,6 @@ sub write_blist_loc {
     $engine->storage->print_at( $self->offset + $self->base_size,
         pack( $StP{$engine->byte_size}, $loc ),
     );
-
 }
 
 sub get_blist_loc {
@@ -228,27 +227,6 @@ sub get_blist_loc {
     my $blist_loc = $e->storage->read_at( $self->offset + $self->base_size, $e->byte_size );
     return unpack( $StP{$e->byte_size}, $blist_loc );
 }
-
-#sub clear {
-#    my $self = shift;
-#    my ($args) = @_;
-#    $args ||= {};
-#
-#    my $engine = $self->engine;
-#
-#    # If there's nothing pointed to from this reference, there's nothing to do.
-#    my $loc = $self->get_blist_loc
-#        or return;
-#
-#    my $sector = $engine->load_sector( $loc )
-#        or DBM::Deep->_throw_error( "Cannot read sector at $loc in clear()" );
-#
-#    $sector->clear;
-#
-#    $self->write_blist_loc( 0 );
-#
-#    return;
-#}
 
 sub get_bucket_list {
     my $self = shift;
@@ -429,28 +407,29 @@ sub data {
     my ($args) = @_;
     $args ||= {};
 
-    my $obj;
-    unless ( $obj = $self->engine->cache->{ $self->offset } ) {
-        $obj = DBM::Deep->new({
+    my $engine = $self->engine;
+#    if ( !exists $engine->cache->{ $self->offset } ) {
+        my $obj = DBM::Deep->new({
             type        => $self->type,
             base_offset => $self->offset,
             staleness   => $self->staleness,
-            storage     => $self->engine->storage,
-            engine      => $self->engine,
+            storage     => $engine->storage,
+            engine      => $engine,
         });
 
-        if ( $self->engine->storage->{autobless} ) {
+#        $engine->cache->{$self->offset} = $obj;
+#    }
+#    my $obj = $engine->cache->{$self->offset};
+
+    # We're not exporting, so just return.
+    unless ( $args->{export} ) {
+        if ( $engine->storage->{autobless} ) {
             my $classname = $self->get_classname;
             if ( defined $classname ) {
                 bless $obj, $classname;
             }
         }
 
-        $self->engine->cache->{$self->offset} = $obj;
-    }
-
-    # We're not exporting, so just return.
-    unless ( $args->{export} ) {
         return $obj;
     }
 
@@ -528,6 +507,37 @@ sub write_refcount {
         $self->offset + $self->base_size + 2 * $e->byte_size,
         pack( $StP{$e->byte_size}, $num ),
     );
+}
+
+sub clear {
+    my $self = shift;
+
+    my $blist_loc = $self->get_blist_loc or return;
+
+    my $engine = $self->engine;
+
+    # This won't work with autoblessed items.
+    if ($engine->get_running_txn_ids) {
+        # ~~~ Temporary; the code below this block needs to be modified to
+        #     take transactions into account.
+        $self->data->_get_self->_clear;
+        return;
+    }
+
+    my $sector = $engine->load_sector( $blist_loc )
+        or DBM::Deep->_throw_error(
+           "Cannot read sector at $blist_loc in clear()"
+        );
+
+    # Set blist offset to 0
+    $engine->storage->print_at( $self->offset + $self->base_size,
+        pack( $StP{$engine->byte_size}, 0 ),
+    );
+
+    # Free the blist
+    $sector->free;
+
+    return;
 }
 
 1;

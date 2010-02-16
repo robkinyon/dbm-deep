@@ -4,6 +4,7 @@ use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';
+no warnings 'recursion';
 
 use base qw( DBM::Deep::Engine );
 
@@ -1006,6 +1007,20 @@ sub supports {
     my ($feature) = @_;
 
     return 1 if $feature eq 'transactions';
+    return;
+}
+
+sub clear {
+    my $self = shift;
+    my $obj = shift;
+
+    my $sector = $self->load_sector( $obj->_base_offset )
+        or return;
+
+    return unless $sector->staleness == $obj->_staleness;
+
+    $sector->clear;
+
     return;
 }
 

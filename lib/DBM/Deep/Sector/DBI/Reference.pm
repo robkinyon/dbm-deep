@@ -112,27 +112,28 @@ sub data {
     my ($args) = @_;
     $args ||= {};
 
-    my $obj;
-    unless ( $obj = $self->engine->cache->{ $self->offset } ) {
-        $obj = DBM::Deep->new({
+    my $engine = $self->engine;
+#    if ( !exists $engine->cache->{ $self->offset } ) {
+        my $obj = DBM::Deep->new({
             type        => $self->type,
             base_offset => $self->offset,
-            storage     => $self->engine->storage,
-            engine      => $self->engine,
+            storage     => $engine->storage,
+            engine      => $engine,
         });
 
-        if ( $self->engine->storage->{autobless} ) {
+#        $engine->cache->{$self->offset} = $obj;
+#    }
+#    my $obj = $engine->cache->{$self->offset};
+
+    # We're not exporting, so just return.
+    unless ( $args->{export} ) {
+        if ( $engine->storage->{autobless} ) {
             my $classname = $self->get_classname;
             if ( defined $classname ) {
                 bless $obj, $classname;
             }
         }
 
-        $self->engine->cache->{$self->offset} = $obj;
-    }
-
-    # We're not exporting, so just return.
-    unless ( $args->{export} ) {
         return $obj;
     }
 
@@ -199,6 +200,19 @@ sub write_refcount {
         "UPDATE refs SET refcount = ? WHERE id = ?", undef,
         $num, $self->offset,
     );
+}
+
+sub clear {
+    my $self = shift;
+
+    DBM::Deep->new({
+        type        => $self->type,
+        base_offset => $self->offset,
+        storage     => $self->engine->storage,
+        engine      => $self->engine,
+    })->_clear;
+
+    return;
 }
 
 1;

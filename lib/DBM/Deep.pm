@@ -4,6 +4,7 @@ use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';
+no warnings 'recursion';
 
 our $VERSION = q(1.0019_003);
 
@@ -51,7 +52,7 @@ sub new {
     my $class = shift;
     my $args = $class->_get_args( @_ );
     my $self;
-    
+
     if (defined($args->{type}) && $args->{type} eq TYPE_ARRAY) {
         $class = 'DBM::Deep::Array';
         require DBM::Deep::Array;
@@ -135,6 +136,8 @@ sub lock_exclusive {
 *lock = \&lock_exclusive;
 sub lock_shared {
     my $self = shift->_get_self;
+use Carp qw( cluck ); use Data::Dumper;
+cluck Dumper($self) unless $self->_engine;
     return $self->_engine->lock_shared( $self, @_ );
 }
 
@@ -324,6 +327,7 @@ sub optimize {
     $self->lock_exclusive;
     $self->_engine->clear_cache;
     $self->_copy_node( $db_temp );
+    $self->unlock;
     $db_temp->_engine->storage->close;
     undef $db_temp;
 
@@ -362,9 +366,6 @@ sub optimize {
 }
 
 sub clone {
-    ##
-    # Make copy of object and return
-    ##
     my $self = shift->_get_self;
 
     return __PACKAGE__->new(
@@ -424,6 +425,7 @@ sub begin_work {
 
 sub rollback {
     my $self = shift->_get_self;
+
     $self->lock_exclusive;
     my $rv = eval {
         local $SIG{'__DIE__'};
@@ -582,10 +584,16 @@ sub CLEAR {
     }
 
     $self->lock_exclusive;
-
-    $engine->clear;
+    eval {
+        local $SIG{'__DIE__'};
+        $engine->clear( $self );
+    };
+    my $e = $@;
+    warn "$e\n" if $e;
 
     $self->unlock;
+
+    die $e if $e;
 
     return 1;
 }

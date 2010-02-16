@@ -349,20 +349,6 @@ elements, returning nothing.
 
 =cut
 
-sub clear {
-    my $self = shift;
-    my $obj = shift;
-
-    my $sector = $self->_load_sector( $obj->_base_offset )
-        or return;
-
-    return unless $sector->staleness == $obj->_staleness;
-
-    $sector->clear;
-
-    return;
-}
-
 =head2 cache / clear_cache
 
 This is the cache of loaded Reference sectors.

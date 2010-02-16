@@ -15,7 +15,7 @@ my $build = Module::Build->subclass(
 
         sub ACTION_test {
             my $self = shift;
-            if ( $self->notes('TEST_MYSQL_DSN') ) {
+            if ( $self->notes(\'TEST_MYSQL_DSN\') ) {
                 $ENV{$_} = $self->notes($_) for qw(
                     TEST_MYSQL_DSN TEST_MYSQL_USER TEST_MYSQL_PASS
                 );

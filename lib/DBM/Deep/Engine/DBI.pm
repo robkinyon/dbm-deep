@@ -4,6 +4,7 @@ use 5.006_000;
 
 use strict;
 use warnings FATAL => 'all';
+no warnings 'recursion';
 
 use base 'DBM::Deep::Engine';
 
@@ -345,6 +346,18 @@ sub supports {
 #        return 1 if $self->storage->driver eq 'sqlite';
         return;
     }
+    return;
+}
+
+sub clear {
+    my $self = shift;
+    my $obj = shift;
+
+    my $sector = $self->load_sector( $obj->_base_offset, 'refs' )
+        or return;
+
+    $sector->clear;
+
     return;
 }
 

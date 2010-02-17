@@ -377,7 +377,7 @@ sub clone {
 }
 
 sub supports {
-    my $self = shift;
+    my $self = shift->_get_self;
     return $self->_engine->supports( @_ );
 }
 

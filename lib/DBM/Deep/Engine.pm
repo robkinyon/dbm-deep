@@ -367,7 +367,11 @@ that feature. C<$option> can be one of:
 
 =item * transactions
 
+=item * singletons
+
 =back
+
+Any other value will return false.
 
 =cut
 

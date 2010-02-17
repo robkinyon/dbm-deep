@@ -1,13 +1,20 @@
 Revision history for DBM::Deep (ordered by revision number).
 
-1.0019_003 Jan XX XX:XX:00 2010 EST
+1.0019_003 Feb 16 22:00:00 2010 EST
     (This is the third developer release for 1.0020.)
-    (This version is compatible with 1.0014)
+    (This version is compatible with 1.0016)
 	- Fixed problem where "./Build test" wouldn't actually -do- anything.
         - (No-one apparently tried to install this till Steven Lembark. Thanks!)
     - Fixed speed regression with keys in the File backend.
         - Introduced in 1.0019_002 to fix #50541
+        - Thanks, SPROUT!
     - (RT #53575) Recursion failure in STORE (Thanks, SPROUT)
+    - Merged the rest of the fixes from 1.0015 and 1.0016
+        - Thanks to our new co-maintainer, SPROUT! :)
+    - Had to turn off singleton support in the File backend because the caching
+      was causing havoc with transactions. Turning on fatal warnings does give
+      apparently important information.
+    - Oh - forgot to mention that fatal warnings are now on in all files.
 
 1.0019_002 Jan 05 22:30:00 2010 EST
     (This is the second developer release for 1.0020.)

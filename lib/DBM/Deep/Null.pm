@@ -25,7 +25,7 @@ It is used to represent null sectors in DBM::Deep.
 use overload
     'bool'   => sub { undef },
     '""'     => sub { undef },
-    '0+'     => sub { undef },
+    '0+'     => sub { 0 },
     fallback => 1,
     nomethod => 'AUTOLOAD';
 

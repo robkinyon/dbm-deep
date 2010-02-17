@@ -342,10 +342,8 @@ sub supports {
     my $self = shift;
     my ($feature) = @_;
 
-    if ( $feature eq 'transactions' ) {
-#        return 1 if $self->storage->driver eq 'sqlite';
-        return;
-    }
+    return if $feature eq 'transactions';
+    return 1 if $feature eq 'singletons';
     return;
 }
 

@@ -14,29 +14,34 @@ my $dbm_factory = new_dbm(
 while ( my $dbm_maker = $dbm_factory->() ) {
     my $db = $dbm_maker->();
 
-    $db->{a} = 1;
-    $db->{foo} = { a => 'b' };
-    my $x = $db->{foo};
-    my $y = $db->{foo};
+    SKIP: {
+        skip "This engine doesn't support singletons", 8
+            unless $db->supports( 'singletons' );
 
-    is( $x, $y, "The references are the same" );
+        $db->{a} = 1;
+        $db->{foo} = { a => 'b' };
+        my $x = $db->{foo};
+        my $y = $db->{foo};
 
-    delete $db->{foo};
-    is( $x, undef, "After deleting the DB location, external references are also undef (\$x)" );
-    is( $y, undef, "After deleting the DB location, external references are also undef (\$y)" );
-    is( $x + 0, undef, "DBM::Deep::Null can be added to." );
-    is( $y + 0, undef, "DBM::Deep::Null can be added to." );
-    is( $db->{foo}, undef, "The {foo} location is also undef." );
+        is( $x, $y, "The references are the same" );
 
-    # These shenanigans work to get another hashref
-    # into the same data location as $db->{foo} was.
-    $db->{foo} = {};
-    delete $db->{foo};
-    $db->{foo} = {};
-    $db->{bar} = {};
+        delete $db->{foo};
+        is( $x, undef, "After deleting the DB location, external references are also undef (\$x)" );
+        is( $y, undef, "After deleting the DB location, external references are also undef (\$y)" );
+        is( eval { $x + 0 }, undef, "DBM::Deep::Null can be added to." );
+        is( eval { $y + 0 }, undef, "DBM::Deep::Null can be added to." );
+        is( $db->{foo}, undef, "The {foo} location is also undef." );
 
-    is( $x, undef, "After re-assigning to {foo}, external references to old values are still undef (\$x)" );
-    is( $y, undef, "After re-assigning to {foo}, external references to old values are still undef (\$y)" );
+        # These shenanigans work to get another hashref
+        # into the same data location as $db->{foo} was.
+        $db->{foo} = {};
+        delete $db->{foo};
+        $db->{foo} = {};
+        $db->{bar} = {};
+
+        is( $x, undef, "After re-assigning to {foo}, external references to old values are still undef (\$x)" );
+        is( $y, undef, "After re-assigning to {foo}, external references to old values are still undef (\$y)" );
+    }
 }
 
 SKIP: {

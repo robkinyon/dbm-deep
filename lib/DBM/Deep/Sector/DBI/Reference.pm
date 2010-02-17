@@ -113,7 +113,7 @@ sub data {
     $args ||= {};
 
     my $engine = $self->engine;
-#    if ( !exists $engine->cache->{ $self->offset } ) {
+    if ( !exists $engine->cache->{ $self->offset } ) {
         my $obj = DBM::Deep->new({
             type        => $self->type,
             base_offset => $self->offset,
@@ -121,9 +121,9 @@ sub data {
             engine      => $engine,
         });
 
-#        $engine->cache->{$self->offset} = $obj;
-#    }
-#    my $obj = $engine->cache->{$self->offset};
+        $engine->cache->{$self->offset} = $obj;
+    }
+    my $obj = $engine->cache->{$self->offset};
 
     # We're not exporting, so just return.
     unless ( $args->{export} ) {

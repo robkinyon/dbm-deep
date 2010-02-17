@@ -30,10 +30,10 @@ sub new_dbm {
     my @args = @_;
     my ($fh, $filename) = new_fh();
 
-    my @reset_funcs;
-    my @extra_args;
+    my (@names, @reset_funcs, @extra_args);
 
     unless ( $ENV{NO_TEST_FILE} ) {
+        push @names, 'File';
         push @reset_funcs, undef;
         push @extra_args, [
             file => $filename,
@@ -42,7 +42,7 @@ sub new_dbm {
 
     if ( $ENV{TEST_SQLITE} ) {
         (undef, my $filename) = new_fh();
-#        $filename = 'test.db';
+        push @names, 'SQLite';
         push @reset_funcs, sub {
             require 'DBI.pm';
             my $dbh = DBI->connect(
@@ -69,6 +69,7 @@ sub new_dbm {
     }
 
     if ( $ENV{TEST_MYSQL_DSN} ) {
+        push @names, 'MySQL';
         push @reset_funcs, sub {
             require 'DBI.pm';
             my $dbh = DBI->connect(
@@ -102,6 +103,7 @@ sub new_dbm {
         if ( my $reset = shift @reset_funcs ) {
             $reset->();
         }
+        Test::More::diag( "Testing '@{[shift @names]}'\n" ) if $ENV{TEST_VERBOSE};
         return sub {
             DBM::Deep->new( @these_args, @args, @_ )
         };

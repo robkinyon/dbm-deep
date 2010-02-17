@@ -408,7 +408,7 @@ sub data {
     $args ||= {};
 
     my $engine = $self->engine;
-#    if ( !exists $engine->cache->{ $self->offset } ) {
+#    if ( !exists $engine->cache->{ $self->offset }{ $engine->trans_id } ) {
         my $obj = DBM::Deep->new({
             type        => $self->type,
             base_offset => $self->offset,
@@ -417,9 +417,9 @@ sub data {
             engine      => $engine,
         });
 
-#        $engine->cache->{$self->offset} = $obj;
+#        $engine->cache->{$self->offset}{ $engine->trans_id } = $obj;
 #    }
-#    my $obj = $engine->cache->{$self->offset};
+#    my $obj = $engine->cache->{$self->offset}{ $engine->trans_id };
 
     # We're not exporting, so just return.
     unless ( $args->{export} ) {
@@ -447,17 +447,19 @@ sub free {
     # We're not ready to be removed yet.
     return if $self->decrement_refcount > 0;
 
+    my $e = $self->engine;
+
     # Rebless the object into DBM::Deep::Null.
-    eval { %{ $self->engine->cache->{ $self->offset } } = (); };
-    eval { @{ $self->engine->cache->{ $self->offset } } = (); };
-    bless $self->engine->cache->{ $self->offset }, 'DBM::Deep::Null';
-    delete $self->engine->cache->{ $self->offset };
+#    eval { %{ $e->cache->{ $self->offset }{ $e->trans_id } } = (); };
+#    eval { @{ $e->cache->{ $self->offset }{ $e->trans_id } } = (); };
+#    bless $e->cache->{ $self->offset }{ $e->trans_id }, 'DBM::Deep::Null';
+#    delete $e->cache->{ $self->offset }{ $e->trans_id };
 
     my $blist_loc = $self->get_blist_loc;
-    $self->engine->load_sector( $blist_loc )->free if $blist_loc;
+    $e->load_sector( $blist_loc )->free if $blist_loc;
 
     my $class_loc = $self->get_class_offset;
-    $self->engine->load_sector( $class_loc )->free if $class_loc;
+    $e->load_sector( $class_loc )->free if $class_loc;
 
     $self->SUPER::free();
 }

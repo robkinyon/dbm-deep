@@ -242,8 +242,7 @@ while ( my $dbm_maker = $dbm_factory->() ) {
         $db->exists();
     } qr/Cannot use an undefined array index/, "EXISTS fails on an undefined key";
 }
-done_testing;
-__END__
+
 # Bug reported by Mike Schilli
 # Also, RT #29583 reported by HANENKAMP
 $dbm_factory = new_dbm( type => DBM::Deep->TYPE_ARRAY );
@@ -269,6 +268,24 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     } "Splice doesn't die moving references around";
     is( $db->[4][3][1], 2, "Right arrayref there" );
     is( $db->[5]{foo}, 1, "Right hashref there" );
+}
+
+done_testing;
+__END__
+{ # Make sure we do not trigger a deep recursion warning [RT #53575]
+    my $w;
+    local $SIG{__WARN__} = sub { $w = shift };
+    my ($fh, $filename) = new_fh();
+    my $db = DBM::Deep->new( file => $filename, fh => $fh, );
+    my $a = [];
+    my $tmp = $a;
+    for(1..100) {
+        ($tmp) = @$tmp = [];
+    }
+    ok eval {
+        $db->{""} = $a;
+    }, 'deep recursion in array assignment' or diag $@;
+    is $w, undef, 'no warnings with deep recursion in array assignment';
 }
 
 done_testing;

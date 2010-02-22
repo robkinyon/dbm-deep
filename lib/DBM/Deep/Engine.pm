@@ -56,6 +56,8 @@ is the following:
 
 =item * setup
 
+=item * clear
+
 =item * begin_work
 
 =item * commit

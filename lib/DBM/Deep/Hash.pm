@@ -102,7 +102,7 @@ sub first_key { (shift)->FIRSTKEY(@_) }
 sub next_key  { (shift)->NEXTKEY(@_)  }
 
 sub _clear {
-    my $self = shift->_get_self;
+    my $self = shift;
 
     while ( defined(my $key = $self->first_key) ) {
       do {
@@ -118,7 +118,7 @@ sub _copy_node {
     my ($db_temp) = @_;
 
     my $key = $self->first_key();
-    while ($key) {
+    while (defined $key) {
         my $value = $self->get($key);
         $self->_copy_value( \$db_temp->{$key}, $value );
         $key = $self->next_key($key);

@@ -43,6 +43,7 @@ my $build = Module::Build->subclass(
         'Test::More'      => '0.88',
         'Test::Deep'      => '0.095',
         'Test::Warn'      => '0.08',
+        'Test::More'      => '0.88', # done_testing
         'Test::Exception' => '0.21',
         'IO::Scalar'      => '0.01',
     },

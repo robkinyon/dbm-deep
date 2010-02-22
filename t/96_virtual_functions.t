@@ -103,9 +103,6 @@ my @methods = (
 # If only I could use natatime(). *sighs*
 while ( @methods ) {
     my ($entry, $requirements) = splice @methods, 0, 2;
-    if ( $entry eq 'clear' ) {
-        diag "Please ignore the spurious die for clear. I can't figure out how to prevent it"
-    }
     while ( @$requirements ) {
         my ($class, $child_method) = splice @$requirements, 0, 2;
 

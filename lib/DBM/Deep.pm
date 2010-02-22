@@ -587,7 +587,7 @@ sub CLEAR {
         $engine->clear( $self );
     };
     my $e = $@;
-    warn "$e\n" if $e;
+    warn "$e\n" if $e && DEBUG;
 
     $self->unlock;
 

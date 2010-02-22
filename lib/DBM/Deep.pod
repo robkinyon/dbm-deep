@@ -1123,6 +1123,26 @@ been an C<$x> or what memory location to assign an C<export()> to.
 B<NOTE:> This does not affect importing because imports do a walk over the
 reference to be imported in order to explicitly leave it untied.
 
+=head2 Stale References
+
+If you take a reference to an array or hash from the database, it is tied
+to the database itself. This means that if the datum in question is subsequently deleted from the database, the reference to it will point to
+an invalid location and unpredictable things will happen if you try to use
+it.
+
+So a seemingly innocuous piece of code like this:
+
+  my %hash = %{ $db->{some_hash} };
+
+can fail if another process deletes or clobbers C<< $db->{some_hash} >>
+while the data are being extracted, since S<C<%{ ... }>> is not atomic.
+(This actually happened.) The solution is to lock the database before
+reading the data:
+
+  $db->lock_exclusive;
+  my %hash = %{ $db->{some_hash} };
+  $db->unlock;
+
 =head1 CODE COVERAGE
 
 L<Devel::Cover> is used to test the code coverage of the tests. Below is the
@@ -1131,21 +1151,21 @@ L<Devel::Cover> report on this distribution's test suite.
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
   File                           stmt   bran   cond    sub    pod   time  total
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm          100.0   90.0   81.8  100.0  100.0   32.4   98.2
+  blib/lib/DBM/Deep.pm          100.0   89.1   82.9  100.0  100.0   32.5   98.1
   blib/lib/DBM/Deep/Array.pm    100.0   94.4  100.0  100.0  100.0    5.2   98.8
-  blib/lib/DBM/Deep/Engine.pm   100.0   92.9  100.0  100.0  100.0    7.5  100.0
-  ...ib/DBM/Deep/Engine/DBI.pm   93.3   71.2  100.0  100.0  100.0    1.5   89.0
-  ...b/DBM/Deep/Engine/File.pm   91.8   77.8   88.9  100.0  100.0    4.9   89.9
-  blib/lib/DBM/Deep/Hash.pm     100.0  100.0  100.0  100.0  100.0    3.9  100.0
+  blib/lib/DBM/Deep/Engine.pm   100.0   92.9  100.0  100.0  100.0    7.4  100.0
+  ...ib/DBM/Deep/Engine/DBI.pm   95.0   73.1  100.0  100.0  100.0    1.5   90.4
+  ...b/DBM/Deep/Engine/File.pm   92.3   78.5   88.9  100.0  100.0    4.9   90.3
+  blib/lib/DBM/Deep/Hash.pm     100.0  100.0  100.0  100.0  100.0    3.8  100.0
   .../lib/DBM/Deep/Iterator.pm  100.0    n/a    n/a  100.0  100.0    0.0  100.0
-  .../DBM/Deep/Iterator/DBI.pm  100.0  100.0    n/a  100.0  100.0    1.4  100.0
+  .../DBM/Deep/Iterator/DBI.pm  100.0  100.0    n/a  100.0  100.0    1.2  100.0
   ...DBM/Deep/Iterator/File.pm   92.5   84.6    n/a  100.0   66.7    0.6   90.0
   ...erator/File/BucketList.pm  100.0   75.0    n/a  100.0   66.7    0.4   93.8
   ...ep/Iterator/File/Index.pm  100.0  100.0    n/a  100.0  100.0    0.2  100.0
   blib/lib/DBM/Deep/Null.pm      87.5    n/a    n/a   75.0    n/a    0.0   83.3
   blib/lib/DBM/Deep/Sector.pm    91.7    n/a    n/a   83.3    0.0    6.7   74.4
   ...ib/DBM/Deep/Sector/DBI.pm   96.8   83.3    n/a  100.0    0.0    1.0   89.8
-  ...p/Sector/DBI/Reference.pm   98.9   86.4  100.0  100.0    0.0    2.2   89.2
+  ...p/Sector/DBI/Reference.pm  100.0   95.5  100.0  100.0    0.0    2.2   91.2
   ...Deep/Sector/DBI/Scalar.pm  100.0  100.0    n/a  100.0    0.0    1.1   92.9
   ...b/DBM/Deep/Sector/File.pm   96.0   87.5  100.0   92.3   25.0    2.2   91.0
   ...Sector/File/BucketList.pm   98.2   85.7   83.3  100.0    0.0    3.3   89.4
@@ -1153,11 +1173,11 @@ L<Devel::Cover> report on this distribution's test suite.
   ...Deep/Sector/File/Index.pm  100.0   80.0   33.3  100.0    0.0    0.8   83.1
   .../Deep/Sector/File/Null.pm  100.0  100.0    n/a  100.0    0.0    0.0   91.7
   .../Sector/File/Reference.pm  100.0   90.0   80.0  100.0    0.0    1.4   91.5
-  ...eep/Sector/File/Scalar.pm   98.3   87.5    n/a  100.0    0.0    0.8   91.5
+  ...eep/Sector/File/Scalar.pm   98.4   87.5    n/a  100.0    0.0    0.8   91.9
   blib/lib/DBM/Deep/Storage.pm  100.0    n/a    n/a  100.0  100.0    0.0  100.0
   ...b/DBM/Deep/Storage/DBI.pm   97.3   70.8    n/a  100.0   38.5    6.7   87.0
-  .../DBM/Deep/Storage/File.pm   96.6   77.1   80.0   95.7  100.0   15.8   91.8
-  Total                          99.2   84.8   84.7   99.8   63.3  100.0   97.6
+  .../DBM/Deep/Storage/File.pm   96.6   77.1   80.0   95.7  100.0   16.0   91.8
+  Total                          99.3   85.2   84.9   99.8   63.3  100.0   97.6
   ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 MORE INFORMATION

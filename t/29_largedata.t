@@ -10,10 +10,10 @@ my $dbm_factory = new_dbm();
 while ( my $dbm_maker = $dbm_factory->() ) {
     my $db = $dbm_maker->();
 
-    my $val1 = "a" x 1000;
+    my $val1 = "a" x 6000;
 
     $db->{foo} = $val1;
-    is( $db->{foo}, $val1, "1000 char value stored and retrieved" );
+    is( $db->{foo}, $val1, "6000 char value stored and retrieved" );
 
 #    delete $db->{foo};
 #    my $size = -s $filename;

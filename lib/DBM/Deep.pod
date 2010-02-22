@@ -1128,16 +1128,37 @@ reference to be imported in order to explicitly leave it untied.
 L<Devel::Cover> is used to test the code coverage of the tests. Below is the
 L<Devel::Cover> report on this distribution's test suite.
 
-  ------------------------------------------ ------ ------ ------ ------ ------
-  File                                         stmt   bran   cond    sub  total
-  ------------------------------------------ ------ ------ ------ ------ ------
-  blib/lib/DBM/Deep.pm                         97.2   90.9   83.3  100.0   95.4
-  blib/lib/DBM/Deep/Array.pm                  100.0   95.7  100.0  100.0   99.0
-  blib/lib/DBM/Deep/Engine.pm                  95.6   84.7   81.6   98.4   92.5
-  blib/lib/DBM/Deep/File.pm                    97.2   81.6   66.7  100.0   91.9
-  blib/lib/DBM/Deep/Hash.pm                   100.0  100.0  100.0  100.0  100.0
-  Total                                        96.7   87.5   82.2   99.2   94.1
-  ------------------------------------------ ------ ------ ------ ------ ------
+  ---------------------------- ------ ------ ------ ------ ------ ------ ------
+  File                           stmt   bran   cond    sub    pod   time  total
+  ---------------------------- ------ ------ ------ ------ ------ ------ ------
+  blib/lib/DBM/Deep.pm          100.0   90.0   81.8  100.0  100.0   32.4   98.2
+  blib/lib/DBM/Deep/Array.pm    100.0   94.4  100.0  100.0  100.0    5.2   98.8
+  blib/lib/DBM/Deep/Engine.pm   100.0   92.9  100.0  100.0  100.0    7.5  100.0
+  ...ib/DBM/Deep/Engine/DBI.pm   93.3   71.2  100.0  100.0  100.0    1.5   89.0
+  ...b/DBM/Deep/Engine/File.pm   91.8   77.8   88.9  100.0  100.0    4.9   89.9
+  blib/lib/DBM/Deep/Hash.pm     100.0  100.0  100.0  100.0  100.0    3.9  100.0
+  .../lib/DBM/Deep/Iterator.pm  100.0    n/a    n/a  100.0  100.0    0.0  100.0
+  .../DBM/Deep/Iterator/DBI.pm  100.0  100.0    n/a  100.0  100.0    1.4  100.0
+  ...DBM/Deep/Iterator/File.pm   92.5   84.6    n/a  100.0   66.7    0.6   90.0
+  ...erator/File/BucketList.pm  100.0   75.0    n/a  100.0   66.7    0.4   93.8
+  ...ep/Iterator/File/Index.pm  100.0  100.0    n/a  100.0  100.0    0.2  100.0
+  blib/lib/DBM/Deep/Null.pm      87.5    n/a    n/a   75.0    n/a    0.0   83.3
+  blib/lib/DBM/Deep/Sector.pm    91.7    n/a    n/a   83.3    0.0    6.7   74.4
+  ...ib/DBM/Deep/Sector/DBI.pm   96.8   83.3    n/a  100.0    0.0    1.0   89.8
+  ...p/Sector/DBI/Reference.pm   98.9   86.4  100.0  100.0    0.0    2.2   89.2
+  ...Deep/Sector/DBI/Scalar.pm  100.0  100.0    n/a  100.0    0.0    1.1   92.9
+  ...b/DBM/Deep/Sector/File.pm   96.0   87.5  100.0   92.3   25.0    2.2   91.0
+  ...Sector/File/BucketList.pm   98.2   85.7   83.3  100.0    0.0    3.3   89.4
+  .../Deep/Sector/File/Data.pm  100.0    n/a    n/a  100.0    0.0    0.1   90.9
+  ...Deep/Sector/File/Index.pm  100.0   80.0   33.3  100.0    0.0    0.8   83.1
+  .../Deep/Sector/File/Null.pm  100.0  100.0    n/a  100.0    0.0    0.0   91.7
+  .../Sector/File/Reference.pm  100.0   90.0   80.0  100.0    0.0    1.4   91.5
+  ...eep/Sector/File/Scalar.pm   98.3   87.5    n/a  100.0    0.0    0.8   91.5
+  blib/lib/DBM/Deep/Storage.pm  100.0    n/a    n/a  100.0  100.0    0.0  100.0
+  ...b/DBM/Deep/Storage/DBI.pm   97.3   70.8    n/a  100.0   38.5    6.7   87.0
+  .../DBM/Deep/Storage/File.pm   96.6   77.1   80.0   95.7  100.0   15.8   91.8
+  Total                          99.2   84.8   84.7   99.8   63.3  100.0   97.6
+  ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 MORE INFORMATION
 

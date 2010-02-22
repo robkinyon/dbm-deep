@@ -57,7 +57,7 @@ sub size {
     return $self->{size};
 }
 
-sub free_meth { return '_add_free_blist_sector' }
+sub free_meth { '_add_free_blist_sector' }
 
 sub free {
     my $self = shift;

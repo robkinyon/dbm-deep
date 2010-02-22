@@ -111,6 +111,8 @@ serious programming that make my head hurts just to think about it.
 
 =cut
 
+=head1 METHODS
+
 =head2 read_value( $obj, $key )
 
 This takes an object that provides _base_offset() and a string. It returns the
@@ -244,6 +246,7 @@ sub get_next_key {
     # XXX Need to add logic about resetting the iterator if any key in the
     # reference has changed
     unless ( defined $prev_key ) {
+        eval "use " . $self->iterator_class; die $@ if $@;
         $obj->{iterator} = $self->iterator_class->new({
             base_offset => $obj->_base_offset,
             engine      => $self,
@@ -338,16 +341,14 @@ defined sector type.
 
 sub load_sector { $_[0]->sector_type->load( @_ ) }
 
-=head2 clear
-
-=cut
-
 =head2 clear( $obj )
 
 This takes an object that provides _base_offset() and deletes all its 
 elements, returning nothing.
 
 =cut
+
+sub clear { die "clear must be implemented in a child class" }
 
 =head2 cache / clear_cache
 
@@ -377,7 +378,7 @@ Any other value will return false.
 
 sub supports { die "supports must be implemented in a child class" }
 
-=head2 ACCESSORS
+=head1 ACCESSORS
 
 The following are readonly attributes.
 
@@ -387,6 +388,8 @@ The following are readonly attributes.
 
 =item * sector_type
 
+=item * iterator_class
+
 =back
 
 =cut
@@ -394,6 +397,7 @@ The following are readonly attributes.
 sub storage { $_[0]{storage} }
 
 sub sector_type { die "sector_type must be implemented in a child class" }
+sub iterator_class { die "iterator_class must be implemented in a child class" }
 
 # This code is to make sure we write all the values in the $value to the
 # disk and to make sure all changes to $value after the assignment are

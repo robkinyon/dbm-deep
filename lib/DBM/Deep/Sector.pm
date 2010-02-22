@@ -15,7 +15,7 @@ sub new {
 }
 
 sub _init {}
-#sub clone { die "clone must be implemented in a child class" }
+
 sub clone {
     my $self = shift;
     return ref($self)->new({

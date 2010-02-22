@@ -8,7 +8,7 @@ use t::common qw( new_dbm );
 
 use_ok( 'DBM::Deep' );
 
-my $max_txns = 255;
+my $max_txns = 220;
 
 my $dbm_factory = new_dbm(
     num_txns  => $max_txns,

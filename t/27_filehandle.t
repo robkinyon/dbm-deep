@@ -1,11 +1,14 @@
 use strict;
 use warnings FATAL => 'all';
 
-# Need to have an explicit plan in order for the sub-testing to work right.
-#XXX Figure out how to use subtests for that.
-use Test::More tests => 14;
+use Test::More;
 use Test::Exception;
 use t::common qw( new_fh );
+
+# Need to have an explicit plan in order for the sub-testing to work right.
+#XXX Figure out how to use subtests for that.
+my $pre_fork_tests = 14;
+plan tests => $pre_fork_tests + 2;
 
 use_ok( 'DBM::Deep' );
 
@@ -31,6 +34,14 @@ use_ok( 'DBM::Deep' );
         } qr/Cannot write to a readonly filehandle/, "Can't write to a read-only filehandle";
         ok( !$db->exists( 'foo' ), "foo doesn't exist" );
 
+        throws_ok {
+            delete $db->{foo};
+        } qr/Cannot write to a readonly filehandle/, "Can't delete from a read-only filehandle";
+
+        throws_ok {
+            %$db = ();
+        } qr/Cannot write to a readonly filehandle/, "Can't clear from a read-only filehandle";
+
         SKIP: {
             skip( "No inode tests on Win32", 1 )
                 if ( $^O eq 'MSWin32' || $^O eq 'cygwin' );
@@ -48,18 +59,18 @@ use_ok( 'DBM::Deep' );
     my ($fh,$filename) = new_fh();
 
     print $fh "#!$^X\n";
-    print $fh <<'__END_FH__';
+    print $fh <<"__END_FH__";
 use strict;
 use Test::More 'no_plan';
 Test::More->builder->no_ending(1);
-Test::More->builder->{Curr_Test} = 12;
+Test::More->builder->{Curr_Test} = $pre_fork_tests;
 
 use_ok( 'DBM::Deep' );
 
-my $db = DBM::Deep->new({
+my \$db = DBM::Deep->new({
     fh => *DATA,
 });
-is($db->{x}, 'b', "and get at stuff in the database");
+is(\$db->{x}, 'b', "and get at stuff in the database");
 __END_FH__
     print $fh "__DATA__\n";
     close $fh;

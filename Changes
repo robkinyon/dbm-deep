@@ -1,5 +1,14 @@
 Revision history for DBM::Deep (ordered by revision number).
 
+1.0020 Feb 16 22:00:00 2010 EST
+    (This version is compatible with 1.0016)
+	- Fixed t/43_transaction_maximum.t so that it doesn't error out on systems
+      which cannot fork > 255 children at one time.
+    - Improved code coverage
+        - Added t/96_virtual_functions.t which helps describe what actually
+          needs to be overridden in a new plugin.
+    
+
 1.0019_003 Feb 16 22:00:00 2010 EST
     (This is the third developer release for 1.0020.)
     (This version is compatible with 1.0016)

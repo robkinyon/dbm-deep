@@ -5,9 +5,6 @@ use 5.006_000;
 use strict;
 use warnings FATAL => 'all';
 
-use DBM::Deep::Iterator::DBI ();
-use DBM::Deep::Iterator::File ();
-
 =head1 NAME
 
 DBM::Deep::Iterator

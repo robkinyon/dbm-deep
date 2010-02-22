@@ -132,6 +132,8 @@ sub close {
 
 This will return the size of the DB. If file_offset is set, this will take that into account.
 
+B<NOTE>: This function isn't used internally anywhere.
+
 =cut
 
 sub size {

@@ -92,20 +92,20 @@ sub unlock {
 #    $self->{dbh}->commit;
 }
 
-sub begin_work {
-    my $self = shift;
-    $self->{dbh}->begin_work;
-}
-
-sub commit {
-    my $self = shift;
-    $self->{dbh}->commit;
-}
-
-sub rollback {
-    my $self = shift;
-    $self->{dbh}->rollback;
-}
+#sub begin_work {
+#    my $self = shift;
+#    $self->{dbh}->begin_work;
+#}
+#
+#sub commit {
+#    my $self = shift;
+#    $self->{dbh}->commit;
+#}
+#
+#sub rollback {
+#    my $self = shift;
+#    $self->{dbh}->rollback;
+#}
 
 sub read_from {
     my $self = shift;

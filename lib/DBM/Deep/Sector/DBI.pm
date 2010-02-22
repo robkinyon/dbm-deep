@@ -10,9 +10,6 @@ use base qw( DBM::Deep::Sector );
 use DBM::Deep::Sector::DBI::Reference ();
 use DBM::Deep::Sector::DBI::Scalar ();
 
-sub _init {
-}
-
 sub free {
     my $self = shift;
 

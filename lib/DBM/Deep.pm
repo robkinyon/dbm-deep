@@ -6,7 +6,7 @@ use strict;
 use warnings FATAL => 'all';
 no warnings 'recursion';
 
-our $VERSION = q(1.0019_003);
+our $VERSION = q(1.0020);
 
 use Scalar::Util ();
 
@@ -85,9 +85,10 @@ sub _init {
     }, $class;
 
     unless ( exists $args->{engine} ) {
-        my $class = exists $args->{dbi}
-            ? 'DBM::Deep::Engine::DBI'
-            : 'DBM::Deep::Engine::File';
+        my $class =
+            exists $args->{dbi}   ? 'DBM::Deep::Engine::DBI'  :
+            exists $args->{_test} ? 'DBM::Deep::Engine::Test' :
+                                    'DBM::Deep::Engine::File' ;
 
         eval "use $class"; die $@ if $@;
         $args->{engine} = $class->new({
@@ -134,10 +135,15 @@ sub lock_exclusive {
     return $self->_engine->lock_exclusive( $self, @_ );
 }
 *lock = \&lock_exclusive;
+
 sub lock_shared {
     my $self = shift->_get_self;
-use Carp qw( cluck ); use Data::Dumper;
-cluck Dumper($self) unless $self->_engine;
+    # cluck() the problem with cached File objects.
+    unless ( $self->_engine ) {
+        require Carp;
+        require Data::Dumper;
+        Carp::cluck( Data::Dumper->Dump( [$self], ['self'] ) );
+    }
     return $self->_engine->lock_shared( $self, @_ );
 }
 
@@ -187,14 +193,6 @@ sub _copy_value {
 
     return 1;
 }
-
-#sub _copy_node {
-#    die "Must be implemented in a child class\n";
-#}
-#
-#sub _repr {
-#    die "Must be implemented in a child class\n";
-#}
 
 sub export {
     my $self = shift->_get_self;

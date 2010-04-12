@@ -192,7 +192,7 @@ specify the C<type> parameter:
       type => DBM::Deep->TYPE_ARRAY
   );
 
-B<Note:> Specifing the C<type> parameter only takes effect when beginning
+B<Note:> Specifying the C<type> parameter only takes effect when beginning
 a new DB file. If you create a DBM::Deep object with an existing file, the
 C<type> will be loaded from the file header, and an error will be thrown if
 the wrong type is passed in.
@@ -737,7 +737,7 @@ four available filter hooks.
 
 =head2 set_filter()
 
-This method takes two paramters - the filter type and the filter subreference.
+This method takes two parameters - the filter type and the filter subreference.
 The four types are:
 
 =over

@@ -107,7 +107,7 @@ probably a failure in Consistency as well as Durability.)
 
 Other DBMSes use transaction logs (a separate file, generally) to achieve
 Durability.  As DBM::Deep is a single-file, we would have to do something
-similar to what SQLite and BDB do in terms of committing using synchonized
+similar to what SQLite and BDB do in terms of committing using synchronized
 writes. To do this, we would have to use a much higher RAM footprint and some
 serious programming that make my head hurts just to think about it.
 

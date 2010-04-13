@@ -1066,7 +1066,7 @@ any modifications to either $db or $copy will be visible to both.
 =head2 Stale References
 
 If you take a reference to an array or hash from the database, it is tied
-to the database itself. This means that if the datum in question is subsequentl
+to the database itself. This means that if the datum in question is subsequently deleted from the database, the reference to it will point to
 an invalid location and unpredictable things will happen if you try to use
 it.
 

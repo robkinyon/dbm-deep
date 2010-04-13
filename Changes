@@ -1,5 +1,14 @@
 Revision history for DBM::Deep (ordered by revision number).
 
+1.0021
+    (This version is compatible with 1.0020)
+    - Correct spelling mistakes in the documentation (thanks to Gregor
+      Herrmann for the corrections and to Ansgar Burchardt for passing
+      them on) (RT#56520)
+    - MANIFEST now lists the test libs so they get included in the
+      distribution (RT#56512)
+    - It no longer crashes in perl 5.6.2.
+
 1.0020 Feb 16 22:00:00 2010 EST
     (This version is compatible with 1.0016)
 	- Fixed t/43_transaction_maximum.t so that it doesn't error out on systems
@@ -62,19 +71,6 @@ Revision history for DBM::Deep (ordered by revision number).
       been enabled yet. That's the next developer release.
     - Hopefully, this multi-engine support will allow deprecation of the file
       format in the future.
-
-1.0016 Feb 05 22:10:00 2010 PST
-    - (This version is compatible with 1.0015)
-    - New caveat in the docs explaining stale references (RT#42129)
-    - All included modules now have the same version in META.yml, so
-      the CPAN shell will no longer try to downgrade.
-    - Fixed bug in clear() for hashes (RT#50541)
-
-1.0015 Jan 25 22:05:00 2010 PST
-    - (This version is compatible with 1.0014)
-    - Fix deep recursion errors (RT#53575)
-    - Avoid leaving temp files lying around (RT#32462)
-    - (RT #48031) Fixed bug with localized $, (Thanks, SPROUT!)
 
 1.0016 Feb 05 22:10:00 2010 PST
     - (This version is compatible with 1.0015)

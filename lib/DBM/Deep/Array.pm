@@ -3,7 +3,7 @@ package DBM::Deep::Array;
 use 5.006_000;
 
 use strict;
-use warnings FATAL => 'all';
+use warnings $] < 5.007 ? () : (FATAL => 'all');
 no warnings 'recursion';
 
 # This is to allow DBM::Deep::Array to handle negative indices on

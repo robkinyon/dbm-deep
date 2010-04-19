@@ -1,6 +1,6 @@
 Revision history for DBM::Deep (ordered by revision number).
 
-1.0021
+1.0021 Apr 18 18:25:00 2010 PDT
     (This version is compatible with 1.0020)
     - Correct spelling mistakes in the documentation (thanks to Gregor
       Herrmann for the corrections and to Ansgar Burchardt for passing

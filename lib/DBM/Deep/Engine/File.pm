@@ -1007,7 +1007,7 @@ sub supports {
     my ($feature) = @_;
 
     return 1 if $feature eq 'transactions';
-    return if $feature eq 'singletones';
+    return 1 if $feature eq 'singletons';
     return;
 }
 

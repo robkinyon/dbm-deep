@@ -1,5 +1,12 @@
 Revision history for DBM::Deep (ordered by revision number).
 
+1.0022 Apr 25 ??:??:00 2010 PDT
+    (This version is compatible with 1.0021)
+    - Singleton support has been re-enabled in the File back end.
+    - t/43_transaction_maximum.t was still failing on some systems
+      (see http://www.cpantesters.org/cpan/report/7151810), so now we
+      try to detect the maximum number of files we can open.
+
 1.0021 Apr 18 18:28:00 2010 PDT
     (This version is compatible with 1.0020)
     - Correct spelling mistakes in the documentation (thanks to Gregor
@@ -12,7 +19,7 @@ Revision history for DBM::Deep (ordered by revision number).
 1.0020 Apr 10 10:50:00 2010 EDT
     (This version is compatible with 1.0016)
 	- Fixed t/43_transaction_maximum.t so that it doesn't error out on systems
-      which cannot fork > 255 children at one time.
+      which cannot open > 255 files at one time.
     - Improved code coverage
         - Added t/96_virtual_functions.t which helps describe what actually
           needs to be overridden in a new plugin.

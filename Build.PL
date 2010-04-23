@@ -48,6 +48,7 @@ my $build = Module::Build->subclass(
         'IO::Scalar'      => '0.01',
     },
     create_makefile_pl => 'traditional',
+    create_readme    =>  1,
     add_to_cleanup => [
         'META.yml', '*.bak', '*.gz', 'Makefile.PL', 'cover_db',
     ],

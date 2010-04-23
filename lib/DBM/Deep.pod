@@ -234,14 +234,14 @@ one of these two constants:
 
 =over 4
 
-=item * C<<DBM::Deep->TYPE_HASH>>
+=item * C<< DBM::Deep->TYPE_HASH >>
 
-=item * C<<DBM::Deep->TYPE_ARRAY>>
+=item * C<< DBM::Deep->TYPE_ARRAY >>
 
 =back
 
 This only takes effect when beginning a new file. This is an optional
-parameter, and defaults to C<<DBM::Deep->TYPE_HASH>>.
+parameter, and defaults to C<< DBM::Deep->TYPE_HASH >>.
 
 =item * autoflush
 
@@ -371,14 +371,15 @@ hash reference, not a lookup. Meaning, you should B<never> do this:
 This causes an infinite loop, because for each iteration, Perl is calling
 FETCH() on the $db handle, resulting in a "new" hash for foo every time, so
 it effectively keeps returning the first key over and over again. Instead,
-assign a temporary variable to C<<$db->{foo}>>, then pass that to each().
+assign a temporary variable to C<< $db->{foo} >>, then pass that to each().
 
 =head2 Arrays
 
 As with hashes, you can treat any DBM::Deep object like a normal Perl array
 reference. This includes inserting, removing and manipulating elements,
 and the C<push()>, C<pop()>, C<shift()>, C<unshift()> and C<splice()> functions.
-The object must have first been created using type C<<DBM::Deep->TYPE_ARRAY>>,
+The object must have first been created using type
+C<< DBM::Deep->TYPE_ARRAY >>,
 or simply be a nested array reference inside a hash. Example:
 
   my $db = DBM::Deep->new(
@@ -816,7 +817,7 @@ This tells DBM::Deep to pack all file offsets with 8-byte (64-bit) quad words
 instead of 32-bit longs. After setting these values your DB files have a
 theoretical maximum size of 16 XB (exabytes).
 
-You can also use C<<pack_size => 'small'>> in order to use 16-bit file
+You can also use C<< pack_size => 'small' >> in order to use 16-bit file
 offsets.
 
 B<Note:> Changing these values will B<NOT> work for existing database files.
@@ -1026,7 +1027,7 @@ the reference. Again, this would generally be considered a feature.
 
 =head2 External references and transactions
 
-If you do C<<my $x = $db->{foo};>>, then start a transaction, $x will be
+If you do C<< my $x = $db->{foo}; >>, then start a transaction, $x will be
 referencing the database from outside the transaction. A fix for this (and other
 issues with how external references into the database) is being looked into. This
 is the skipped set of tests in t/39_singletons.t and a related issue is the focus

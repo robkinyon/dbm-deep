@@ -131,7 +131,7 @@ This is a hashref containing:
 
 =back
 
-Theses correspond to the 4 parameters L<DBI/connect> takes.
+These correspond to the 4 parameters L<DBI/connect> takes.
 
 =back
 

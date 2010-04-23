@@ -50,7 +50,7 @@ of storage. There is the original storage (called 'File') and a database storage
 (called 'DBI'). q.v. L</PLUGINS> for more information.
 
 B<NOTE>: 1.0000 has significant file format differences from prior versions.
-THere is a backwards-compatibility layer at C<utils/upgrade_db.pl>. Files
+There is a backwards-compatibility layer at C<utils/upgrade_db.pl>. Files
 created by 1.0000 or higher are B<NOT> compatible with scripts using prior
 versions.
 

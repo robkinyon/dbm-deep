@@ -1,6 +1,6 @@
 Revision history for DBM::Deep (ordered by revision number).
 
-1.0022 Apr 25 ??:??:00 2010 PDT
+1.0022 Apr 25 18:40:00 2010 PDT
     (This version is compatible with 1.0021)
     - Singleton support has been re-enabled in the File back end.
     - t/43_transaction_maximum.t was still failing on some systems

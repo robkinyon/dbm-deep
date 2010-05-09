@@ -57,7 +57,7 @@ sub open {
     ) or die $DBI::error;
 
     # Should we use the same method as done in new() if passed a $dbh?
-    (undef, $self->{driver}) = map lc, DBI->parse_dsn( $self->{dbi}{dsn} );
+    (undef, $self->{driver}) = map defined($_) ? lc($_) : undef, DBI->parse_dsn( $self->{dbi}{dsn} );
 
     return 1;
 }

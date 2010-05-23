@@ -6,13 +6,6 @@ use warnings FATAL => 'all';
 my $build = Module::Build->subclass(
     class => "Module::Build::Custom",
     code => '
-        sub prepare_metadata {
-            my $node = shift->SUPER::prepare_metadata(@_);
-            my $ver = $node->{version};
-            $_->{version} = $ver for values %{$node->{provides}};
-            $node;
-        }
-
         sub ACTION_test {
             my $self = shift;
             if ( $self->notes(\'TEST_MYSQL_DSN\') ) {

@@ -202,7 +202,7 @@ the wrong type is passed in.
 Alternately, you can create a DBM::Deep handle by using Perl's built-in
 tie() function. The object returned from tie() can be used to call methods,
 such as lock() and unlock(). (That object can be retrieved from the tied
-variable at any time using tied() - please see L<perltie> for more info.
+variable at any time using tied() - please see L<perltie> for more info.)
 
   my %hash;
   my $db = tie %hash, "DBM::Deep", "foo.db";

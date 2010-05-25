@@ -590,7 +590,7 @@ sub get_running_txn_ids {
 =head2 get_txn_staleness_counter( $trans_id )
 
 This will return the staleness counter for the given transaction ID. Please see
-L</TRANSACTION STALENESS> for more information.
+L<DBM::Deep::Engine/STALENESS> for more information.
 
 =cut
 
@@ -612,7 +612,7 @@ sub get_txn_staleness_counter {
 =head2 inc_txn_staleness_counter( $trans_id )
 
 This will increment the staleness counter for the given transaction ID. Please see
-L</TRANSACTION STALENESS> for more information.
+L<DBM::Deep::Engine/STALENESS> for more information.
 
 =cut
 

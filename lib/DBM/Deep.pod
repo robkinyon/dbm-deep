@@ -403,7 +403,7 @@ In addition to the I<tie()> interface, you can also use a standard OO interface
 to manipulate all aspects of DBM::Deep databases. Each type of object (hash or
 array) has its own methods, but both types share the following common methods:
 C<put()>, C<get()>, C<exists()>, C<delete()> and C<clear()>. C<fetch()> and
-C<store(> are aliases to C<put()> and C<get()>, respectively.
+C<store()> are aliases to C<put()> and C<get()>, respectively.
 
 =over
 

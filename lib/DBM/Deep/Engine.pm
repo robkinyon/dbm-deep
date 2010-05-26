@@ -79,14 +79,14 @@ Engine::Sector::* hierarchy and dispatch to them.
 =head1 TRANSACTIONS
 
 Transactions in DBM::Deep are implemented using a variant of MVCC. This attempts
-to keep the amount of actual work done against the file low while stil providing
+to keep the amount of actual work done against the file low while still providing
 Atomicity, Consistency, and Isolation. Durability, unfortunately, cannot be done
 with only one file.
 
 =head2 STALENESS
 
 If another process uses a transaction slot and writes stuff to it, then
-terminates, the data that process wrote it still within the file. In order to
+terminates, the data that process wrote is still within the file. In order to
 address this, there is also a transaction staleness counter associated within
 every write.  Each time a transaction is started, that process increments that
 transaction's staleness counter. If, when it reads a value, the staleness

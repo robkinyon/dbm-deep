@@ -5,6 +5,10 @@ use Test::More;
 use Test::Deep;
 use t::common qw( new_dbm );
 
+sub is_undef {
+ ok(!defined $_[0] || ref $_[0] eq 'DBM::Deep::Null', $_[1])
+}
+
 use_ok( 'DBM::Deep' );
 
 my $dbm_factory = new_dbm(
@@ -26,11 +30,11 @@ while ( my $dbm_maker = $dbm_factory->() ) {
         is( $x, $y, "The references are the same" );
 
         delete $db->{foo};
-        is( $x, undef, "After deleting the DB location, external references are also undef (\$x)" );
-        is( $y, undef, "After deleting the DB location, external references are also undef (\$y)" );
+        is_undef( $x, "After deleting the DB location, external references are also undef (\$x)" );
+        is_undef( $y, "After deleting the DB location, external references are also undef (\$y)" );
         is( eval { $x + 0 }, undef, "DBM::Deep::Null can be added to." );
         is( eval { $y + 0 }, undef, "DBM::Deep::Null can be added to." );
-        is( $db->{foo}, undef, "The {foo} location is also undef." );
+        is_undef( $db->{foo}, "The {foo} location is also undef." );
 
         # These shenanigans work to get another hashref
         # into the same data location as $db->{foo} was.
@@ -39,8 +43,8 @@ while ( my $dbm_maker = $dbm_factory->() ) {
         $db->{foo} = {};
         $db->{bar} = {};
 
-        is( $x, undef, "After re-assigning to {foo}, external references to old values are still undef (\$x)" );
-        is( $y, undef, "After re-assigning to {foo}, external references to old values are still undef (\$y)" );
+        is_undef( $x, "After re-assigning to {foo}, external references to old values are still undef (\$x)" );
+        is_undef( $y, "After re-assigning to {foo}, external references to old values are still undef (\$y)" );
     }
 }
 

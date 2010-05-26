@@ -48,6 +48,12 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     }
 }
 
+{
+ my $null = bless {}, 'DBM::Deep::Null';
+ cmp_ok $null, 'eq', undef, 'DBM::Deep::Null compares equal to undef';
+ cmp_ok $null, '==', undef, 'DBM::Deep::Null compares ==ual to undef';
+}
+
 SKIP: {
     skip "What do we do with external references and txns?", 2;
 

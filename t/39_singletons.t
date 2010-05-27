@@ -46,11 +46,21 @@ while ( my $dbm_maker = $dbm_factory->() ) {
         is_undef( $x, "After re-assigning to {foo}, external references to old values are still undef (\$x)" );
         is_undef( $y, "After re-assigning to {foo}, external references to old values are still undef (\$y)" );
 
-        my $w;
+        my($w,$line);
+        my $file = __FILE__;
         local $SIG{__WARN__} = sub { $w = $_[0] };
-        $db->{stext} = $x;     my($file,$line) = (__FILE__,__LINE__);
-        is $w, "Assignment of stale reference at $file line $line.\n",
-          'assigning a stale reference back to the DB warns';
+        eval {
+            $line = __LINE__;   $db->{stext} = $x;
+        };
+        is $@, "Assignment of stale reference at $file line $line.\n",
+            'assigning a stale reference to the DB dies w/FATAL warnings';
+        {
+            no warnings;
+            use warnings 'uninitialized'; # non-FATAL
+            $db->{stext} = $x;     $line = __LINE__;
+            is $w, "Assignment of stale reference at $file line $line.\n",
+              'assigning a stale reference back to the DB warns';
+        }
         {
             no warnings 'uninitialized';
             $w = undef;

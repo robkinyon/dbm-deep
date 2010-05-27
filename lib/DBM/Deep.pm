@@ -615,9 +615,15 @@ sub _warnif {
  {
   my($pack, $file, $line, $bitmask) = (caller $level++)[0..2,9];
   redo if $pack =~ /^DBM::Deep(?:::|\z)/;
-  warn $_[1] =~ /\n\z/ ? $_[1] : "$_[1] at $file line $line.\n"
-   if  vec $bitmask, $warnings'Offsets{$_[0]}, 1,
+  if(  vec $bitmask, $warnings'Offsets{$_[0]}, 1,
     || vec $bitmask, $warnings'Offsets{all}, 1,
+    ) {
+     my $msg = $_[1] =~ /\n\z/ ? $_[1] : "$_[1] at $file line $line.\n";
+     die $msg
+      if  vec $bitmask, $warnings'Offsets{$_[0]}+1, 1,
+       || vec $bitmask, $warnings'Offsets{all}+1, 1;
+     warn $msg;
+  }
  }
 }
 

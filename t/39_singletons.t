@@ -56,7 +56,7 @@ while ( my $dbm_maker = $dbm_factory->() ) {
             $w = undef;
             $db->{stext} = $x;
             is $w, undef,
-	      'stale ref assignment warnings can be suppressed';
+              'stale ref assignment warnings can be suppressed';
         }
 
 	eval {                   $line = __LINE__+1;

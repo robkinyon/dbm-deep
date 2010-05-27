@@ -55,7 +55,7 @@ while ( my $dbm_maker = $dbm_factory->() ) {
         is $@, "Assignment of stale reference at $file line $line.\n",
             'assigning a stale reference to the DB dies w/FATAL warnings';
         {
-            no warnings;
+            no warnings FATAL => "all";
             use warnings 'uninitialized'; # non-FATAL
             $db->{stext} = $x;     $line = __LINE__;
             is $w, "Assignment of stale reference at $file line $line.\n",

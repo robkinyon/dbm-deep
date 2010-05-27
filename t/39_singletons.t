@@ -45,6 +45,27 @@ while ( my $dbm_maker = $dbm_factory->() ) {
 
         is_undef( $x, "After re-assigning to {foo}, external references to old values are still undef (\$x)" );
         is_undef( $y, "After re-assigning to {foo}, external references to old values are still undef (\$y)" );
+
+        my $w;
+        local $SIG{__WARN__} = sub { $w = $_[0] };
+        $db->{stext} = $x;     my($file,$line) = (__FILE__,__LINE__);
+        is $w, "Assignment of stale reference at $file line $line.\n",
+          'assigning a stale reference back to the DB warns';
+
+	eval {                   $line = __LINE__+1;
+          () = $x->{stit};
+        };
+        like $@,
+          qr/^Can't use a stale reference as a HASH at \Q$file\E line(?x:
+             ) $line\.?\n\z/,
+          'Using a stale reference as a hash dies';
+	eval {                   $line = __LINE__+1;
+          () = $x->[28];
+        };
+        like $@,
+          qr/^Can't use a stale reference as an ARRAY at $file line (?x:
+             )$line\.?\n\z/,
+          'Using a stale reference as an array dies';
     }
 }
 

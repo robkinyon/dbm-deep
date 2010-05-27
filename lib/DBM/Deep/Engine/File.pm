@@ -298,6 +298,13 @@ sub write_value {
     if ( !defined $value ) {
         $class = 'DBM::Deep::Sector::File::Null';
     }
+    elsif ( ref $value eq 'DBM::Deep::Null' ) {
+        DBM::Deep::_warnif(
+             'uninitialized', 'Assignment of stale reference'
+        );
+        $class = 'DBM::Deep::Sector::File::Null';
+        $value = undef;
+    }
     elsif ( $r eq 'ARRAY' || $r eq 'HASH' ) {
         my $tmpvar;
         if ( $r eq 'ARRAY' ) {

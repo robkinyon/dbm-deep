@@ -607,5 +607,19 @@ sub clear  { (shift)->CLEAR( @_ )  }
 
 sub _dump_file {shift->_get_self->_engine->_dump_file;}
 
+sub _warnif {
+ # There is, unfortunately, no way to avoid this hack. warnings.pm does not
+ # allow us to specify exactly the call frame we want. So, for now, we just
+ # look at the bitmask ourselves.
+ my $level;
+ {
+  my($pack, $file, $line, $bitmask) = (caller $level++)[0..2,9];
+  redo if $pack =~ /^DBM::Deep(?:::|\z)/;
+  warn $_[1] =~ /\n\z/ ? $_[1] : "$_[1] at $file line $line.\n"
+   if  vec $bitmask, $warnings'Offsets{$_[0]}, 1,
+    || vec $bitmask, $warnings'Offsets{all}, 1,
+ }
+}
+
 1;
 __END__

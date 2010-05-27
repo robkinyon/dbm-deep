@@ -261,6 +261,12 @@ sub write_value {
             DBM::Deep->_throw_error( "Cannot store something that is tied." );
         }
 
+        if ( ref $value eq 'DBM::Deep::Null' ) {
+            DBM::Deep::_warnif(
+             'uninitialized', 'Assignment of stale reference'
+            );
+        }
+
         $class = 'DBM::Deep::Sector::DBI::Scalar';
         $type  = 'S';
     }

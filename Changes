@@ -1,5 +1,13 @@
 Revision history for DBM::Deep (ordered by revision number).
 
+1.0024 May 30 ??:??:00 2010 PDT
+    (This version is compatible with 1.0023)
+    - If you assign a stale reference to a database location,
+      DBM::Deep now warns and assigns undef, instead of dying with
+      obscure error messages.
+    - Using a stale reference as a hash or array ref now causes an
+      error with a more helpful message.
+
 1.0023 May 9 14:33:00 2010 PDT
     (This version is compatible with 1.0022)
     - The DBI back end no longer dies with ‘Use of uninitialized value

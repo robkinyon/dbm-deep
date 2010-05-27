@@ -2,6 +2,10 @@ Revision history for DBM::Deep (ordered by revision number).
 
 1.0024 May 30 ??:??:00 2010 PDT
     (This version is compatible with 1.0023)
+    - Stale references (objects blessed into DBM::Deep::Null), which
+      have always supposed to act like undef, now compare equal to
+      undef, "" and 0. $stale_ref eq "" used to return false, even
+      though "$stale_ref" was the empty string.
     - If you assign a stale reference to a database location,
       DBM::Deep now warns and assigns undef, instead of dying with
       obscure error messages.

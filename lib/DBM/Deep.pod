@@ -1085,6 +1085,11 @@ reading the data:
   my %hash = %{ $db->{some_hash} };
   $db->unlock;
 
+As of version 1.0024, if you assign a stale reference to a location
+in the database, DBM::Deep will warn, if you have uninitialized warnings
+enabled, and treat the stale reference as C<undef>. An attempt to use a
+stale reference as an array or hash reference will cause an error.
+
 =head2 Large Arrays
 
 Beware of using C<shift()>, C<unshift()> or C<splice()> with large arrays.

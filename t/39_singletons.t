@@ -51,6 +51,13 @@ while ( my $dbm_maker = $dbm_factory->() ) {
         $db->{stext} = $x;     my($file,$line) = (__FILE__,__LINE__);
         is $w, "Assignment of stale reference at $file line $line.\n",
           'assigning a stale reference back to the DB warns';
+        {
+            no warnings 'uninitialized';
+            $w = undef;
+            $db->{stext} = $x;
+            is $w, undef,
+	      'stale ref assignment warnings can be suppressed';
+        }
 
 	eval {                   $line = __LINE__+1;
           () = $x->{stit};

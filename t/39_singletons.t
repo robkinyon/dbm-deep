@@ -80,8 +80,8 @@ while ( my $dbm_maker = $dbm_factory->() ) {
           () = $x->[28];
         };
         like $@,
-          qr/^Can't use a stale reference as an ARRAY at $file line (?x:
-             )$line\.?\n\z/,
+          qr/^Can't use a stale reference as an ARRAY at \Q$file\E line(?x:
+             ) $line\.?\n\z/,
           'Using a stale reference as an array dies';
     }
 }

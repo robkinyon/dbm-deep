@@ -1,5 +1,9 @@
 Revision history for DBM::Deep (ordered by revision number).
 
+1.0025 Jun 6 12:46:00 2010 PDT
+    (This version is compatible with 1.0024)
+    - Fixed t/39_singletons.t to work on Windows.
+
 1.0024 May 30 14:25:00 2010 PDT
     (This version is compatible with 1.0023)
     - Stale references (objects blessed into DBM::Deep::Null), which

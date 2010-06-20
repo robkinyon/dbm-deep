@@ -1,6 +1,21 @@
 Revision history for DBM::Deep (ordered by revision number).
 
-???
+1.9999_01
+    (This is the first developer release for 2.0000.)
+    - THIS VERSION CHANGES THE FILE FORMAT.
+        - Databases from DBM::Deep 1.x can still be opened.
+        - Newly-created databases automatically use the version 2.x
+          format (numbered 4 internally), which version 1.x
+          cannot open.
+        - The optimize method, since it copies everything to a new
+          database, upgrades it.
+    - Support for perl 5.6 has been dropped. We now require 5.8. 5.6
+      users can still use version 1.0025. If anyone really needs 5.6
+      support in version 2.x, we can add it back again, but would pre-
+      fer not to. Bug fixes may be back-ported to 1.002x if requested.
+    - The File back end now supports Unicode. This is only supported
+      for new databases. Old databases in the DBM::Deep 1 format will
+      have to be upgraded for this to work.
     - New external_refs mode, which allows objects retrieved from the
       database to hang on to the corresponding database entries, keep-
       ing them alive, even after all references to them from the data-

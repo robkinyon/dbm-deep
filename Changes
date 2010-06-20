@@ -1,5 +1,17 @@
 Revision history for DBM::Deep (ordered by revision number).
 
+???
+    - New external_refs mode, which allows objects retrieved from the
+      database to hang on to the corresponding database entries, keep-
+      ing them alive, even after all references to them from the data-
+      base itself have been deleted.
+    - Numeric comparison of DBM::Deep objects now works. Different
+      objects used to compare equal. And there were uninitial-
+      ized warnings.
+    - Deletions now work properly in the DBI back end. Deleting an
+      array or hash referenced by two keys in the database used to
+      be a no-op.
+
 1.0025 Jun 6 12:46:00 2010 PDT
     (This version is compatible with 1.0024)
     - Fixed t/39_singletons.t to work on Windows.

@@ -1,6 +1,6 @@
 package DBM::Deep::Engine;
 
-use 5.006_000;
+use 5.008_000;
 
 use strict;
 use warnings FATAL => 'all';

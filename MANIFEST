@@ -84,6 +84,8 @@ t/52_memory_leak.t
 t/53_misc_transactions.t
 t/54_output_punct_vars.t
 t/55_recursion.t
+t/56_unicode.t
+t/57_old_db.t
 t/96_virtual_functions.t
 t/97_dump_file.t
 t/98_pod.t

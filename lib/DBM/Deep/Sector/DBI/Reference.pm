@@ -90,6 +90,12 @@ sub delete_key {
     my $data;
     if ( $old_value ) {
         $data = $old_value->data({ export => 1 });
+
+        $self->engine->storage->delete_from(
+            'datas',
+             { ref_id => $self->offset,
+               key => $args->{key},  },
+        );
         $old_value->free;
     }
 

@@ -23,6 +23,13 @@ while ( my $dbm_maker = $dbm_factory->() ) {
         ok(!$@, "No eval failure after ${x}th iteration");
         $x++;
     }
+
+    $$db{foo} = [];
+    $$db{bar} = $$db{foo};
+    delete $$db{foo};
+    is $$db{foo}, undef,
+     'deleting a key containing a reference that two keys point two works';
+
 }
 
 done_testing;

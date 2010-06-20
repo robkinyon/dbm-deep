@@ -320,6 +320,37 @@ This uses 8-byte offsets, allowing for a maximum file size of 16 XB
 
 See L</LARGEFILE SUPPORT> for more information.
 
+=item * external_refs
+
+This is a boolean option. When enabled, it allows external references to
+database entries to hold on to those entries, even when they are deleted.
+
+To illustrate, if you retrieve a hash (or array) reference from the
+database,
+
+  $foo_hash = $db->{foo};
+
+the hash reference is still tied to the database. So if you
+
+  delete $db->{foo};
+
+C<$foo_hash> will point to a location in the DB that is no longer valid (we
+call this a stale reference). So if you try to retrieve the data from
+C<$foo_hash>,
+
+  for(keys %$foo_hash) {
+
+you will get an error.
+
+The C<external_refs> option causes C<$foo_hash> to 'hang on' to the
+DB entry, so it will not be deleted from the database if there is still a
+reference to it in a running program. It will be deleted, instead, when the
+C<$foo_hash> variable no longer exists, or is overwritten.
+
+This has the potential to cause database bloat if your program crashes, so
+it is not enabled by default. (See also the L</export> method for an
+alternative workaround.)
+
 =back
 
 =head1 TIE INTERFACE

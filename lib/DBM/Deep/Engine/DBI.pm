@@ -23,6 +23,7 @@ sub new {
 
     my $self = bless {
         storage => undef,
+        external_refs => undef,
     }, $class;
 
     # Grab the parameters we want to use

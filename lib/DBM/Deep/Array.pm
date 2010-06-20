@@ -16,7 +16,15 @@ use base 'DBM::Deep';
 use Scalar::Util ();
 
 sub _get_self {
-    eval { local $SIG{'__DIE__'}; tied( @{$_[0]} ) } || $_[0]
+    # We used to have
+    #  eval { local $SIG{'__DIE__'}; tied( @{$_[0]} ) } || $_[0]
+    # but this does not always work during global destruction (DBM::Deep’s
+    # destructor calls this method), but will return $_[0] even when $_[0]
+    # is tied, if it’s tied to undef. In those cases it’s better to return
+    # undef, so the destructor can tell not to do anything,  and,  if any-
+    # thing else calls us, it will fail with a more helpful error message.
+
+    Scalar::Util::reftype $_[0] eq 'ARRAY' ? tied @{$_[0]} : $_[0];
 }
 
 sub _repr { [] }

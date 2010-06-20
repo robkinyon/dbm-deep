@@ -7,6 +7,8 @@ use warnings FATAL => 'all';
 
 use base 'DBM::Deep::Sector::DBI';
 
+use Scalar::Util;
+
 sub table { 'refs' }
 
 sub _init {
@@ -119,17 +121,25 @@ sub data {
     $args ||= {};
 
     my $engine = $self->engine;
-    if ( !exists $engine->cache->{ $self->offset } ) {
-        my $obj = DBM::Deep->new({
+    my $cache = $engine->cache;
+    my $off = $self->offset;
+    my $obj;
+    if ( !defined $cache->{ $off } ) {
+        $obj = DBM::Deep->new({
             type        => $self->type,
             base_offset => $self->offset,
             storage     => $engine->storage,
             engine      => $engine,
         });
 
-        $engine->cache->{$self->offset} = $obj;
+        $cache->{$off} = $obj;
+        if($engine->{external_refs}) {
+            Scalar::Util::weaken($cache->{$off});
+        }
     }
-    my $obj = $engine->cache->{$self->offset};
+    else {
+        $obj = $cache->{$off};
+    }
 
     # We're not exporting, so just return.
     unless ( $args->{export} ) {
@@ -158,16 +168,21 @@ sub free {
     return if $self->decrement_refcount > 0;
 
     # Rebless the object into DBM::Deep::Null.
-    eval { %{ $self->engine->cache->{ $self->offset } } = (); };
-    eval { @{ $self->engine->cache->{ $self->offset } } = (); };
-    bless $self->engine->cache->{ $self->offset }, 'DBM::Deep::Null';
-    delete $self->engine->cache->{ $self->offset };
+    # In external_refs mode, this will already have been removed from
+    # the cache, so we can skip this.
+    my $e  = $self->engine;
+    if(!$e->{external_refs}) {
+        eval { %{ $e->cache->{ $self->offset } } = (); };
+        eval { @{ $e->cache->{ $self->offset } } = (); };
+        bless $e->cache->{ $self->offset }, 'DBM::Deep::Null';
+        delete $e->cache->{ $self->offset };
+    }
 
-    $self->engine->storage->delete_from(
+    $e->storage->delete_from(
         'datas', { ref_id => $self->offset },
     );
 
-    $self->engine->storage->delete_from(
+    $e->storage->delete_from(
         'datas', { value => $self->offset, data_type => 'R' },
     );
 

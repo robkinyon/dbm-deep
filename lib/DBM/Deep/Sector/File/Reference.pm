@@ -7,6 +7,8 @@ use warnings FATAL => 'all';
 
 use base qw( DBM::Deep::Sector::File::Data );
 
+use Scalar::Util;
+
 my $STALE_SIZE = 2;
 
 # Please refer to the pack() documentation for further information
@@ -408,8 +410,11 @@ sub data {
     $args ||= {};
 
     my $engine = $self->engine;
-    if ( !exists $engine->cache->{ $self->offset }{ $engine->trans_id } ) {
-        my $obj = DBM::Deep->new({
+    my $cache_entry = $engine->cache->{ $self->offset } ||= {};
+    my $trans_id = $engine->trans_id;
+    my $obj;
+    if ( !defined $$cache_entry{ $trans_id } ) {
+        $obj = DBM::Deep->new({
             type        => $self->type,
             base_offset => $self->offset,
             staleness   => $self->staleness,
@@ -417,9 +422,14 @@ sub data {
             engine      => $engine,
         });
 
-        $engine->cache->{$self->offset}{ $engine->trans_id } = $obj;
+        $$cache_entry{ $trans_id } = $obj;
+        if($engine->{external_refs}) {
+            Scalar::Util::weaken($$cache_entry{ $trans_id });
+        }
     }
-    my $obj = $engine->cache->{$self->offset}{ $engine->trans_id };
+    else {
+        $obj = $$cache_entry{ $trans_id };
+    }
 
     # We're not exporting, so just return.
     unless ( $args->{export} ) {
@@ -450,14 +460,18 @@ sub free {
     my $e = $self->engine;
 
     # Rebless the object into DBM::Deep::Null.
+    # In external_refs mode, this will already have been removed from
+    # the cache, so we can skip this.
+    if(!$e->{external_refs}) {
 #    eval { %{ $e->cache->{ $self->offset }{ $e->trans_id } } = (); };
 #    eval { @{ $e->cache->{ $self->offset }{ $e->trans_id } } = (); };
-    my $cache = $e->cache;
-    my $off = $self->offset;
-    if(  exists $cache->{ $off }
-     and exists $cache->{ $off }{ my $trans_id = $e->trans_id } ) {
+      my $cache = $e->cache;
+      my $off = $self->offset;
+      if(  exists $cache->{ $off }
+       and exists $cache->{ $off }{ my $trans_id = $e->trans_id } ) {
         bless $cache->{ $off }{ $trans_id }, 'DBM::Deep::Null';
         delete $cache->{ $off }{ $trans_id };
+      }
     }
 
     my $blist_loc = $self->get_blist_loc;

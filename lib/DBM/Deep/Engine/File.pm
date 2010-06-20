@@ -76,6 +76,8 @@ sub new {
 
         entries => {}, # This is the list of entries for transactions
         storage => undef,
+
+        external_refs => undef,
     }, $class;
 
     # Never allow byte_size to be set directly.

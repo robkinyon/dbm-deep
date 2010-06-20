@@ -27,7 +27,7 @@ sub load {
     my $self = shift;
     my ($engine, $offset, $type) = @_;
 
-    if ( $type eq 'refs' ) {
+    if ( !defined $type || $type eq 'refs' ) {
         return DBM::Deep::Sector::DBI::Reference->new({
             engine => $engine,
             offset => $offset,

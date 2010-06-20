@@ -9,7 +9,12 @@ no warnings 'recursion';
 use base 'DBM::Deep';
 
 sub _get_self {
-    eval { local $SIG{'__DIE__'}; tied( %{$_[0]} ) } || $_[0]
+    # See the note in Array.pm as to why this is commented out.
+    # eval { local $SIG{'__DIE__'}; tied( %{$_[0]} ) } || $_[0]
+
+    # During global destruction %{$_[0]} might get tied to undef, so we
+    # need to check that case if tied returns false.
+    tied %{$_[0]} or local *@, eval { exists $_[0]{_}; 1 } ? $_[0] : undef
 }
 
 sub _repr { return {} }

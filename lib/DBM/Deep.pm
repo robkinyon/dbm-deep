@@ -10,10 +10,6 @@ our $VERSION = q(1.0025);
 
 use Scalar::Util ();
 
-use overload
-    '""' => sub { overload::StrVal( $_[0] ) },
-    fallback => 1;
-
 use constant DEBUG => 0;
 
 use DBM::Deep::Engine;

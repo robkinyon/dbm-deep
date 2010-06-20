@@ -32,7 +32,6 @@ sub free {
     return;
 }
 
-sub type { $_[0]{engine}->SIG_DATA }
 sub _init {
     my $self = shift;
 
@@ -44,6 +43,18 @@ sub _init {
         $self->{offset} = $engine->_request_data_sector( $self->size );
 
         my $data = delete $self->{data};
+        my $utf8 = do { no warnings 'utf8'; $data !~ /^[\0-\xff]*\z/ };
+        if($utf8){
+            if($engine->{v} < 4) {
+                DBM::Deep->_throw_error(
+                 "This database format version is too old for Unicode"
+                );
+            }
+            utf8::encode $data;
+            $self->{type} = $engine->SIG_UNIDATA;
+        }
+        else { $self->{type} = $engine->SIG_DATA; }
+
         my $dlen = length $data;
         my $continue = 1;
         my $curr_offset = $self->offset;
@@ -108,19 +119,22 @@ sub chain_loc {
 
 sub data {
     my $self = shift;
+    my $engine = $self->engine;
 
     my $data;
     while ( 1 ) {
         my $chain_loc = $self->chain_loc;
 
-        $data .= $self->engine->storage->read_at(
-            $self->offset + $self->base_size + $self->engine->byte_size + 1, $self->data_length,
+        $data .= $engine->storage->read_at(
+            $self->offset + $self->base_size + $engine->byte_size + 1, $self->data_length,
         );
 
         last unless $chain_loc;
 
-        $self = $self->engine->load_sector( $chain_loc );
+        $self = $engine->load_sector( $chain_loc );
     }
+
+    utf8::decode $data  if $self->type eq $engine->SIG_UNIDATA;
 
     return $data;
 }

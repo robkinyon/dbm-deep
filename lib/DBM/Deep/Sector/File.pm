@@ -85,7 +85,7 @@ sub load {
             offset => $offset,
         });
     }
-    elsif ( $type eq $engine->SIG_DATA ) {
+    elsif ( $type eq $engine->SIG_DATA || $type eq $engine->SIG_UNIDATA ) {
         return DBM::Deep::Sector::File::Scalar->new({
             engine => $engine,
             type   => $type,

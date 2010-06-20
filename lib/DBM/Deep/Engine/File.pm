@@ -24,6 +24,7 @@ sub SIG_FILE     () { 'DPDB' }
 sub SIG_HEADER   () { 'h'    }
 sub SIG_NULL     () { 'N'    }
 sub SIG_DATA     () { 'D'    }
+sub SIG_UNIDATA  () { 'U'    }
 sub SIG_INDEX    () { 'I'    }
 sub SIG_BLIST    () { 'B'    }
 sub SIG_FREE     () { 'F'    }
@@ -723,7 +724,8 @@ settings that set how the file is interpreted.
 
 {
     my $header_fixed = length( __PACKAGE__->SIG_FILE ) + 1 + 4 + 4;
-    my $this_file_version = 3;
+    my $this_file_version = 4;
+    my $min_file_version = 3;
 
     sub _write_file_header {
         my $self = shift;
@@ -759,6 +761,8 @@ settings that set how the file is interpreted.
         $self->set_trans_loc( $header_fixed + 4 );
         $self->set_chains_loc( $header_fixed + 4 + $bl + $STALE_SIZE * ($nt-1) );
 
+        $self->{v} = $this_file_version;
+
         return;
     }
 
@@ -782,13 +786,15 @@ settings that set how the file is interpreted.
             DBM::Deep->_throw_error( "Pre-1.00 file version found" );
         }
 
-        unless ( $file_version == $this_file_version ) {
+        if ( $file_version > $this_file_version
+          || $file_version < $min_file_version ) {
             $self->storage->close;
             DBM::Deep->_throw_error(
                 "Wrong file version found - " .  $file_version .
-                " - expected " . $this_file_version
+                " - expected $min_file_version to " . $this_file_version
             );
         }
+        $self->{v} = $file_version;
 
         my $buffer2 = $self->storage->read_at( undef, $size );
         my @values = unpack( 'C C C C', $buffer2 );
@@ -829,7 +835,9 @@ passed in and return the result.
 
 sub _apply_digest {
     my $self = shift;
-    return $self->{digest}->(@_);
+    my $victim = shift;
+    utf8::encode $victim if $self->{v} >= 4;
+    return $self->{digest}->($victim);
 }
 
 =head2 _add_free_blist_sector( $offset, $size )
@@ -1015,8 +1023,7 @@ sub supports {
     shift;
     my ($feature) = @_;
 
-    return 1 if $feature eq 'transactions';
-    return 1 if $feature eq 'singletons';
+    return 1 if $feature =~ /^(?:(?:transacti|singlet)ons|unicode)\z/;
     return;
 }
 
@@ -1106,7 +1113,7 @@ sub _dump_file {
         }
         else {
             $return .= sprintf "%08d: %s  %04d", $spot, $sector->type, $sector->size;
-            if ( $sector->type eq 'D' ) {
+            if ( $sector->type =~ /^[DU]\z/ ) {
                 $return .= ' ' . $sector->data;
             }
             elsif ( $sector->type eq 'A' || $sector->type eq 'H' ) {

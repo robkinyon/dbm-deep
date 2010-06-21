@@ -19,6 +19,16 @@ my $build = Module::Build->subclass(
 
             $self->SUPER::ACTION_test( @_ );
         }
+        sub ACTION_dist {
+            my $self = shift;
+            my $v = $self->dist_version;
+            system
+              $^X,
+             "-pi -le",
+             "\$_ = q<$v> if ?VVVVV?",
+             "lib/DBM/Deep.pod";
+            $self->SUPER::ACTION_dist( @_ );
+        }
     ',
 )->new(
     module_name => 'DBM::Deep',

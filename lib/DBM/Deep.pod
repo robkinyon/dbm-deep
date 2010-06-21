@@ -2,6 +2,10 @@
 
 DBM::Deep - A pure perl multi-level hash/array DBM that supports transactions
 
+=head1 VERSION
+
+VVVVV (placeholder for ./Build dist)
+
 =head1 SYNOPSIS
 
   use DBM::Deep;

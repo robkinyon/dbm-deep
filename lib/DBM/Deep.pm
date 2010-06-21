@@ -666,8 +666,8 @@ sub DESTROY {
 }
 
 # Relying on the destructor alone is problematic, as the order in which
-# objects are discarded is random in global destruction. So we run the
-# destructors preemptively before global destruction.
+# objects are discarded is random in global destruction. So we do the
+# clean-up here before preemptively before global destruction.
 END {
  defined $$_ and  $$_->_free, delete $$_->{engine}
    for(values %obj_cache);

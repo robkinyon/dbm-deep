@@ -25,7 +25,8 @@ my $build = Module::Build->subclass(
             system
               $^X,
              "-pi -le",
-             "\$_ = q<$v> if ?VVVVV?",
+              q"$line = $. if ?VERSION?; "
+                 . q"$_ = q<" . $v . q"> if $line && $. == $line+2",
              "lib/DBM/Deep.pod";
             $self->SUPER::ACTION_dist( @_ );
         }

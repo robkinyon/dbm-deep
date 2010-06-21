@@ -669,9 +669,6 @@ sub DESTROY {
 # objects are discarded is random in global destruction. So we run the
 # destructors preemptively before global destruction.
 END {
- # In this case, running the destructor explicitly is perfectly safe, as,
- # when it fires upon actual destruction, it will no longer reference
- # the engine.
  defined $$_ and  $$_->_free, delete $$_->{engine}
    for(values %obj_cache);
 }

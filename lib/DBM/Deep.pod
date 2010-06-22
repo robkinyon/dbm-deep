@@ -310,6 +310,10 @@ bookkeeping. (It's 4 + the number of bytes in your L</pack_size>.) This is
 included within the data_sector_size, thus the effective value is 6-10 bytes
 less than what you specified.
 
+B<Another note:> If your strings contain any characters beyond the byte
+range, they will be encoded as UTF-8 before being stored in the file. This
+will make all non-ASCII characters take up more than one byte each.
+
 =item * pack_size
 
 This is the size of the file pointer used throughout the file. The valid values

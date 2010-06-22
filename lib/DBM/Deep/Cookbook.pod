@@ -9,28 +9,32 @@ plus some examples of how to do common tasks.
 
 =head1 RECIPES
 
-=head2 UTF8 data
+=head2 Unicode data
 
-When you're using UTF8 data, you may run into the "Wide character in print"
-warning. To fix that in 5.8+, do the following:
+If possible, it is highly recommended that you upgrade your database to
+version 2 (using the F<utils/upgrade_db.pl> script in the CPAN
+distribution), in order to use Unicode.
+
+If your databases are still shared by perl installations with older
+DBM::Deep versions, you can use filters to encode strings on the fly:
 
   my $db = DBM::Deep->new( ... );
-  binmode $db->_fh, ":utf8";
+  my $encode_sub = sub { my $s = shift; utf8::encode($s); $s };
+  my $decode_sub = sub { my $s = shift; utf8::decode($s); $s };
+  $db->set_filter( 'store_value' => $encode_sub );
+  $db->set_filter( 'fetch_value' => $decode_sub );
+  $db->set_filter( 'store_key' => $encode_sub );
+  $db->set_filter( 'fetch_key' => $decode_sub );
 
-In 5.6, you will have to do the following:
-
-  my $db = DBM::Deep->new( ... );
-  $db->set_filter( 'store_value' => sub { pack "U0C*", unpack "C*", $_[0] } );
-  $db->set_filter( 'retrieve_value' => sub { pack "C*", unpack "U0C*", $_[0] } );
-
-In a future version, you will be able to specify C<utf8 =E<gt> 1> and
-L<DBM::Deep> will do these things for you.
+A previous version of this cookbook recommended using
+C<binmode $db-E<gt>_fh, ":utf8">, but that is I<not> a good idea, as it
+could easily corrupt the database.
 
 =head2 Real-time Encryption Example
 
 B<NOTE>: This is just an example of how to write a filter. This most
 definitely should B<NOT> be taken as a proper way to write a filter that does
-encryption.
+encryption. (Furthermore, it fails to take Unicode into account.)
 
 Here is a working example that uses the I<Crypt::Blowfish> module to
 do real-time encryption / decryption of keys & values with DBM::Deep Filters.
@@ -100,10 +104,14 @@ more on I<Compress::Zlib>.
   exit;
 
   sub my_compress {
-      return Compress::Zlib::memGzip( $_[0] ) ;
+      my $s = shift;
+      utf8::encode($s);
+      return Compress::Zlib::memGzip( $s ) ;
   }
   sub my_decompress {
-      return Compress::Zlib::memGunzip( $_[0] ) ;
+      my $s = Compress::Zlib::memGunzip( shift ) ;
+      utf8::decode($s);
+      return $s;
   }
 
 B<Note:> Filtering of keys only applies to hashes. Array "keys" are
@@ -123,6 +131,9 @@ and the length of the algorithm's hashes (in bytes) as the 'hash_size'
 parameter. Here is a working example that uses a 256-bit hash from the
 I<Digest::SHA256> module. Please see
 L<http://search.cpan.org/search?module=Digest::SHA256> for more information.
+
+The value passed to your digest function will be encoded as UTF-8 if the
+database is in version 2 format or higher.
 
   use DBM::Deep;
   use Digest::SHA256;
@@ -195,5 +206,10 @@ consider using the C<pack_size =E<gt> 'small'> option. This will instruct
 DBM::Deep to use 16bit addresses, meaning that the seek times will be less.
 
 =back
+
+=head1 SEE ALSO
+
+L<DBM::Deep(3)>, L<Digest::MD5(3)>, L<Digest::SHA256(3)>,
+L<Crypt::Blowfish(3)>, L<Compress::Zlib(3)>
 
 =cut

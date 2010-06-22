@@ -10,6 +10,7 @@ Revision history for DBM::Deep (ordered by revision number).
           cannot open.
         - The optimize method, since it copies everything to a new
           database, upgrades it.
+        - There is a new db_version method.
     - Support for perl 5.6 has been dropped. We now require 5.8. 5.6
       users can still use version 1.0025. If anyone really needs 5.6
       support in version 2.x, we can add it back again, but would pre-

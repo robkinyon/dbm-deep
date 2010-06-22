@@ -396,6 +396,10 @@ sub supports {
     return $self->_engine->supports( @_ );
 }
 
+sub db_version {
+    shift->_get_self->_engine->db_version;
+}
+
 #XXX Migrate this to the engine, where it really belongs and go through some
 # API - stop poking in the innards of someone else..
 {

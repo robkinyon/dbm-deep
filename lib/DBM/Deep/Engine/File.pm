@@ -1027,6 +1027,10 @@ sub supports {
     return;
 }
 
+sub db_version {
+    return $_[0]{v} == 3 ? '1.0003' : 2;
+}
+
 sub clear {
     my $self = shift;
     my $obj = shift;

@@ -786,12 +786,22 @@ settings that set how the file is interpreted.
             DBM::Deep->_throw_error( "Pre-1.00 file version found" );
         }
 
-        if ( $file_version > $this_file_version
-          || $file_version < $min_file_version ) {
+        if ( $file_version < $min_file_version ) {
             $self->storage->close;
             DBM::Deep->_throw_error(
-                "Wrong file version found - " .  $file_version .
-                " - expected $min_file_version to " . $this_file_version
+                "This file version is too old - "
+              . _guess_version($file_version) .
+                " - expected " . _guess_version($min_file_version)
+              . " to " . _guess_version($this_file_version)
+            );
+        }
+        if ( $file_version > $this_file_version ) {
+            $self->storage->close;
+            DBM::Deep->_throw_error(
+                "This file version is too new - probably "
+              . _guess_version($file_version) .
+                " - expected " . _guess_version($min_file_version)
+              . " to " . _guess_version($this_file_version)
             );
         }
         $self->{v} = $file_version;
@@ -823,6 +833,16 @@ settings that set how the file is interpreted.
         $self->set_chains_loc( $header_fixed + scalar(@values) + $bl + $STALE_SIZE * ($self->num_txns - 1) );
 
         return length($buffer) + length($buffer2);
+    }
+
+    sub _guess_version {
+        $_[0] == 4 and return  2;
+        $_[0] == 3 and return '1.0003';
+        $_[0] == 2 and return '1.00';
+        $_[0] == 1 and return '0.99';
+        $_[0] == 0 and return '0.91';
+
+        return $_[0]-2;
     }
 }
 

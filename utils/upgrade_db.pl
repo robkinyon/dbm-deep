@@ -19,6 +19,7 @@ my %headerver_to_module = (
   '0' => 'DBM::Deep::09830',
   '2' => 'DBM::Deep::10002', 
   '3' => 'DBM::Deep',
+  '4' => 'DBM::Deep',
 );
 
 my %is_dev = (
@@ -28,7 +29,7 @@ my %is_dev = (
 my %opts = (
   man => 0,
   help => 0,
-  version => '1.0014',
+  version => '2',
   autobless => 1,
 );
 GetOptions( \%opts,
@@ -71,7 +72,10 @@ my %db;
 
 {
   my $ver = $opts{version};
-  if ( $ver =~ /^1\.001[0-4]/ ) {
+  if ( $ver =~ /^2(?:\.|\z)/ ) {
+    $ver = 4;
+  }
+  elsif ( $ver =~ /^1\.001[0-4]/ ) {
     $ver = 3;
   }
   elsif ( $ver =~ /^1\.000[3-9]/ ) {
@@ -108,6 +112,13 @@ my %db;
     autobless => $opts{autobless},
   });
   $db{output}->lock;
+
+  # Hack to write a version 3 file:
+  if($ver == 3) {
+    my $engine = $db{output}->_engine;
+    $engine->{v} = 3;
+    $engine->storage->print_at( 5, pack('N',3) );
+  }
 }
 
 # Do the actual conversion. This is the code that compress uses.

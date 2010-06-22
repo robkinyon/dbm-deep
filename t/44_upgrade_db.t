@@ -22,7 +22,7 @@ BEGIN {
     }
 }
 
-plan tests => 302;
+plan tests => 351;
 
 use t::common qw( new_fh );
 use File::Spec;
@@ -75,7 +75,7 @@ my @output_versions = (
     '0.99_01', '0.99_02', '0.99_03', '0.99_04',
     '1.00', '1.000', '1.0000', '1.0001', '1.0002',
     '1.0003', '1.0004', '1.0005', '1.0006', '1.0007', '1.0008', '1.0009', '1.0010',
-    '1.0011', '1.0012', '1.0013', '1.0014',
+    '1.0011', '1.0012', '1.0013', '1.0014', '2.0000'
 );
 
 foreach my $input_filename (
@@ -131,10 +131,18 @@ foreach my $input_filename (
         die "'$input_filename' -> '$v' : $output\n" if $output;
 
         my $db;
-        if ( $v =~ /^1\.001[0-4]/ || $v =~ /^1\.000[3-9]/ ) {
+        my $db_version;
+        if ( $v =~ /^2(?:\.|\z)/ ) {
+            push @INC, 'lib';
+            eval "use DBM::Deep 1.9999"; die $@ if $@;
+            $db = DBM::Deep->new( $output_filename );
+            $db_version = 2;
+        }
+        elsif( $v =~ /^1\.001[0-4]/ || $v =~ /^1\.000[3-9]/ ) {
             push @INC, 'lib';
             eval "use DBM::Deep $v"; die $@ if $@;
             $db = DBM::Deep->new( $output_filename );
+            $db_version = '1.0003';
         }
         elsif ( $v =~ /^1\.000?[0-2]?/ ) {
             push @INC, File::Spec->catdir( 'utils', 'lib' );
@@ -157,6 +165,10 @@ foreach my $input_filename (
             { foo => [ 1 .. 3 ] },
             "We can read the output file",
         );
+
+        if($db_version) {
+            is $db->db_version, $db_version, "db_version is $db_version";
+        }
     }
 }
 

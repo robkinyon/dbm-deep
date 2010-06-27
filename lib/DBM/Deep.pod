@@ -4,7 +4,7 @@ DBM::Deep - A pure perl multi-level hash/array DBM that supports transactions
 
 =head1 VERSION
 
-VVVVV (placeholder for ./Build dist)
+1.9999_01
 
 =head1 SYNOPSIS
 
@@ -375,7 +375,7 @@ alternative workaround.)
 
 With DBM::Deep you can access your databases using Perl's standard hash/array
 syntax. Because all DBM::Deep objects are I<tied> to hashes or arrays, you can
-treat them as such (but see L</external_refs, above, and
+treat them as such (but see L</external_refs>, above, and
 C</Stale References>, below). DBM::Deep will intercept
 all reads/writes and direct them
 to the right place -- the DB file. This has nothing to do with the

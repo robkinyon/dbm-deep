@@ -2,6 +2,9 @@ NAME
     DBM::Deep - A pure perl multi-level hash/array DBM that supports
     transactions
 
+VERSION
+    1.9999_01
+
 SYNOPSIS
       use DBM::Deep;
       my $db = DBM::Deep->new( "foo.db" );
@@ -42,6 +45,12 @@ DESCRIPTION
     Unix, Mac OS X and Windows.
 
 VERSION DIFFERENCES
+    NOTE: 2.0000 introduces Unicode support in the File back end. This
+    necessitates a change in the file format. The version 1.0003 format is
+    still supported, though, so we have added a /db_version method. If you
+    are using a database in the old format, you will have to upgrade it to
+    get Unicode support.
+
     NOTE: 1.0020 introduces different engines which are backed by different
     types of storage. There is the original storage (called 'File') and a
     database storage (called 'DBI'). q.v. PLUGINS for more information.
@@ -91,6 +100,10 @@ PLUGINS
         the same DB file. This is an optional parameter, and defaults to 1
         (enabled). See LOCKING below for more.
 
+    When you open an existing database file, the version of the database
+    format will stay the same. But if you are creating a new file, it will
+    be in the latest format.
+
   DBI
     This is a storage engine that stores the data in a relational database.
     Funnily enough, this engine doesn't work with transactions (yet) as
@@ -111,9 +124,9 @@ PLUGINS
 
         These correspond to the 4 parameters DBI takes.
 
-    NOTE: This has only been tested with MySQL (with disappointing results).
-    I plan on extending this to work with SQLite and PostgreSQL in the next
-    release. Oracle, Sybase, and other engines will come later.
+    NOTE: This has only been tested with MySQL and SQLite (with
+    disappointing results). I plan on extending this to work with PostgreSQL
+    in the near future. Oracle, Sybase, and other engines will come later.
 
   Planned engines
     There are plans to extend this functionality to (at least) the
@@ -252,6 +265,11 @@ SETUP
         This is included within the data_sector_size, thus the effective
         value is 6-10 bytes less than what you specified.
 
+        Another note: If your strings contain any characters beyond the byte
+        range, they will be encoded as UTF-8 before being stored in the
+        file. This will make all non-ASCII characters take up more than one
+        byte each.
+
     * pack_size
         This is the size of the file pointer used throughout the file. The
         valid values are:
@@ -271,15 +289,47 @@ SETUP
 
         See LARGEFILE SUPPORT for more information.
 
+    * external_refs
+        This is a boolean option. When enabled, it allows external
+        references to database entries to hold on to those entries, even
+        when they are deleted.
+
+        To illustrate, if you retrieve a hash (or array) reference from the
+        database,
+
+          $foo_hash = $db->{foo};
+
+        the hash reference is still tied to the database. So if you
+
+          delete $db->{foo};
+
+        `$foo_hash' will point to a location in the DB that is no longer
+        valid (we call this a stale reference). So if you try to retrieve
+        the data from `$foo_hash',
+
+          for(keys %$foo_hash) {
+
+        you will get an error.
+
+        The `external_refs' option causes `$foo_hash' to 'hang on' to the DB
+        entry, so it will not be deleted from the database if there is still
+        a reference to it in a running program. It will be deleted, instead,
+        when the `$foo_hash' variable no longer exists, or is overwritten.
+
+        This has the potential to cause database bloat if your program
+        crashes, so it is not enabled by default. (See also the export
+        method for an alternative workaround.)
+
 TIE INTERFACE
     With DBM::Deep you can access your databases using Perl's standard
     hash/array syntax. Because all DBM::Deep objects are *tied* to hashes or
-    arrays, you can treat them as such. DBM::Deep will intercept all
-    reads/writes and direct them to the right place -- the DB file. This has
-    nothing to do with the TIE CONSTRUCTION section above. This simply tells
-    you how to use DBM::Deep using regular hashes and arrays, rather than
-    calling functions like `get()' and `put()' (although those work too). It
-    is entirely up to you how to want to access your databases.
+    arrays, you can treat them as such (but see external_refs, above, and
+    `/Stale References', below). DBM::Deep will intercept all reads/writes
+    and direct them to the right place -- the DB file. This has nothing to
+    do with the TIE CONSTRUCTION section above. This simply tells you how to
+    use DBM::Deep using regular hashes and arrays, rather than calling
+    functions like `get()' and `put()' (although those work too). It is
+    entirely up to you how to want to access your databases.
 
   Hashes
     You can treat any DBM::Deep object like a normal Perl hash reference.
@@ -382,11 +432,12 @@ OO INTERFACE
 
     * delete()
         Deletes one hash key/value pair or array element. Takes one
-        argument: the hash key or array index. Returns true on success,
-        false if not found. For arrays, the remaining elements located after
-        the deleted element are NOT moved over. The deleted element is
-        essentially just undefined, which is exactly how Perl's internal
-        arrays work.
+        argument: the hash key or array index. Returns the data that the
+        element used to contain (just like Perl's `delete' function), which
+        is `undef' if it did not exist. For arrays, the remaining elements
+        located after the deleted element are NOT moved over. The deleted
+        element is essentially just undefined, which is exactly how Perl's
+        internal arrays work.
 
           $db->delete("foo"); # for hashes
           $db->delete(1); # for arrays
@@ -407,6 +458,9 @@ OO INTERFACE
         that freespace just sits in the datafile unless `optimize()' is
         called.
 
+        `optimize' basically copies everything into a new database, so, if
+        it is in version 1.0003 format, it will be upgraded.
+
     * import()
         Unlike simple assignment, `import()' does not tie the right-hand
         side. Instead, a copy of your data is put into the DB. `import()'
@@ -423,10 +477,20 @@ OO INTERFACE
         information.
 
     * supports( $option )
-        This returns a boolean depending on if this instance of DBM::Dep
+        This returns a boolean indicating whether this instance of DBM::Deep
         supports that feature. `$option' can be one of:
 
         * transactions
+        * unicode
+
+    * db_version()
+        This returns the version of the database format that the current
+        database is in. This is specified as the earliest version of
+        DBM::Deep that supports it.
+
+        For the File back end, this will be 1.0003 or 2.
+
+        For the DBI back end, it is currently always 1.0020.
 
   Hashes
     For hashes, DBM::Deep supports all the common methods described above,
@@ -605,7 +669,7 @@ IMPORTING/EXPORTING
 
     This recursively imports the entire `$struct' object into `$db',
     including all nested hashes and arrays. If the DBM::Deep object contains
-    exsiting data, keys are merged with the existing ones, replacing if they
+    existing data, keys are merged with the existing ones, replacing if they
     already exist. The `import()' method can be called on any database level
     (not just the base level), and works with both hash and array DB types.
 
@@ -683,8 +747,8 @@ FILTERS
 
       # or...
 
-      $db->set_filter( "filter_store_value", \&my_filter_store );
-      $db->set_filter( "filter_fetch_value", \&my_filter_fetch );
+      $db->set_filter( "store_value", \&my_filter_store );
+      $db->set_filter( "fetch_value", \&my_filter_fetch );
 
     Your filter function will be called only when dealing with SCALAR keys
     or values. When nested hashes and arrays are being stored/fetched,
@@ -692,10 +756,10 @@ FILTERS
     single SCALAR argument, and expected to return a single SCALAR value. If
     you want to remove a filter, set the function reference to `undef':
 
-      $db->set_filter( "filter_store_value", undef );
+      $db->set_filter( "store_value", undef );
 
   Examples
-    Please read DBM::Deep::Manual for examples of filters.
+    Please read DBM::Deep::Cookbook for examples of filters.
 
 ERROR HANDLING
     Most DBM::Deep methods return a true value for success, and call die()
@@ -815,14 +879,16 @@ TRANSACTIONS
     the same method used by the InnoDB MySQL engine.
 
 MIGRATION
-    As of 1.0000, the file format has changed. Furthermore, DBM::Deep is now
-    designed to potentially change file format between point-releases, if
-    needed to support a requested feature. To aid in this, a migration
-    script is provided within the CPAN distribution called
-    `utils/upgrade_db.pl'.
+    As of 1.0000, the file format has changed. To aid in upgrades, a
+    migration script is provided within the CPAN distribution, called
+    utils/upgrade_db.pl.
 
     NOTE: This script is not installed onto your system because it carries a
     copy of every version prior to the current version.
+
+    As of version 2.0000, databases created by old versions back to 1.0003
+    can be read, but new features may not be available unless the database
+    is upgraded first.
 
 TODO
     The following are items that are planned to be added in future releases.
@@ -861,8 +927,9 @@ CAVEATS, ISSUES & BUGS
     This section describes all the known issues with DBM::Deep. These are
     issues that are either intractable or depend on some feature within Perl
     working exactly right. It you have found something that is not listed
-    below, please send an e-mail to rkinyon@cpan.org. Likewise, if you think
-    you know of a way around one of these issues, please let me know.
+    below, please send an e-mail to bug-DBM-Deep@rt.cpan.org. Likewise, if
+    you think you know of a way around one of these issues, please let me
+    know.
 
   References
     (The following assumes a high level of Perl understanding, specifically
@@ -1081,8 +1148,9 @@ CONTRIBUTORS
     transactions.
 
 SEE ALSO
-    perltie(1), Tie::Hash(3), Digest::MD5(3), Fcntl(3), flock(2), lockf(3),
-    nfs(5), Digest::SHA256(3), Crypt::Blowfish(3), Compress::Zlib(3)
+    DBM::Deep::Cookbook(3)
+
+    perltie(1), Tie::Hash(3), Fcntl(3), flock(2), lockf(3), nfs(5)
 
 LICENSE
     Copyright (c) 2007 Rob Kinyon. All Rights Reserved. This is free

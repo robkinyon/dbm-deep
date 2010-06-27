@@ -1,6 +1,6 @@
 Revision history for DBM::Deep (ordered by revision number).
 
-1.9999_01
+1.9999_01 Jun 27 14:22:00 2010 PDT
     (This is the first developer release for 2.0000.)
     - THIS VERSION CHANGES THE FILE FORMAT.
         - Databases from DBM::Deep 1.0003 and higher can still

@@ -376,7 +376,7 @@ alternative workaround.)
 With DBM::Deep you can access your databases using Perl's standard hash/array
 syntax. Because all DBM::Deep objects are I<tied> to hashes or arrays, you can
 treat them as such (but see L</external_refs>, above, and
-C</Stale References>, below). DBM::Deep will intercept
+L</Stale References>, below). DBM::Deep will intercept
 all reads/writes and direct them
 to the right place -- the DB file. This has nothing to do with the
 L</TIE CONSTRUCTION> section above. This simply tells you how to use DBM::Deep

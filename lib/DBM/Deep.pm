@@ -20,7 +20,7 @@ sub TYPE_ARRAY  () { DBM::Deep::Engine->SIG_ARRAY }
 my %obj_cache; # In external_refs mode, all objects are registered here,
                # and dealt with in the END block at the bottom.
 use constant HAVE_HUFH => scalar eval{ require Hash::Util::FieldHash };
-HAVE_HUFH and Hash::Util::FieldHash::fieldhash %obj_cache;
+HAVE_HUFH and Hash::Util::FieldHash::fieldhash(%obj_cache);
 
 # This is used in all the children of this class in their TIE<type> methods.
 sub _get_args {

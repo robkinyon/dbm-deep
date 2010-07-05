@@ -10,6 +10,9 @@ our $VERSION = q(1.9999_01);
 
 use Scalar::Util ();
 
+use overload
+    fallback => 1;
+
 use constant DEBUG => 0;
 
 use DBM::Deep::Engine;

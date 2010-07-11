@@ -3,7 +3,7 @@ NAME
     transactions
 
 VERSION
-    1.9999_01
+    1.9999_02
 
 SYNOPSIS
       use DBM::Deep;
@@ -324,9 +324,9 @@ TIE INTERFACE
     With DBM::Deep you can access your databases using Perl's standard
     hash/array syntax. Because all DBM::Deep objects are *tied* to hashes or
     arrays, you can treat them as such (but see external_refs, above, and
-    `/Stale References', below). DBM::Deep will intercept all reads/writes
-    and direct them to the right place -- the DB file. This has nothing to
-    do with the TIE CONSTRUCTION section above. This simply tells you how to
+    Stale References, below). DBM::Deep will intercept all reads/writes and
+    direct them to the right place -- the DB file. This has nothing to do
+    with the TIE CONSTRUCTION section above. This simply tells you how to
     use DBM::Deep using regular hashes and arrays, rather than calling
     functions like `get()' and `put()' (although those work too). It is
     entirely up to you how to want to access your databases.

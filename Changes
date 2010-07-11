@@ -1,5 +1,10 @@
 Revision history for DBM::Deep (ordered by revision number).
 
+1.9999_02 Jul 11 13:??:00 2010 PDT
+    (This is the second developer release for 2.0000.)
+    - Fixed a broken test
+    - Fixed compilation and overloading under perl 5.8.x
+
 1.9999_01 Jun 27 14:22:00 2010 PDT
     (This is the first developer release for 2.0000.)
     - THIS VERSION CHANGES THE FILE FORMAT.

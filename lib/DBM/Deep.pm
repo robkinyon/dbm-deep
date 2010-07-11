@@ -11,6 +11,10 @@ our $VERSION = q(1.9999_01);
 use Scalar::Util ();
 
 use overload
+   (
+    '""' =>
+    '0+' => sub { $_[0] },
+   )[0,2,1,2], # same sub for both
     fallback => 1;
 
 use constant DEBUG => 0;

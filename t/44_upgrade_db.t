@@ -14,7 +14,6 @@ BEGIN {
 
     my @failures;
     eval "use Pod::Usage 1.3;"; push @failures, 'Pod::Usage' if $@;
-    eval "use IO::Scalar;"; push @failures, 'IO::Scalar' if $@;
     eval "use FileHandle::Fmode;"; push @failures, 'FileHandle::Fmode' if $@;
     if ( @failures ) {
         my $missing = join ',', @failures;

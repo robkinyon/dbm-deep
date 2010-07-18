@@ -48,7 +48,6 @@ my $build = Module::Build->subclass(
         'Test::Warn'      => '0.08',
         'Test::More'      => '0.88', # done_testing
         'Test::Exception' => '0.21',
-        'IO::Scalar'      => '0.01',
     },
     create_makefile_pl => 'traditional',
     create_readme    =>  1,

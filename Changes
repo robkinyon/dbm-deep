@@ -6,6 +6,7 @@ Revision history for DBM::Deep (ordered by revision number).
       release. See 1.9999_01, below, for all the hype. 
     - Also, a memory leak caused by misuse of field hashes has
       been fixed.
+    - perl 5.8.4 is now required.
 
 1.9999_02 Jul 11 13:02:00 2010 PDT
     (This is the second developer release for 2.0000.)

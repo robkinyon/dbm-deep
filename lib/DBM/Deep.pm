@@ -129,7 +129,7 @@ sub _init {
         $sector->increment_refcount;
 
         Scalar::Util::weaken( my $feeble_ref = $self );
-        $obj_cache{ 0+$self } = \$feeble_ref;
+        $obj_cache{ $self } = \$feeble_ref;
 
         # Make sure this cache is not a memory hog
         if(!HAVE_HUFH) {

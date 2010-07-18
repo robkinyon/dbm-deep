@@ -1,6 +1,6 @@
 package DBM::Deep::Storage::DBI;
 
-use 5.008_000;
+use 5.008_004;
 
 use strict;
 use warnings FATAL => 'all';

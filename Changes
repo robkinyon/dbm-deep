@@ -1,5 +1,10 @@
 Revision history for DBM::Deep (ordered by revision number).
 
+2.0000 Aug 22 ??:??:00 2010 PDT
+    - Simply reading a hash or array element no longer causes autoviv-
+      ification. (Dereferencing it does still.) This makes DBM::Deep
+      comply with Perl’s behaviour (RT#60391).
+
 2.0000 Jul 18 14:30:00 2010 PDT
     - THIS VERSION IS NOT FULLY COMPATIBLE WITH 1.002x.
     - This version is practically identical to the previous dev

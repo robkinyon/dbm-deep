@@ -39,11 +39,8 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     ok( exists $db->{key2}, "exists() works against tied hash" );
 
     ok( !exists $db->{key4}, "exists() function works for keys that aren't there" );
-    is( $db->{key4}, undef, "Autovivified key4" );
-    ok( exists $db->{key4}, "Autovivified key4 now exists" );
-
-    delete $db->{key4};
-    ok( !exists $db->{key4}, "And key4 doesn't exists anymore" );
+    is( $db->{key4}, undef, "Nonexistent key4 is undef" );
+    ok( !exists $db->{key4}, "Simply reading key4 does not autovivify" );
 
     # Keys will be done via an iterator that keeps a breadcrumb trail of the last
     # key it provided. There will also be an "edit revision number" on the

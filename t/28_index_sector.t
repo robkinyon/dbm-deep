@@ -27,7 +27,8 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     cmp_ok( scalar(@keys), '==', 17, "Right number of keys returned" );
 
     ok( !exists $db->{does_not_exist}, "EXISTS works on large hashes for non-existent keys" );
-    is( $db->{does_not_exist}, undef, "autovivification works on large hashes" );
+    $db->{does_not_exist}{ling} = undef;
+    ok( $db->{does_not_exist}, "autovivification works on large hashes" );
     ok( exists $db->{does_not_exist}, "EXISTS works on large hashes for newly-existent keys" );
     cmp_ok( scalar(keys %$db), '==', 18, "Number of keys after autovivify is correct" );
 }

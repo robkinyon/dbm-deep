@@ -112,7 +112,7 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     # exists
     ##
     ok( $db->exists(1), "The 1st value exists" );
-    ok( $db->exists(0), "The 0th value doesn't exist" );
+    ok( !$db->exists(0), "The 0th value doesn't exist" );
     ok( !$db->exists(22), "The 22nd value doesn't exists" );
     ok( $db->exists(-1), "The -1st value does exists" );
     ok( !$db->exists(-22), "The -22nd value doesn't exists" );

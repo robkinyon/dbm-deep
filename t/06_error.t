@@ -137,4 +137,12 @@ use_ok( 'DBM::Deep' );
         )1\.0003 to \d/, "Fail if opening a file version 1";
 }
 
+{
+    # Make sure we get the right file name in the error message.
+    throws_ok {
+        eval "#line 1 gneen\nDBM::Deep->new( 't/etc/db-0-99_04' )"
+	 or die $@
+    } qr/ at gneen line 1\b/, "Line number in error message is correct";
+}
+
 done_testing;

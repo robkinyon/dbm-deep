@@ -3,7 +3,7 @@ NAME
     transactions
 
 VERSION
-    2.0000
+    2.0001
 
 SYNOPSIS
       use DBM::Deep;

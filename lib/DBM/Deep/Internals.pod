@@ -7,6 +7,8 @@ DBM::Deep::Internals
 This document is out-of-date. It describes an intermediate file format used
 during the development from 0.983 to 1.0000. It will be rewritten soon.
 
+So far, the description of the header format has been updated.
+
 =head1 DESCRIPTION
 
 This is a document describing the internal workings of L<DBM::Deep>. It is
@@ -43,11 +45,24 @@ to handle datastructure-wide items, such as transactions.
 
 =head1 FILE LAYOUT
 
+This describes the 1.0003 and 2.0000 formats, which internally are numbered
+3 and 4, respectively. The internal numbers are used in this section. These
+two formats are almost identical.
+
 DBM::Deep uses a tagged file layout. Every section has a tag, a size, and then
 the data.
 
 =head2 File header
 
+The file header consists of two parts. The first part is a fixed length of
+13 bytes:
+
+  DBDP h VVVV SSSS
+  \  / |    \   \
+   \/  '---. \   '--- size of the second part of the header
+  file      \ '--- version
+ signature  tag
+  
 =over 4
 
 =item * File Signature
@@ -55,29 +70,77 @@ the data.
 The first four bytes are 'DPDB' in network byte order, signifying that this is
 a DBM::Deep file.
 
-=item * File tag/size
+=item * File tag
 
-This is the tagging of the file header. The file used by versions prior to
-1.00 had a different fifth byte, allowing the difference to the determined.
+A literal ASCII 'h', indicating that this is the header. The file used by
+versions prior to 1.00 had a different fifth byte, allowing the difference
+to be determined.
 
 =item * Version
 
 This is four bytes containing the file version. This lets the file format change over time.
+
+It is packed in network order, so version 4 is stored as "\0\0\0\cD".
+
+=item * Header size
+
+The size of the second part of the header, in bytes. This number is also
+packed in network order.
+
+=back
+
+The second part of the header is as follows:
+
+  S B S T T(TTTTTTTTT...) (SS SS SS SS ...)  (continued...)
+  | | | |              \       |
+  | | | '----------.    \  staleness counters
+  | | '--------.    \  txn bitfield
+  | '------.    \  number of transactions
+ byte size  \  data sector size
+          max buckets
+
+ (continuation...)
+  BB(BBBBBB) DD(DDDDDD) II(IIIIII)
+      |        |            |
+      |    free data        |
+  free blist           free index
 
 =item * Constants
 
 These are the file-wide constants that determine how the file is laid out.
 They can only be set upon file creation.
 
+The byte size is the number of bytes used to point to an offset elsewhere
+in the file. This corresponds to the C<pack_size> option. This and the
+next three values are stored as packed 8-bit integers (chars), so 2 is
+represented by "\cB".
+
+C<max_buckets> and C<data_sector_size> are documented in the main
+L<DBM::Deep> man page. The number stored is actually one less than what is
+passed to the constructor, to allow for a range of 1-256.
+
+The number of transactions corresponds to the C<num_txns> value passed to
+the constructor.
+
 =item * Transaction information
 
-The current running transactions are stored here, as is the next transaction
-ID.
+The transaction bitfield consists of one bit for every available
+transaction ID. It is therefore anywhere from 1 byte to 32 bytes long.
+
+The staleness counters each take two bytes (packed 32-bit integers), one
+for each transaction, not including the so-called HEAD (the main
+transaction that all processes share I<before> calling C<begin_work>). So
+these take up 0 to 508 bytes.
+
+Staleness is explained in L<DBM::Deep::Engine|DBM::Deep::Engine/STALENESS>.
 
 =item * Freespace information
 
-Pointers into the next free sectors of the various sector sizes (Index,
-Bucketlist, and Data) are stored here.
+Pointers into the first free sectors of the various sector sizes (Index,
+Bucketlist, and Data) are stored here. These are called chains internally,
+as each free sector points to the next one.
+
+The number of bytes is determined by the byte size, ranging from 2 to 8.
 
 =back
 

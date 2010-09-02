@@ -426,7 +426,7 @@ sub begin_work {
 
     my @slots = $self->read_txn_slots;
     my $found;
-    for my $i ( 0 .. $#slots ) {
+    for my $i ( 0 .. $self->num_txns-2 ) {
         next if $slots[$i];
 
         $slots[$i] = 1;

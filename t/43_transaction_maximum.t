@@ -30,12 +30,15 @@ while ( my $dbm_maker = $dbm_factory->() ) {
          ),
          ()
         )
-    } 2 .. $max_txns;
-    if($reached_max) {
+    } 2 .. $max_txns-1; # -1 because the head is included in the number
+    if($reached_max) {  #  of transactions
         diag "This OS apparently can open only $max_txns files.";
     }
 
-    cmp_ok( scalar(@dbs), '==', $max_txns, "We could open enough DB handles" );
+    cmp_ok(
+      scalar(@dbs), '==', $max_txns-1,
+     "We could open enough DB handles"
+    );
 
     my %trans_ids;
     for my $n (0 .. $#dbs) {

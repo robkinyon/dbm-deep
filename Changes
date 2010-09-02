@@ -7,6 +7,8 @@ Revision history for DBM::Deep (ordered by revision number).
       tion exceeds the number the file was created to support. Some-
       times it would allow a few more transactions, and then proceed
       to corrupt the database (RT#60903).
+    - The description of the file header in DBM::Deep::Internals has
+      been brought up to date.
 
 2.0001 Aug 22 12:03:00 2010 PDT
     - Simply reading a hash or array element no longer causes autoviv-

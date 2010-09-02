@@ -105,6 +105,8 @@ The second part of the header is as follows:
       |    free data        |
   free blist           free index
 
+=over
+
 =item * Constants
 
 These are the file-wide constants that determine how the file is laid out.

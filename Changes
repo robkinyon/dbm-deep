@@ -1,6 +1,6 @@
 Revision history for DBM::Deep (ordered by revision number).
 
-2.0002 Sep 5 ??:??:00 2010 PDT
+2.0002 Sep 5 12:35:00 2010 PDT
     - Error messages from DBM::Deep now use the caller’s file name.
       They used incorrectly to use the name of the program ($0).
     - begin_work now checks correctly to see whether the new transac-

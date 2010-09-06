@@ -57,7 +57,7 @@ the data.
 The file header consists of two parts. The first part is a fixed length of
 13 bytes:
 
-  DBDP h VVVV SSSS
+  DPDB h VVVV SSSS
   \  / |    \   \
    \/  '---. \   '--- size of the second part of the header
   file      \ '--- version

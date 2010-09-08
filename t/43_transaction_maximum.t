@@ -26,7 +26,7 @@ while ( my $dbm_maker = $dbm_factory->() ) {
         # our test because of that.
         scalar(
          $@ =~ /Cannot sysopen file/ && (
-          $reached_max++ or $max_txns = $_ - 1
+          $reached_max++ or $max_txns = $_
          ),
          ()
         )

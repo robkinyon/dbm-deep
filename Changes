@@ -1,6 +1,6 @@
 Revision history for DBM::Deep (ordered by revision number).
 
-2.0003 Sep ?? ??:??:00 2010 PDT
+2.0003 Sep 12 12:02:00 2010 PDT
     - t/43_transaction_maximum.t has been fixed. It was broken in the
       previous release for systems that will only open so many files.
 

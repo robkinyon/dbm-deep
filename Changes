@@ -1,5 +1,8 @@
 Revision history for DBM::Deep (ordered by revision number).
 
+2.0004 Sep 12 18:38:00 2010 PDT
+    - t/27_filehandle.t has been fixed to work with Test::More 2.
+
 2.0003 Sep 12 12:02:00 2010 PDT
     - t/43_transaction_maximum.t has been fixed. It was broken in the
       previous release for systems that will only open so many files.

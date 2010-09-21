@@ -4,7 +4,7 @@ DBM::Deep - A pure perl multi-level hash/array DBM that supports transactions
 
 =head1 VERSION
 
-2.0000
+2.0004
 
 =head1 SYNOPSIS
 
@@ -281,8 +281,13 @@ from the values stored in the datafile's header.
 =item * num_txns
 
 This is the number of transactions that can be running at one time. The
-default is one - the HEAD. The minimum is one and the maximum is 255. The more
+default is one - the HEAD . The minimum is one and the maximum is 255. The more
 transactions, the larger and quicker the datafile grows.
+
+Simple access to a database, regardless of how many processes are doing it,
+already counts as one transaction (the HEAD). So, if you want, say, 5
+processes to be able to call begin_work at the same time, C<num_txns> must
+be at least 6.
 
 See L</TRANSACTIONS> below.
 

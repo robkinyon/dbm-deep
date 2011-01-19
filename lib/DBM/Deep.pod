@@ -281,7 +281,7 @@ from the values stored in the datafile's header.
 =item * num_txns
 
 This is the number of transactions that can be running at one time. The
-default is one - the HEAD . The minimum is one and the maximum is 255. The more
+default is one - the HEAD. The minimum is one and the maximum is 255. The more
 transactions, the larger and quicker the datafile grows.
 
 Simple access to a database, regardless of how many processes are doing it,

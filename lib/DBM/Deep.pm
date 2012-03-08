@@ -6,7 +6,7 @@ use strict;
 use warnings FATAL => 'all';
 no warnings 'recursion';
 
-our $VERSION = q(2.0004);
+our $VERSION = q(2.0005);
 
 use Scalar::Util ();
 

@@ -20,3 +20,4 @@ cover_db
 ^articles
 ^t_attic
 ^.gitignore
+^MYMETA.yml$

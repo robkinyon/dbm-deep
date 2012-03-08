@@ -3,7 +3,7 @@ NAME
     transactions
 
 VERSION
-    2.0004
+    2.0005
 
 SYNOPSIS
       use DBM::Deep;
@@ -238,6 +238,11 @@ SETUP
         The default is one - the HEAD. The minimum is one and the maximum is
         255. The more transactions, the larger and quicker the datafile
         grows.
+
+        Simple access to a database, regardless of how many processes are
+        doing it, already counts as one transaction (the HEAD). So, if you
+        want, say, 5 processes to be able to call begin_work at the same
+        time, `num_txns' must be at least 6.
 
         See TRANSACTIONS below.
 

@@ -44,6 +44,7 @@ my $build = Module::Build->subclass(
         'File::Path'      => '0.01',
         'File::Temp'      => '0.01',
         'Pod::Usage'      => '1.3',
+        'Test::Builder'   => '0.13', # working current_test
         'Test::Deep'      => '0.095',
         'Test::Warn'      => '0.08',
         'Test::More'      => '0.88', # done_testing

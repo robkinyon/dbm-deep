@@ -62,10 +62,10 @@ use_ok( 'DBM::Deep' );
     print $fh <<"__END_FH__";
 use Test::More 'no_plan';
 Test::More->builder->no_ending(1);
-if(INC->{"Test/Builder2/History.pm"}) {
- Test::More->builder->{History}->counter->set($pre_fork_tests);
+for (scalar Test::More->builder) {
+ \$_->no_ending(1);
+ \$_->current_test($pre_fork_tests);
 }
-else { Test::More->builder->{Curr_Test} = $pre_fork_tests; }
 
 use_ok( 'DBM::Deep' );
 

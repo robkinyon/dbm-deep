@@ -1,6 +1,6 @@
 Revision history for DBM::Deep (ordered by revision number).
 
-2.0005 Mar 11 ??:??:00 2011 PST
+2.0005 Mar 25 13:05:00 2012 PDT
     - t/27_filehandle.t has been fixed again. It no longer violates
       Test::Builder’s encapsulation.
 

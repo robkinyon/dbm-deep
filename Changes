@@ -1,5 +1,9 @@
 Revision history for DBM::Deep (ordered by revision number).
 
+2.0006 Apr 1 ??:??:00 2012 PDT
+    - Er, try harder to get t/27_filehandle.t to work under TB2. The
+      extra ‘TAP version 13’ line was causing a TAP parse error.
+
 2.0005 Mar 25 13:05:00 2012 PDT
     - t/27_filehandle.t has been fixed again. It no longer violates
       Test::Builder’s encapsulation.

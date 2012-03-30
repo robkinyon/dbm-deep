@@ -60,19 +60,16 @@ use_ok( 'DBM::Deep' );
 
     print $fh "#!$^X\n";
     print $fh <<"__END_FH__";
-use Test::More 'no_plan';
-Test::More->builder->no_ending(1);
-for (scalar Test::More->builder) {
- \$_->no_ending(1);
- \$_->current_test($pre_fork_tests);
-}
+my \$t = $pre_fork_tests;
 
-use_ok( 'DBM::Deep' );
+print "not " unless eval { require DBM::Deep };
+print "ok ", ++\$t, " - use DBM::Deep\n";
 
 my \$db = DBM::Deep->new({
     fh => *DATA,
 });
-is(\$db->{x}, 'b', "and get at stuff in the database");
+print "not " unless \$db->{x} eq 'b';
+print "ok ", ++\$t, " - and get at stuff in the database\n";
 __END_FH__
 
     # The exec below prevents END blocks from doing this.

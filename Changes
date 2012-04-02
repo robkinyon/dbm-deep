@@ -1,6 +1,6 @@
 Revision history for DBM::Deep (ordered by revision number).
 
-2.0006 Apr 1 ??:??:00 2012 PDT
+2.0006 Apr 1 17:15:00 2012 PDT
     - Er, try harder to get t/27_filehandle.t to work under TB2. The
       extra ‘TAP version 13’ line was causing a TAP parse error.
 

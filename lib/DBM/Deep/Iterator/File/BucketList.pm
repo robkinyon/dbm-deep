@@ -7,7 +7,7 @@ use warnings FATAL => 'all';
 
 =head1 NAME
 
-DBM::Deep::Iterator::BucketList
+DBM::Deep::Iterator::BucketList - mediate between DBM::Deep::Iterator and DBM::Deep::Engine::Sector::BucketList
 
 =head1 PURPOSE
 

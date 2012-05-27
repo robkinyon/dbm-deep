@@ -7,7 +7,7 @@ use warnings FATAL => 'all';
 
 =head1 NAME
 
-DBM::Deep::Iterator::Index
+DBM::Deep::Iterator::Index - mediate between DBM::Deep::Iterator and DBM::Deep::Engine::Sector::Index
 
 =head1 PURPOSE
 

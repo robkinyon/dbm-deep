@@ -19,7 +19,7 @@ sub SIG_ARRAY    () { 'A' }
 
 =head1 NAME
 
-DBM::Deep::Engine
+DBM::Deep::Engine - mediate mapping between DBM::Deep objects and storage medium
 
 =head1 PURPOSE
 

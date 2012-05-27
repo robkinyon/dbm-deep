@@ -13,7 +13,7 @@ use base 'DBM::Deep::Storage';
 
 =head1 NAME
 
-DBM::Deep::Storage::File
+DBM::Deep::Storage::File - mediate low-level interaction with storage mechanism
 
 =head1 PURPOSE
 

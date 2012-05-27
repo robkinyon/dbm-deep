@@ -41,7 +41,7 @@ my %StP = (
 
 =head1 NAME
 
-DBM::Deep::Engine::File
+DBM::Deep::Engine::File - engine for use with DBM::Deep::Storage::File
 
 =head1 PURPOSE
 

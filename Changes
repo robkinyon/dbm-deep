@@ -1,5 +1,12 @@
 Revision history for DBM::Deep (ordered by revision number).
 
+2.0007 May 27 13:00:00 2012 PDT
+    - Include one-line descriptions of each POD page after the name.
+      Thanks to Yves Agostini for the patch and Gregor Herrmann for
+      submitting it (RT#76378).
+    - t/98_pod.t: Skip tests if Pod::Simple 3.21 is installed
+      (RT#77419).
+
 2.0006 Apr 1 17:15:00 2012 PDT
     - Er, try harder to get t/27_filehandle.t to work under TB2. The
       extra ‘TAP version 13’ line was causing a TAP parse error.

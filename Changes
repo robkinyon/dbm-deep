@@ -1,6 +1,6 @@
 Revision history for DBM::Deep (ordered by revision number).
 
-2.0007 May 27 13:00:00 2012 PDT
+2.0007 May 27 19:35:00 2012 PDT
     - Include one-line descriptions of each POD page after the name.
       Thanks to Yves Agostini for the patch and Gregor Herrmann for
       submitting it (RT#76378).

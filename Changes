@@ -1,6 +1,6 @@
 Revision history for DBM::Deep (ordered by revision number).
 
-2.0008 Jun 17 ???? 2012 PDT
+2.0008 Jun 17 13:00:00 2012 PDT
     - Arrays and hashes retrieved from a database no longer create
       circular references (RT#77746).
 

@@ -1,19 +1,42 @@
-# This was discussed here:
-# http://groups.google.com/group/DBM-Deep/browse_thread/thread/a6b8224ffec21bab
-# brought up by Alex Gallichotte
-
 use strict;
 use warnings FATAL => 'all';
 
 use Test::More;
 
-plan skip_all => "Need to figure out what platforms this runs on";
-
 use_ok( 'DBM::Deep' );
 
 use t::common qw( new_dbm );
 
+# RT #77746
 my $dbm_factory = new_dbm();
+while ( my $dbm_maker = $dbm_factory->() ) {
+    my $db = $dbm_maker->();
+
+    $db->{foo} = {};
+    my $data = $db->{foo};
+
+    use Scalar::Util 'weaken';
+    weaken $db;
+    weaken $data;
+
+    is $db, undef, 'no $db after weakening';
+    is $data, undef, 'hashes returned from db contain no circular refs';
+}
+    
+
+
+# This was discussed here:
+# http://groups.google.com/group/DBM-Deep/browse_thread/thread/a6b8224ffec21bab
+# brought up by Alex Gallichotte
+
+SKIP: {
+    skip "Need to figure out what platforms this runs on", 1;
+}
+
+done_testing;
+exit;
+
+$dbm_factory = new_dbm();
 while ( my $dbm_maker = $dbm_factory->() ) {
     my $db = $dbm_maker->();
 

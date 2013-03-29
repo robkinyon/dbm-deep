@@ -1,6 +1,6 @@
 package DBM::Deep::Engine::File;
 
-use 5.008_004;
+use 5.006;
 
 use strict;
 use warnings FATAL => 'all';
@@ -847,7 +847,7 @@ passed in and return the result.
 sub _apply_digest {
     my $self = shift;
     my $victim = shift;
-    utf8::encode $victim if $self->{v} >= 4;
+    utf8::encode $victim if $self->{v} >= 4 and $] > 5.008003;
     return $self->{digest}->($victim);
 }
 

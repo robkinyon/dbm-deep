@@ -33,6 +33,9 @@ Chains(I):
 00000545: D  0064 foo
 __END_DUMP__
 
+SKIP: {
+skip "5.6",1 if $] < 5.008004;
+
 $db->{ḟoo} = 'bār';
 
 is( $db->_dump_file, <<"__END_DUMP__", "Dump after Unicode assignment" );
@@ -49,5 +52,7 @@ Chains(I):
 00000609: U  0064 bār
 00000673: U  0064 ḟoo
 __END_DUMP__
+
+}
 
 done_testing;

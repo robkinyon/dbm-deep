@@ -68,7 +68,8 @@ while ( my $dbm_maker = $dbm_factory->() ) {
             is $w, undef,
               'stale ref assignment warnings can be suppressed';
         }
-
+      SKIP: {
+        skip "5.6", 2 if $] < 5.008004;
 	eval {                   $line = __LINE__+1;
           () = $x->{stit};
         };
@@ -83,6 +84,7 @@ while ( my $dbm_maker = $dbm_factory->() ) {
           qr/^Can't use a stale reference as an ARRAY at \Q$file\E line(?x:
              ) $line\.?\n\z/,
           'Using a stale reference as an array dies';
+      }
     }
 }
 

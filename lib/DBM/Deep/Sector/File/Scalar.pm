@@ -1,6 +1,6 @@
 package DBM::Deep::Sector::File::Scalar;
 
-use 5.008_004;
+use 5.006;
 
 use strict;
 use warnings FATAL => 'all';
@@ -44,7 +44,7 @@ sub _init {
 
         my $data = delete $self->{data};
         my $utf8 = do { no warnings 'utf8'; $data !~ /^[\0-\xff]*\z/ };
-        if($utf8){
+        if($utf8 and $] > 5.008003){
             if($engine->{v} < 4) {
                 DBM::Deep->_throw_error(
                  "This database format version is too old for Unicode"

@@ -244,7 +244,7 @@ sub PUSH {
 
     my $length = $self->FETCHSIZE();
 
-    while (my $content = shift @_) {
+    while (defined (my $content = shift @_)) {
         $self->STORE( $length, $content );
         $length++;
     }

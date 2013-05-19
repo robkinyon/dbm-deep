@@ -1275,6 +1275,8 @@ The following have contributed greatly to make DBM::Deep what it is today:
 
 =item * Dan Golden and others at YAPC::NA 2006 for helping me design through transactions.
 
+=item * James Stanley for bug fix
+
 =back
 
 =head1 SEE ALSO

@@ -138,6 +138,20 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     $db->clear;
 
     ##
+    # push with non-true values
+    ##
+    $db->push( 'foo', 0, 'bar', undef, 'baz', '', 'quux' );
+    is( $db->length, 7, "7-element push results in seven elements" );
+    is( $db->[0], 'foo', "First element is 'foo'" );
+    is( $db->[1], 0, "Second element is 0" );
+    is( $db->[2], 'bar', "Third element is 'bar'" );
+    is( $db->[3], undef, "Fourth element is undef" );
+    is( $db->[4], 'baz', "Fifth element is 'baz'" );
+    is( $db->[5], '', "Sixth element is ''" );
+    is( $db->[6], 'quux', "Seventh element is 'quux'" );
+    $db->clear;
+
+    ##
     # multi-push
     ##
     $db->push( 'elem first', "elem middle", "elem last" );

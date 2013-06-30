@@ -104,3 +104,4 @@ etc/sqlite_tables.sql
 utils/lib/DBM/Deep/09830.pm
 utils/lib/DBM/Deep/10002.pm
 utils/upgrade_db.pl
+META.json

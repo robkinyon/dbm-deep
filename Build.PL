@@ -72,6 +72,11 @@ my $build = Module::Build->subclass(
         },
     },
     meta_add => { no_index => { directory => [ 'utils' ] } },
+    meta_merge => {
+        resources => {
+            repository => 'https://github.com/robkinyon/dbm-deep',
+        }
+    },
 );
 
 if ( $build->y_n( "Run the long-running tests", 'n' ) ) {

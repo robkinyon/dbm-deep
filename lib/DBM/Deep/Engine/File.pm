@@ -808,7 +808,7 @@ settings that set how the file is interpreted.
         #XXX Add warnings if values weren't set right
         @{$self}{qw(byte_size max_buckets data_sector_size num_txns)} = @values;
 
-        # These shenangians are to allow a 256 within a C
+        # These shenanigans are to allow a 256 within a C
         $self->{max_buckets} += 1;
         $self->{data_sector_size} += 1;
 
@@ -839,7 +839,7 @@ settings that set how the file is interpreted.
 
 =head2 _apply_digest( @stuff )
 
-This will apply the digest methd (default to Digest::MD5::md5) to the arguments
+This will apply the digest method (default to Digest::MD5::md5) to the arguments
 passed in and return the result.
 
 =cut

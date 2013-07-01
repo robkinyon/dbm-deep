@@ -361,7 +361,7 @@ sub optimize {
     # q.v. perlport for more information on this variable
     if ( $^O eq 'MSWin32' || $^O eq 'cygwin' ) {
         ##
-        # Potential race condition when optmizing on Win32 with locking.
+        # Potential race condition when optimizing on Win32 with locking.
         # The Windows filesystem requires that the filehandle be closed
         # before it is overwritten with rename().  This could be redone
         # with a soft copy.

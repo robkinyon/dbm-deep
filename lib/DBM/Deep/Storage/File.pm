@@ -147,7 +147,7 @@ sub size {
 
 This will set the inode value of the underlying file object.
 
-This is only needed to handle some obscure Win32 bugs. It reqlly shouldn't be
+This is only needed to handle some obscure Win32 bugs. It really shouldn't be
 needed outside this object.
 
 There is no return value.

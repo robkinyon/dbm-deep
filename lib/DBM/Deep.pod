@@ -910,7 +910,7 @@ you can call the C<_fh()> method, which returns the handle:
 
   my $fh = $db->_fh();
 
-This method can be called on the root level of the datbase, or any child
+This method can be called on the root level of the database, or any child
 hashes or arrays. All levels share a I<root> structure, which contains things
 like the filehandle, a reference counter, and all the options specified
 when you created the object. You can get access to this file object by
@@ -963,7 +963,7 @@ a future release by adding singleton support.
 
 =head1 TRANSACTIONS
 
-As of 1.0000, DBM::Deep hass ACID transactions. Every DBM::Deep object is completely
+As of 1.0000, DBM::Deep has ACID transactions. Every DBM::Deep object is completely
 transaction-ready - it is not an option you have to turn on. You do have to
 specify how many transactions may run simultaneously (q.v. L</num_txns>).
 
@@ -1261,7 +1261,7 @@ Originally written by Joseph Huckaby, L<jhuckaby@cpan.org>
 =head1 SPONSORS
 
 Stonehenge Consulting (L<http://www.stonehenge.com/>) sponsored the
-developement of transactions and freespace management, leading to the 1.0000
+development of transactions and freespace management, leading to the 1.0000
 release. A great debt of gratitude goes out to them for their continuing
 leadership in and support of the Perl community.
 

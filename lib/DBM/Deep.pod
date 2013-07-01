@@ -1277,6 +1277,8 @@ The following have contributed greatly to make DBM::Deep what it is today:
 
 =item * James Stanley for bug fix
 
+=item * David Steinbrunner for fixing typos and adding repository cpan metadata
+
 =back
 
 =head1 SEE ALSO

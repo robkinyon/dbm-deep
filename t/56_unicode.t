@@ -13,7 +13,7 @@ while ( my $dbm_maker = $dbm_factory->() ) {
 
     SKIP: {
        skip "This engine does not support Unicode", 1
-         unless $db->supports( 'unicode' );
+         if !$db->supports( 'unicode' ) or $] < 5.008004;
 
        my $quote
         = 'Ἐγένετο δὲ λόγῳ μὲν δημοκρατία, λόγῳ δὲ τοῦ πρώτου ἀνδρὸς ἀρχή.'

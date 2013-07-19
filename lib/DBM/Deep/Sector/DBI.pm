@@ -1,6 +1,6 @@
 package DBM::Deep::Sector::DBI;
 
-use 5.008_004;
+use 5.006;
 
 use strict;
 use warnings FATAL => 'all';

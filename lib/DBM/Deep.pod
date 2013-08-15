@@ -51,7 +51,7 @@ Windows.
 
 B<NOTE>: 2.0000 introduces Unicode support in the File back end. This
 necessitates a change in the file format. The version 1.0003 format is
-still supported, though, so we have added a L</db_version|db_version()>
+still supported, though, so we have added a L<db_version()|/db_version>
 method. If you are using a database in the old format, you will have to
 upgrade it to get Unicode support.
 

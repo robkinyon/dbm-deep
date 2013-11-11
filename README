@@ -3,7 +3,7 @@ NAME
     transactions
 
 VERSION
-    2.0009
+    2.0010
 
 SYNOPSIS
       use DBM::Deep;
@@ -47,7 +47,7 @@ DESCRIPTION
 VERSION DIFFERENCES
     NOTE: 2.0000 introduces Unicode support in the File back end. This
     necessitates a change in the file format. The version 1.0003 format is
-    still supported, though, so we have added a /db_version method. If you
+    still supported, though, so we have added a db_version() method. If you
     are using a database in the old format, you will have to upgrade it to
     get Unicode support.
 
@@ -860,11 +860,11 @@ LOW-LEVEL ACCESS
 
       my $fh = $db->_fh();
 
-    This method can be called on the root level of the datbase, or any child
-    hashes or arrays. All levels share a *root* structure, which contains
-    things like the filehandle, a reference counter, and all the options
-    specified when you created the object. You can get access to this file
-    object by calling the "_storage()" method.
+    This method can be called on the root level of the database, or any
+    child hashes or arrays. All levels share a *root* structure, which
+    contains things like the filehandle, a reference counter, and all the
+    options specified when you created the object. You can get access to
+    this file object by calling the "_storage()" method.
 
       my $file_obj = $db->_storage();
 
@@ -911,9 +911,9 @@ CIRCULAR REFERENCES
     in a future release by adding singleton support.
 
 TRANSACTIONS
-    As of 1.0000, DBM::Deep hass ACID transactions. Every DBM::Deep object
-    is completely transaction-ready - it is not an option you have to turn
-    on. You do have to specify how many transactions may run simultaneously
+    As of 1.0000, DBM::Deep has ACID transactions. Every DBM::Deep object is
+    completely transaction-ready - it is not an option you have to turn on.
+    You do have to specify how many transactions may run simultaneously
     (q.v. "num_txns").
 
     Three new methods have been added to support them. They are:
@@ -1195,7 +1195,7 @@ MAINTAINERS
 
 SPONSORS
     Stonehenge Consulting (<http://www.stonehenge.com/>) sponsored the
-    developement of transactions and freespace management, leading to the
+    development of transactions and freespace management, leading to the
     1.0000 release. A great debt of gratitude goes out to them for their
     continuing leadership in and support of the Perl community.
 
@@ -1209,6 +1209,9 @@ CONTRIBUTORS
         transactions.
 
     *   James Stanley for bug fix
+
+    *   David Steinbrunner for fixing typos and adding repository cpan
+        metadata
 
 SEE ALSO
     DBM::Deep::Cookbook(3)

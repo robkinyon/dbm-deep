@@ -1308,6 +1308,8 @@ The following have contributed greatly to make DBM::Deep what it is today:
 
 =item * David Steinbrunner for fixing typos and adding repository cpan metadata
 
+=item * H. Merijn Brandt for fixing the POD escapes.
+
 =back
 
 =head1 SEE ALSO
@@ -1319,7 +1321,7 @@ L<nfs(5)>
 
 =head1 LICENSE
 
-Copyright (c) 2007 Rob Kinyon. All Rights Reserved.
+Copyright (c) 2007-14 Rob Kinyon. All Rights Reserved.
 This is free software, you may use it and distribute it under the same terms
 as Perl itself.
 

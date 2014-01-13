@@ -3,7 +3,7 @@ NAME
     transactions
 
 VERSION
-    2.0010
+    2.0011
 
 SYNOPSIS
       use DBM::Deep;
@@ -160,7 +160,7 @@ SETUP
     This opens a new database handle, mapped to the file "foo.db". If this
     file does not exist, it will automatically be created. DB files are
     opened in "r+" (read/write) mode, and the type of object returned is a
-    hash, unless otherwise specified (see "OPTIONS" below).
+    hash, unless otherwise specified (see "Options" below).
 
     You can pass a number of options to the constructor to specify things
     like locking, autoflush, etc. This is done by passing an inline hash (or
@@ -175,7 +175,7 @@ SETUP
     Notice that the filename is now specified *inside* the hash with the
     "file" parameter, as opposed to being the sole argument to the
     constructor. This is required if any options are specified. See
-    "OPTIONS" below for the complete list.
+    "Options" below for the complete list.
 
     You can also start with an array instead of a hash. For this, you must
     specify the "type" parameter:
@@ -204,7 +204,7 @@ SETUP
       my $db = tie @array, "DBM::Deep", "bar.db";
 
     As with the OO constructor, you can replace the DB filename parameter
-    with a hash containing one or more options (see "OPTIONS" just below for
+    with a hash containing one or more options (see "Options" just below for
     the complete list).
 
       tie %hash, "DBM::Deep", {
@@ -354,7 +354,7 @@ TIE INTERFACE
     arrays, you can treat them as such (but see "external_refs", above, and
     "Stale References", below). DBM::Deep will intercept all reads/writes
     and direct them to the right place -- the DB file. This has nothing to
-    do with the "TIE CONSTRUCTION" section above. This simply tells you how
+    do with the "Tie Construction" section above. This simply tells you how
     to use DBM::Deep using regular hashes and arrays, rather than calling
     functions like "get()" and "put()" (although those work too). It is
     entirely up to you how to want to access your databases.
@@ -604,7 +604,7 @@ OO INTERFACE
         Fetches the first element in the array, deletes it, then shifts all
         the remaining elements over to take up the space. Returns the
         element value. This method is not recommended with large arrays --
-        see "LARGE ARRAYS" below for details.
+        see "Large Arrays" below for details.
 
           my $elem = $db->shift();
 
@@ -613,7 +613,7 @@ OO INTERFACE
         Inserts one or more elements onto the beginning of the array,
         shifting all existing elements over to make room. Accepts scalars,
         hash refs or array refs. No return value. This method is not
-        recommended with large arrays -- see <LARGE ARRAYS> below for
+        recommended with large arrays -- see <Large Arrays> below for
         details.
 
           $db->unshift("foo", "bar", {});
@@ -621,9 +621,9 @@ OO INTERFACE
     *   splice()
 
         Performs exactly like Perl's built-in function of the same name. See
-        "perldoc -f splice" for usage -- it is too complicated to document
-        here. This method is not recommended with large arrays -- see "LARGE
-        ARRAYS" below for details.
+        "splice" in perlfunc for usage -- it is too complicated to document
+        here. This method is not recommended with large arrays -- see "Large
+        Arrays" below for details.
 
     Here are some examples of using arrays:
 
@@ -663,7 +663,7 @@ LOCKING
     exclusive mode for writes, and shared mode for reads. This is required
     if you have multiple processes accessing the same database file, to
     avoid file corruption. Please note that "flock()" does NOT work for
-    files over NFS. See "DB OVER NFS" below for more.
+    files over NFS. See "DB over NFS" below for more.
 
   Explicit Locking
     You can explicitly lock a database, so it remains locked for multiple
@@ -984,9 +984,9 @@ CAVEATS, ISSUES & BUGS
     This section describes all the known issues with DBM::Deep. These are
     issues that are either intractable or depend on some feature within Perl
     working exactly right. It you have found something that is not listed
-    below, please send an e-mail to bug-DBM-Deep@rt.cpan.org. Likewise, if
-    you think you know of a way around one of these issues, please let me
-    know.
+    below, please send an e-mail to bug-DBM-Deep@rt.cpan.org
+    <mailto:bug-DBM-Deep@rt.cpan.org>. Likewise, if you think you know of a
+    way around one of these issues, please let me know.
 
   References
     (The following assumes a high level of Perl understanding, specifically
@@ -1184,14 +1184,16 @@ CODE COVERAGE
 MORE INFORMATION
     Check out the DBM::Deep Google Group at
     <http://groups.google.com/group/DBM-Deep> or send email to
-    DBM-Deep@googlegroups.com. You can also visit #dbm-deep on irc.perl.org
+    DBM-Deep@googlegroups.com <mailto:DBM-Deep@googlegroups.com>. You can
+    also visit #dbm-deep on irc.perl.org
 
     The source code repository is at <http://github.com/robkinyon/dbm-deep>
 
 MAINTAINERS
-    Rob Kinyon, rkinyon@cpan.org
+    Rob Kinyon, rkinyon@cpan.org <mailto:rkinyon@cpan.org>
 
     Originally written by Joseph Huckaby, jhuckaby@cpan.org
+    <mailto:jhuckaby@cpan.org>
 
 SPONSORS
     Stonehenge Consulting (<http://www.stonehenge.com/>) sponsored the
@@ -1213,13 +1215,15 @@ CONTRIBUTORS
     *   David Steinbrunner for fixing typos and adding repository cpan
         metadata
 
+    *   H. Merijn Brandt for fixing the POD escapes.
+
 SEE ALSO
     DBM::Deep::Cookbook(3)
 
     perltie(1), Tie::Hash(3), Fcntl(3), flock(2), lockf(3), nfs(5)
 
 LICENSE
-    Copyright (c) 2007 Rob Kinyon. All Rights Reserved. This is free
+    Copyright (c) 2007-14 Rob Kinyon. All Rights Reserved. This is free
     software, you may use it and distribute it under the same terms as Perl
     itself.
 

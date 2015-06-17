@@ -420,6 +420,10 @@ sub begin_work {
     my $self = shift;
     my ($obj) = @_;
 
+    unless ($self->supports('transactions')) {
+        DBM::Deep->_throw_error( "Cannot begin_work unless transactions are supported" );
+    }
+
     if ( $self->trans_id ) {
         DBM::Deep->_throw_error( "Cannot begin_work within an active transaction" );
     }
@@ -449,6 +453,10 @@ sub begin_work {
 sub rollback {
     my $self = shift;
     my ($obj) = @_;
+
+    unless ($self->supports('transactions')) {
+        DBM::Deep->_throw_error( "Cannot rollback unless transactions are supported" );
+    }
 
     if ( !$self->trans_id ) {
         DBM::Deep->_throw_error( "Cannot rollback without an active transaction" );
@@ -487,6 +495,10 @@ sub rollback {
 sub commit {
     my $self = shift;
     my ($obj) = @_;
+
+    unless ($self->supports('transactions')) {
+        DBM::Deep->_throw_error( "Cannot commit unless transactions are supported" );
+    }
 
     if ( !$self->trans_id ) {
         DBM::Deep->_throw_error( "Cannot commit without an active transaction" );
@@ -805,6 +817,10 @@ settings that set how the file is interpreted.
             DBM::Deep->_throw_error("Corrupted file - bad header");
         }
 
+        if ($values[3] != $self->{num_txns}) {
+            warn "num_txns ($self->{num_txns}) is different from the file ($values[3])\n";
+        }
+
         #XXX Add warnings if values weren't set right
         @{$self}{qw(byte_size max_buckets data_sector_size num_txns)} = @values;
 
@@ -1031,10 +1047,14 @@ sub chains_loc     { $_[0]{chains_loc} }
 sub set_chains_loc { $_[0]{chains_loc} = $_[1] }
 
 sub supports {
-    shift;
+    my $self = shift;
     my ($feature) = @_;
 
-    return 1 if $feature =~ /^(?:(?:transacti|singlet)ons|unicode)\z/;
+    if ( $feature eq 'transactions' ) {
+        return $self->num_txns > 1;
+    }
+    return 1 if $feature eq 'singletons';
+    return 1 if $feature eq 'unicode';
     return;
 }
 

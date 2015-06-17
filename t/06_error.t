@@ -145,14 +145,4 @@ use_ok( 'DBM::Deep' );
     } qr/ at gneen line 1\b/, "File name in error message is correct";
 }
 
-{
-    # Too many transactions.
-    my ($fh, $filename) = new_fh();
-
-    throws_ok {
-        new DBM::Deep $filename =>-> begin_work;
-    } qr/^DBM::Deep: Cannot allocate transaction ID at/,
-     "Error when starting transaction in database with only 1 txn";
-}
-
 done_testing;

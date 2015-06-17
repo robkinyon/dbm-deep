@@ -1,5 +1,8 @@
 Revision history for DBM::Deep (ordered by revision number).
 
+2.0012 Jun 17 20:30:00 2015 PDT
+    - Improved transaction validation and warnings (GH#12)
+
 2.0011 Jan 12 16:00:00 2013 PDT
     - POD fixes by H. Merijn Brandt (The X<> tag - Thanks!)
 

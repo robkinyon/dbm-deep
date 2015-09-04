@@ -1,6 +1,7 @@
 package DBM::Deep::Sector::File::Index;
 
 use strict;
+use warnings FATAL => 'all';
 
 use base qw( DBM::Deep::Sector::File );
 

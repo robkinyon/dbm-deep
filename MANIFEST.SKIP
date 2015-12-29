@@ -21,3 +21,4 @@ cover_db
 ^t_attic
 ^.git
 ^MYMETA.yml$
+^MYMETA\.json$

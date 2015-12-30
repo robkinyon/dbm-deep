@@ -19,5 +19,6 @@ cover_db
 ^__MACOSX
 ^articles
 ^t_attic
-^.gitignore
+^.git
 ^MYMETA.yml$
+^MYMETA\.json$

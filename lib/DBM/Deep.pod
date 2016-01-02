@@ -1310,6 +1310,8 @@ The following have contributed greatly to make DBM::Deep what it is today:
 
 =item * H. Merijn Brandt for fixing the POD escapes.
 
+=item * Breno G. de Oliveira for minor packaging tweaks
+
 =back
 
 =head1 SEE ALSO

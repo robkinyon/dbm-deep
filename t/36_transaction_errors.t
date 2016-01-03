@@ -17,11 +17,10 @@ while ( my $dbm_maker = $dbm_factory->() ) {
     my $db1 = $dbm_maker->();
     ok(!$db1->supports('transactions'), "num_txns<=1 means transactions is not supported");
     
-    my $todo;
+    local $TODO;
     if (ref $db1->_get_self->{engine} eq 'DBM::Deep::Engine::DBI') {
-        $todo = 'DBM transactions not yet implemented';
+        $TODO = 'DBM transactions not yet implemented';
     }
-    local $TODO = $todo;
 
     throws_ok {
         $db1->begin_work;

@@ -5,7 +5,8 @@ use Test::More;
 use Test::Deep;
 use Test::Exception;
 use Test::Warn;
-use t::common qw( new_dbm );
+use lib 't';
+use common qw( new_dbm );
 
 use_ok( 'DBM::Deep' );
 

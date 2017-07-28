@@ -1,0 +1,19 @@
+#!/bin/bash
+
+set -e
+
+if [[ $1 == "bash" ]]; then
+  /bin/bash
+  exit
+fi
+
+echo "Starting tests"
+if [[ $1 == "cover" ]]; then
+  shift
+  carton exec -- cover -delete
+  # Ignore the Carton-created library and ignore our test files.
+  HARNESS_PERL_SWITCHES=-MDevel::Cover=+inc,local/lib/perl5,+ignore,'^t/' carton exec -- prove "$@"
+  carton exec -- cover
+else
+  carton exec -- "$@"
+fi
